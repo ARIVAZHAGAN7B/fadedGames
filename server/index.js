@@ -3,12 +3,15 @@ import express from "express";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { registerSocketHandlers } from "./socket/index.js";
+import dotenv from "dotenv";
+
+// Load environment variables from .env file
+dotenv.config();
 
 const PORT = process.env.PORT || 4000;
-const defaultOrigins = ["http://localhost:5173", "http://127.0.0.1:5173"];
-const configuredOrigins = process.env.CLIENT_ORIGIN
-  ? process.env.CLIENT_ORIGIN.split(",").map((origin) => origin.trim())
-  : defaultOrigins;
+const configuredOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173,http://127.0.0.1:5173")
+  .split(",")
+  .map((origin) => origin.trim());
 
 const app = express();
 app.use(cors({ origin: configuredOrigins }));
