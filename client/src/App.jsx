@@ -403,6 +403,19 @@ export default function App() {
     return response;
   };
 
+  const handleHandCricketRequestChange = async () => {
+    const response = await emitWithAck("hand-cricket-request-change", {
+      roomCode: session.roomCode
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
   const handleRestartGame = async () => {
     const response = await emitWithAck("restart-game", {
       roomCode: session.roomCode
@@ -465,6 +478,7 @@ export default function App() {
         onPickNumber={handleHandCricketPickNumber}
         onChooseDecision={handleHandCricketDecision}
         onSelectTeamPlayer={handleHandCricketSelectPlayer}
+        onRequestTeamChange={handleHandCricketRequestChange}
         onRestartGame={handleRestartGame}
         onLeaveRoom={handleLeaveRoom}
       />
@@ -474,7 +488,7 @@ export default function App() {
   if (view === "game" && room && !room.gameEnded) {
     const expectedBoardSize = room.boardSize || getBoardSize(room.players.length);
     const expectedBoardCells = expectedBoardSize * expectedBoardSize;
-    
+
     if (board.length === expectedBoardCells) {
       return (
         <Game

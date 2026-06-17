@@ -12,6 +12,7 @@ import {
   listActiveRooms,
   markPlayerDisconnected,
   removePlayer,
+  requestHandCricketTeamChange,
   resumeSession,
   restartGame,
   resolveHandCricketCountdown,
@@ -606,6 +607,23 @@ export function registerSocketHandlers(io) {
           roomCode: payload?.roomCode || socket.data.roomCode,
           playerId: payload?.playerId,
           ready: payload?.ready
+        });
+
+        emitRoomUpdate(io, room);
+        scheduleHandCricketMove(io, room);
+        callbackSuccess(callback, {
+          room: serializeRoom(room)
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("hand-cricket-request-change", (payload, callback) => {
+      try {
+        const room = requestHandCricketTeamChange({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode
         });
 
         emitRoomUpdate(io, room);

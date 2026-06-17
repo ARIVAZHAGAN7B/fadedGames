@@ -537,6 +537,8 @@ function createHandCricketState(phase = "waiting", mode = "classic") {
     teamSelectionDeadlineAt: null,
     teamSelectionDurationMs: HAND_CRICKET_TEAM_SELECTION_SWITCH_MS,
     teamSelectionReason: null,
+    teamSelectionRequestedById: null,
+    teamSelectionActions: [],
     moveId: 0,
     moveStartedAt: null,
     moveDeadlineAt: null,
@@ -864,6 +866,7 @@ function clearHandCricketSelectionTimer(state) {
   state.teamSelectionStartedAt = null;
   state.teamSelectionDeadlineAt = null;
   state.teamSelectionReason = null;
+  state.teamSelectionRequestedById = null;
 }
 
 function clearHandCricketWaitingTimers(state) {
@@ -1077,20 +1080,6 @@ function setCurrentTeamPlayers(state) {
   setDefaultTeamBowler(state, getTeamBowlingOrder(state, state.bowlingTeam)[state.currentBowlerIndex]);
 }
 
-function rotateTeamBowler(state) {
-  if (state.mode !== "team") {
-    return;
-  }
-
-  const bowlingOrder = getTeamBowlingOrder(state, state.bowlingTeam);
-
-  if (bowlingOrder.length > 0) {
-    state.currentBowlerIndex = (state.currentBowlerIndex + 1) % bowlingOrder.length;
-  }
-
-  setCurrentTeamPlayers(state);
-}
-
 function switchHandCricketTeamInnings(state) {
   [state.battingTeam, state.bowlingTeam] = [state.bowlingTeam, state.battingTeam];
   state.currentBatsmanIndex = 0;
@@ -1101,18 +1090,25 @@ function switchHandCricketTeamInnings(state) {
 }
 
 function getHandCricketTeamSelectionDuration(reason) {
-  if (reason === "switch") {
-    return HAND_CRICKET_TEAM_SELECTION_SWITCH_MS;
+  if (reason === "change") {
+    return HAND_CRICKET_TEAM_SELECTION_START_MS;
   }
 
   if (reason === "wicket") {
     return HAND_CRICKET_TEAM_SELECTION_WICKET_MS;
   }
 
+  if (reason === "switch") {
+    return HAND_CRICKET_TEAM_SELECTION_SWITCH_MS;
+  }
+
   return HAND_CRICKET_TEAM_SELECTION_START_MS;
 }
 
-function beginHandCricketTeamSelection(state, { countdownRequired = false, reason = "switch" } = {}) {
+function beginHandCricketTeamSelection(
+  state,
+  { countdownRequired = false, reason = "switch", requestedById = null } = {}
+) {
   if (state.mode !== "team") {
     return;
   }
@@ -1142,6 +1138,8 @@ function beginHandCricketTeamSelection(state, { countdownRequired = false, reaso
   state.teamSelectionDeadlineAt = now + duration;
   state.teamSelectionDurationMs = duration;
   state.teamSelectionReason = reason;
+  state.teamSelectionRequestedById = requestedById;
+  state.teamSelectionActions = [];
 }
 
 function maybeStartHandCricketAfterTeamSelection(state) {
@@ -1164,6 +1162,19 @@ function maybeStartHandCricketAfterTeamSelection(state) {
   }
 
   return true;
+}
+
+function addHandCricketTeamSelectionAction(state, { captainId, playerId, role, team }) {
+  const action = {
+    id: `${Date.now()}:${captainId}:${playerId}:${role}`,
+    captainId,
+    playerId,
+    role,
+    team,
+    createdAt: Date.now()
+  };
+
+  state.teamSelectionActions = [...(state.teamSelectionActions || []), action].slice(-4);
 }
 
 function createVisiblePickMap(picks, reveal) {
@@ -1807,6 +1818,41 @@ export function chooseHandCricketDecision({ socketId, roomCode, decision }) {
   return room;
 }
 
+export function requestHandCricketTeamChange({ socketId, roomCode }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.handCricket;
+
+  if (room.gameType !== "hand-cricket" || !state || state.mode !== "team") {
+    throw new Error("Team Hand Cricket is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "innings") {
+    throw new Error("Changes can only be requested between active balls.");
+  }
+
+  const playerTeam = getHandCricketTeamKey(state, player.playerId);
+  const isActiveCaptain =
+    (playerTeam === state.battingTeam || playerTeam === state.bowlingTeam) &&
+    state.teams?.[playerTeam]?.captainId === player.playerId;
+
+  if (!isActiveCaptain) {
+    throw new Error("Only the active captains can request a change.");
+  }
+
+  beginHandCricketTeamSelection(state, {
+    reason: "change",
+    requestedById: player.playerId
+  });
+  touch(room);
+
+  return room;
+}
+
 function applyHandCricketDecision(room, player, decision) {
   const state = room.handCricket;
   const value = cleanTossDecision(decision);
@@ -1891,6 +1937,13 @@ export function selectHandCricketTeamPlayer({ socketId, roomCode, playerId: sele
     } else {
       setTeamBowler(state, requestedPlayerId);
     }
+
+    addHandCricketTeamSelectionAction(state, {
+      captainId: player.playerId,
+      playerId: requestedPlayerId,
+      role: isBattingCaptain ? "bat" : "bowl",
+      team: playerTeam
+    });
 
     if (selectionChanged) {
       state.teamSelectionReady[playerTeam] = false;
@@ -2033,8 +2086,11 @@ function completeHandCricketBall(room) {
       return;
     }
 
-    rotateTeamBowler(state);
-    beginHandCricketTeamSelection(state, { reason: isOut ? "wicket" : "switch" });
+    if (isOut) {
+      beginHandCricketTeamSelection(state, { reason: "wicket" });
+    } else {
+      beginHandCricketMove(state);
+    }
     return;
   }
 

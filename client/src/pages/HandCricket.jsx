@@ -1,4 +1,4 @@
-import { Check, Clock3, Copy, DoorOpen, Home, RotateCcw, Trophy } from "lucide-react";
+import { Check, Clock3, Copy, DoorOpen, Home, RefreshCw, RotateCcw, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buildRoomLink } from "../utils/roomLink.js";
 
@@ -274,6 +274,8 @@ function TeamPlayerSelection({ state, session, playersById, onSelect, secondsLef
   const availableBatsmen = getAvailableTeamBatsmen(state);
   const battingOrderCount = state.teams?.[battingTeam]?.battingOrder?.length || 0;
   const bowlingPlayers = state.teams?.[bowlingTeam]?.players || [];
+  const changeRequester = playersById[state.teamSelectionRequestedById];
+  const selectionActions = state.teamSelectionActions || [];
 
   const renderPlayerButton = (playerId, selected, disabled, tone = "bat") => {
     const player = playersById[playerId];
@@ -330,6 +332,41 @@ function TeamPlayerSelection({ state, session, playersById, onSelect, secondsLef
           style={{ width: `${timerProgress}%` }}
         />
       </div>
+
+      {state.teamSelectionReason === "change" && changeRequester ? (
+        <div className="mb-3 rounded-md border border-honey/70 bg-honey/20 px-3 py-2">
+          <p className="text-sm font-extrabold text-ink">
+            {changeRequester.name} opened change window
+          </p>
+        </div>
+      ) : null}
+
+      {selectionActions.length > 0 ? (
+        <div className="mb-3 grid gap-2">
+          {selectionActions.map((action) => {
+            const captain = playersById[action.captainId];
+            const selectedPlayer = playersById[action.playerId];
+            const roleLabel = action.role === "bat" ? "bat" : "bowl";
+            const message =
+              action.playerId === session.playerId
+                ? `${captain?.name || "Captain"} chose you to ${roleLabel}`
+                : `${captain?.name || "Captain"} chose ${selectedPlayer?.name || "a player"} to ${roleLabel}`;
+
+            return (
+              <p
+                key={action.id}
+                className={`rounded-md px-3 py-2 text-sm font-extrabold ${
+                  action.playerId === session.playerId
+                    ? "bg-mint text-white"
+                    : "bg-white text-ink/65"
+                }`}
+              >
+                {message}
+              </p>
+            );
+          })}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-md border border-ink/10 bg-paper p-3">
@@ -473,6 +510,7 @@ export default function HandCricket({
   onPickNumber,
   onChooseDecision,
   onSelectTeamPlayer,
+  onRequestTeamChange,
   onRestartGame,
   onLeaveRoom
 }) {
@@ -493,6 +531,8 @@ export default function HandCricket({
   const isCaptain = Boolean(myTeam && state.teams?.[myTeam]?.captainId === session.playerId);
   const lastBall = state.balls?.[state.balls.length - 1];
   const requiredRuns = getTeamRequiredRuns(state);
+  const changeRequester = playersById[state.teamSelectionRequestedById];
+  const changeWindowOpen = state.phase === "player-selection" && state.teamSelectionReason === "change";
   const myBallPicked = hasPick(state.currentBallPicks, session.playerId);
   const tossPlayerIds = Object.keys(state.tossPicks || {});
   const tossTotal = Object.values(state.tossPicks || {}).reduce((sum, value) => sum + Number(value), 0);
@@ -507,6 +547,7 @@ export default function HandCricket({
     state.phase === "innings" &&
     (session.playerId === state.battingPlayerId || session.playerId === state.bowlingPlayerId) &&
     !myBallPicked;
+  const canRequestTeamChange = isTeamMode && isCaptain && state.phase === "innings" && Boolean(lastBall);
   const canChooseToss = !isTeamMode || isCaptain;
   const myRole =
     session.playerId === state.battingPlayerId
@@ -683,6 +724,12 @@ export default function HandCricket({
 
   const handleSelectTeamPlayer = async (payload) => {
     const result = await runAction(() => onSelectTeamPlayer(payload));
+
+    return result;
+  };
+
+  const handleRequestTeamChange = async () => {
+    const result = await runAction(onRequestTeamChange);
 
     return result;
   };
@@ -965,12 +1012,31 @@ export default function HandCricket({
 
             {lastBall && state.phase !== "ball-reveal" ? (
               <section className="surface p-3">
-                <p className="text-xs font-extrabold uppercase text-ink/50">Last ball</p>
-                <p className="text-sm font-bold">
-                  {playersById[lastBall.battingPlayerId]?.name} {lastBall.batsmanNumber} vs{" "}
-                  {playersById[lastBall.bowlingPlayerId]?.name} {lastBall.bowlerNumber} -{" "}
-                  {lastBall.out ? "OUT" : `+${lastBall.runs} runs`}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-extrabold uppercase text-ink/50">Last ball</p>
+                    <p className="text-sm font-bold">
+                      {playersById[lastBall.battingPlayerId]?.name} {lastBall.batsmanNumber} vs{" "}
+                      {playersById[lastBall.bowlingPlayerId]?.name} {lastBall.bowlerNumber} -{" "}
+                      {lastBall.out ? "OUT" : `+${lastBall.runs} runs`}
+                    </p>
+                  </div>
+                  {canRequestTeamChange ? (
+                    <button
+                      type="button"
+                      className="compact-button bg-ink text-white hover:bg-ink/90"
+                      onClick={handleRequestTeamChange}
+                    >
+                      <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                      Change
+                    </button>
+                  ) : null}
+                </div>
+                {changeWindowOpen && changeRequester ? (
+                  <p className="mt-2 rounded-md bg-honey/25 px-3 py-2 text-sm font-extrabold text-ink">
+                    {changeRequester.name} opened change window
+                  </p>
+                ) : null}
               </section>
             ) : null}
 
