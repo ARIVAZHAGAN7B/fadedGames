@@ -18,12 +18,13 @@ const teamMeta = {
 };
 
 const tagMaps = {
-  grass: "Grass",
-  winter: "Winter",
-  desert: "Desert"
+  classic: "The Classic",
+  tower: "The Tower",
+  maze: "The Maze",
+  arena: "The Arena"
 };
 
-const tagRoundOptions = [60, 120, 180];
+const tagRoundOptions = [60, 90, 120];
 
 function TeamSetup({ room, session, onJoinTeam }) {
   const [status, setStatus] = useState("");
@@ -176,7 +177,7 @@ export default function Lobby({
   const [roomName, setRoomName] = useState(room.roomName);
   const [maxPlayers, setMaxPlayers] = useState(room.maxPlayers);
   const [teamMembers, setTeamMembers] = useState(room.handCricketTeamSize || 2);
-  const [tagMapId, setTagMapId] = useState(room.tag?.mapId || "grass");
+  const [tagMapId, setTagMapId] = useState(room.tag?.mapId || "classic");
   const [tagRoundSeconds, setTagRoundSeconds] = useState(room.tag?.roundSeconds || 60);
   const isHost = room.host === session.playerId;
   const isBingo = room.gameType === "bingo";
@@ -204,7 +205,7 @@ export default function Lobby({
     setRoomName(room.roomName);
     setMaxPlayers(room.maxPlayers);
     setTeamMembers(room.handCricketTeamSize || 2);
-    setTagMapId(room.tag?.mapId || "grass");
+    setTagMapId(room.tag?.mapId || "classic");
     setTagRoundSeconds(room.tag?.roundSeconds || 60);
   }, [room.handCricketTeamSize, room.maxPlayers, room.roomName, room.tag?.mapId, room.tag?.roundSeconds]);
 

@@ -21,124 +21,185 @@ const HAND_CRICKET_REVEAL_MS = 1000;
 const TAG_MIN_PLAYERS = 2;
 const TAG_MAX_PLAYERS = 4;
 const TAG_DEFAULT_ROUND_SECONDS = 60;
-const TAG_ROUND_SECONDS = new Set([60, 120, 180]);
+const TAG_ROUND_SECONDS = new Set([60, 90, 120, 180]);
 const TAG_WORLD_WIDTH = 2400;
 const TAG_WORLD_HEIGHT = 1200;
-const TAG_PLAYER_WIDTH = 30;
-const TAG_PLAYER_HEIGHT = 34;
-const TAG_GRAVITY = 1850;
-const TAG_JUMP_VELOCITY = -720;
-const TAG_BOUNCE_VELOCITY = -920;
+const TAG_PLAYER_WIDTH = 36;
+const TAG_PLAYER_HEIGHT = 42;
+const TAG_GRAVITY = 1350;
+const TAG_JUMP_VELOCITY = -680;
+const TAG_BOUNCE_VELOCITY = -1040;
 const TAG_RUN_SPEED = 330;
 const TAG_CHASER_SPEED = 350;
-const TAG_TAG_COOLDOWN_MS = 850;
-const TAG_TELEPORT_COOLDOWN_MS = 900;
+const TAG_ACCELERATION = 5200;
+const TAG_DECELERATION = 6200;
+const TAG_MAX_FALL_SPEED = 920;
+const TAG_COUNTDOWN_MS = 3000;
+const TAG_NEW_IT_COOLDOWN_MS = 500;
+const TAG_FREED_INVUL_MS = 1200;
+const TAG_SPAWN_INVUL_MS = 850;
+const TAG_BOUNCE_COOLDOWN_MS = 300;
+const TAG_TELEPORT_COOLDOWN_MS = 1200;
+const TAG_MIN_TAG_OVERLAP = 14;
+const TAG_FLASH_MS = 260;
 const SUPPORTED_GAME_TYPES = new Set(["bingo", "hand-cricket", "tag"]);
 const HAND_CRICKET_MODES = new Set(["classic", "team"]);
 const HAND_CRICKET_TEAMS = ["red", "blue"];
 const HAND_CRICKET_NUMBERS = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 const TAG_MAPS = {
-  grass: {
-    name: "Grass",
+  classic: {
+    name: "The Classic",
     spawnPoints: [
-      { x: 1110, y: 620 },
-      { x: 1285, y: 620 },
-      { x: 340, y: 520 },
-      { x: 2030, y: 900 }
+      { x: 500, y: 640 },
+      { x: 1900, y: 640 },
+      { x: 900, y: 1030 },
+      { x: 1500, y: 1030 }
     ],
     platforms: [
       { x: 1200, y: 1160, w: 2400, h: 34 },
-      { x: 370, y: 690, w: 740, h: 24 },
-      { x: 1500, y: 690, w: 940, h: 24 },
-      { x: 365, y: 500, w: 340, h: 24 },
-      { x: 760, y: 500, w: 700, h: 24 },
-      { x: 1650, y: 500, w: 720, h: 24 },
-      { x: 430, y: 275, w: 520, h: 24 },
-      { x: 1250, y: 365, w: 420, h: 24 },
-      { x: 1960, y: 230, w: 520, h: 24 },
-      { x: 1020, y: 850, w: 450, h: 24 },
-      { x: 1440, y: 790, w: 480, h: 24 },
-      { x: 2060, y: 790, w: 400, h: 24 },
-      { x: 1540, y: 1010, w: 820, h: 24 },
-      { x: 640, y: 1000, w: 360, h: 24 }
+      { x: 650, y: 770, w: 760, h: 24, oneWay: true },
+      { x: 1750, y: 770, w: 760, h: 24, oneWay: true },
+      { x: 520, y: 510, w: 420, h: 24, oneWay: true },
+      { x: 1200, y: 500, w: 520, h: 24, oneWay: true },
+      { x: 1880, y: 510, w: 420, h: 24, oneWay: true },
+      { x: 890, y: 930, w: 420, h: 24 },
+      { x: 1510, y: 930, w: 420, h: 24 }
     ],
     bouncePads: [
-      { x: 980, y: 818, w: 70, h: 14 },
-      { x: 2100, y: 758, w: 70, h: 14 },
-      { x: 470, y: 246, w: 70, h: 14 }
+      { x: 1200, y: 1125, w: 76, h: 14 },
+      { x: 320, y: 1125, w: 76, h: 14 },
+      { x: 2080, y: 1125, w: 76, h: 14 }
     ],
     teleporters: [
-      { id: "left", target: "right", x: 330, y: 246, w: 44, h: 64 },
-      { id: "right", target: "left", x: 2040, y: 758, w: 44, h: 64 }
+      { id: "left", target: "right", x: 280, y: 718, w: 48, h: 68 },
+      { id: "right", target: "left", x: 2120, y: 718, w: 48, h: 68 }
+    ],
+    launchers: [
+      { x: 1030, y: 1130, w: 66, h: 26, vx: -640, vy: -650 },
+      { x: 1370, y: 1130, w: 66, h: 26, vx: 640, vy: -650 }
+    ],
+    movingPlatforms: []
+  },
+  tower: {
+    name: "The Tower",
+    spawnPoints: [
+      { x: 450, y: 1030 },
+      { x: 1950, y: 1030 },
+      { x: 990, y: 850 },
+      { x: 1410, y: 850 }
+    ],
+    platforms: [
+      { x: 1200, y: 1160, w: 2400, h: 34 },
+      { x: 670, y: 920, w: 520, h: 24 },
+      { x: 1730, y: 920, w: 520, h: 24 },
+      { x: 900, y: 730, w: 460, h: 24, oneWay: true },
+      { x: 1500, y: 730, w: 460, h: 24, oneWay: true },
+      { x: 1110, y: 545, w: 390, h: 24, oneWay: true },
+      { x: 1290, y: 545, w: 390, h: 24, oneWay: true },
+      { x: 1200, y: 360, w: 420, h: 24, oneWay: true },
+      { x: 1200, y: 205, w: 310, h: 24 }
+    ],
+    bouncePads: [
+      { x: 370, y: 1125, w: 76, h: 14 },
+      { x: 2030, y: 1125, w: 76, h: 14 },
+      { x: 1200, y: 890, w: 76, h: 14 }
+    ],
+    teleporters: [
+      { id: "bottom", target: "top", x: 1200, y: 1120, w: 48, h: 68 },
+      { id: "top", target: "bottom", x: 1200, y: 165, w: 48, h: 68 }
+    ],
+    launchers: [
+      { x: 760, y: 890, w: 66, h: 26, vx: 700, vy: -590 },
+      { x: 1640, y: 890, w: 66, h: 26, vx: -700, vy: -590 }
+    ],
+    movingPlatforms: [
+      { x: 1200, y: 875, w: 300, h: 22, axis: "x", distance: 250, periodMs: 3200 }
     ]
   },
-  winter: {
-    name: "Winter",
+  maze: {
+    name: "The Maze",
     spawnPoints: [
-      { x: 1080, y: 620 },
-      { x: 1320, y: 620 },
-      { x: 360, y: 520 },
-      { x: 2040, y: 900 }
+      { x: 360, y: 1030 },
+      { x: 2040, y: 1030 },
+      { x: 610, y: 590 },
+      { x: 1790, y: 590 }
     ],
     platforms: [
       { x: 1200, y: 1160, w: 2400, h: 34 },
-      { x: 365, y: 690, w: 720, h: 24 },
-      { x: 1510, y: 690, w: 900, h: 24 },
-      { x: 360, y: 500, w: 410, h: 24 },
-      { x: 770, y: 500, w: 720, h: 24 },
-      { x: 1630, y: 500, w: 660, h: 24 },
-      { x: 625, y: 275, w: 520, h: 24 },
-      { x: 1300, y: 365, w: 420, h: 24 },
-      { x: 1920, y: 230, w: 500, h: 24 },
-      { x: 1040, y: 850, w: 430, h: 24 },
-      { x: 1460, y: 790, w: 480, h: 24 },
-      { x: 2060, y: 790, w: 400, h: 24 },
-      { x: 1540, y: 1010, w: 820, h: 24 }
+      { x: 360, y: 940, w: 440, h: 24 },
+      { x: 940, y: 940, w: 400, h: 24 },
+      { x: 1500, y: 940, w: 400, h: 24 },
+      { x: 2040, y: 940, w: 440, h: 24 },
+      { x: 620, y: 760, w: 390, h: 24, oneWay: true },
+      { x: 1200, y: 760, w: 420, h: 24, oneWay: true },
+      { x: 1780, y: 760, w: 390, h: 24, oneWay: true },
+      { x: 360, y: 580, w: 360, h: 24, oneWay: true },
+      { x: 870, y: 580, w: 360, h: 24, oneWay: true },
+      { x: 1530, y: 580, w: 360, h: 24, oneWay: true },
+      { x: 2040, y: 580, w: 360, h: 24, oneWay: true },
+      { x: 640, y: 390, w: 360, h: 24, oneWay: true },
+      { x: 1200, y: 390, w: 420, h: 24, oneWay: true },
+      { x: 1760, y: 390, w: 360, h: 24, oneWay: true },
+      { x: 1200, y: 220, w: 380, h: 24 }
     ],
     bouncePads: [
-      { x: 900, y: 818, w: 70, h: 14 },
-      { x: 2060, y: 758, w: 70, h: 14 },
-      { x: 615, y: 246, w: 70, h: 14 }
+      { x: 270, y: 1125, w: 76, h: 14 },
+      { x: 2130, y: 1125, w: 76, h: 14 },
+      { x: 1200, y: 735, w: 76, h: 14 }
     ],
     teleporters: [
-      { id: "left", target: "right", x: 350, y: 470, w: 44, h: 64 },
-      { id: "right", target: "left", x: 2105, y: 758, w: 44, h: 64 }
+      { id: "low-left", target: "high-right", x: 420, y: 900, w: 48, h: 68 },
+      { id: "high-right", target: "low-left", x: 1980, y: 535, w: 48, h: 68 }
+    ],
+    launchers: [
+      { x: 890, y: 735, w: 66, h: 26, vx: 650, vy: -540 },
+      { x: 1510, y: 735, w: 66, h: 26, vx: -650, vy: -540 }
+    ],
+    movingPlatforms: [
+      { x: 1200, y: 1060, w: 330, h: 22, axis: "y", distance: 95, periodMs: 2600 }
     ]
   },
-  desert: {
-    name: "Desert",
+  arena: {
+    name: "The Arena",
     spawnPoints: [
-      { x: 1080, y: 620 },
-      { x: 1320, y: 620 },
-      { x: 365, y: 520 },
-      { x: 2040, y: 900 }
+      { x: 430, y: 1030 },
+      { x: 1970, y: 1030 },
+      { x: 430, y: 520 },
+      { x: 1970, y: 520 }
     ],
     platforms: [
       { x: 1200, y: 1160, w: 2400, h: 34 },
-      { x: 360, y: 690, w: 700, h: 24 },
-      { x: 1510, y: 690, w: 900, h: 24 },
-      { x: 355, y: 500, w: 380, h: 24 },
-      { x: 760, y: 500, w: 700, h: 24 },
-      { x: 1620, y: 500, w: 700, h: 24 },
-      { x: 500, y: 275, w: 520, h: 24 },
-      { x: 1240, y: 365, w: 420, h: 24 },
-      { x: 1950, y: 230, w: 520, h: 24 },
-      { x: 1040, y: 850, w: 430, h: 24 },
-      { x: 1470, y: 790, w: 480, h: 24 },
-      { x: 2060, y: 790, w: 400, h: 24 },
-      { x: 1540, y: 1010, w: 820, h: 24 }
+      { x: 360, y: 900, w: 350, h: 24 },
+      { x: 2040, y: 900, w: 350, h: 24 },
+      { x: 360, y: 680, w: 350, h: 24, oneWay: true },
+      { x: 2040, y: 680, w: 350, h: 24, oneWay: true },
+      { x: 360, y: 455, w: 350, h: 24, oneWay: true },
+      { x: 2040, y: 455, w: 350, h: 24, oneWay: true },
+      { x: 1200, y: 790, w: 520, h: 24 },
+      { x: 1200, y: 520, w: 360, h: 24, oneWay: true }
     ],
     bouncePads: [
-      { x: 960, y: 818, w: 70, h: 14 },
-      { x: 2070, y: 758, w: 70, h: 14 },
-      { x: 520, y: 246, w: 70, h: 14 }
+      { x: 650, y: 1125, w: 76, h: 14 },
+      { x: 1750, y: 1125, w: 76, h: 14 },
+      { x: 1200, y: 760, w: 76, h: 14 }
     ],
     teleporters: [
-      { id: "left", target: "right", x: 330, y: 246, w: 44, h: 64 },
-      { id: "right", target: "left", x: 2050, y: 758, w: 44, h: 64 }
+      { id: "left-wall", target: "right-wall", x: 300, y: 420, w: 48, h: 68 },
+      { id: "right-wall", target: "left-wall", x: 2100, y: 420, w: 48, h: 68 }
+    ],
+    launchers: [
+      { x: 1095, y: 1130, w: 66, h: 26, vx: -800, vy: -460 },
+      { x: 1305, y: 1130, w: 66, h: 26, vx: 800, vy: -460 }
+    ],
+    movingPlatforms: [
+      { x: 1200, y: 1015, w: 420, h: 22, axis: "x", distance: 360, periodMs: 3600 }
     ]
   }
 };
+
+TAG_MAPS.grass = TAG_MAPS.classic;
+TAG_MAPS.winter = TAG_MAPS.tower;
+TAG_MAPS.desert = TAG_MAPS.maze;
 
 function cleanNickname(nickname) {
   const value = String(nickname || "").trim().replace(/\s+/g, " ");
@@ -220,8 +281,8 @@ function cleanTagMaxPlayers(maxPlayers) {
 }
 
 function cleanTagMapId(mapId) {
-  const value = String(mapId || "grass").trim().toLowerCase();
-  return TAG_MAPS[value] ? value : "grass";
+  const value = String(mapId || "classic").trim().toLowerCase();
+  return TAG_MAPS[value] ? value : "classic";
 }
 
 function cleanTagRoundSeconds(roundSeconds) {
@@ -555,16 +616,22 @@ function createHandCricketState(phase = "waiting", mode = "classic") {
   };
 }
 
-function createTagState(phase = "waiting", mapId = "grass", roundSeconds = TAG_DEFAULT_ROUND_SECONDS) {
+function createTagState(phase = "waiting", mapId = "classic", roundSeconds = TAG_DEFAULT_ROUND_SECONDS) {
   return {
     phase,
     mapId: cleanTagMapId(mapId),
     roundSeconds: cleanTagRoundSeconds(roundSeconds),
+    countdownStartedAt: null,
+    countdownEndAt: null,
     startedAt: null,
     endAt: null,
     lastTickAt: null,
     itPlayerId: null,
-    tagCooldownUntil: null,
+    currentItStartedAt: null,
+    tagCount: 0,
+    lastTagAt: null,
+    lastTaggedPlayerId: null,
+    itHistory: [],
     players: {},
     result: null
   };
@@ -574,15 +641,36 @@ function createTagInput(input = {}) {
   return {
     left: Boolean(input.left),
     right: Boolean(input.right),
+    down: Boolean(input.down),
     jump: Boolean(input.jump)
   };
 }
 
+function approachNumber(current, target, amount) {
+  if (current < target) {
+    return Math.min(current + amount, target);
+  }
+
+  if (current > target) {
+    return Math.max(current - amount, target);
+  }
+
+  return target;
+}
+
+function rectOverlap(first, second) {
+  const x = (first.w + second.w) / 2 - Math.abs(first.x - second.x);
+  const y = (first.h + second.h) / 2 - Math.abs(first.y - second.y);
+
+  if (x <= 0 || y <= 0) {
+    return null;
+  }
+
+  return { x, y };
+}
+
 function rectsOverlap(first, second) {
-  return (
-    Math.abs(first.x - second.x) * 2 < first.w + second.w &&
-    Math.abs(first.y - second.y) * 2 < first.h + second.h
-  );
+  return Boolean(rectOverlap(first, second));
 }
 
 function tagPlayerRect(player) {
@@ -592,6 +680,30 @@ function tagPlayerRect(player) {
     w: TAG_PLAYER_WIDTH,
     h: TAG_PLAYER_HEIGHT
   };
+}
+
+function getTagMap(mapId) {
+  return TAG_MAPS[mapId] || TAG_MAPS.classic;
+}
+
+function getMovingTagPlatform(platform, now) {
+  const periodMs = platform.periodMs || 3000;
+  const distance = platform.distance || 0;
+  const phase = Math.sin(((now % periodMs) / periodMs) * Math.PI * 2);
+  const offset = phase * distance;
+
+  return {
+    ...platform,
+    x: platform.axis === "x" ? platform.x + offset : platform.x,
+    y: platform.axis === "y" ? platform.y + offset : platform.y
+  };
+}
+
+function getTagPlatforms(map, now) {
+  return [
+    ...(map.platforms || []),
+    ...(map.movingPlatforms || []).map((platform) => getMovingTagPlatform(platform, now))
+  ];
 }
 
 function clampTagPlayerToWorld(player) {
@@ -612,33 +724,65 @@ function clampTagPlayerToWorld(player) {
     player.y = halfHeight;
     player.vy = Math.max(0, player.vy);
   }
-
-  if (player.y > TAG_WORLD_HEIGHT - halfHeight) {
-    player.y = TAG_WORLD_HEIGHT - halfHeight;
-    player.vy = 0;
-    player.grounded = true;
-  }
 }
 
-function moveTagPlayer(player, map, dt) {
+function getNearestTagSpawn(player, map) {
+  return (map.spawnPoints || [{ x: TAG_WORLD_WIDTH / 2, y: TAG_WORLD_HEIGHT - 120 }]).reduce(
+    (best, spawn) => {
+      const bestDistance = Math.abs(best.x - player.x);
+      const distance = Math.abs(spawn.x - player.x);
+      return distance < bestDistance ? spawn : best;
+    }
+  );
+}
+
+function respawnTagPlayer(player, map, now) {
+  const spawn = getNearestTagSpawn(player, map);
+
+  player.x = spawn.x;
+  player.y = spawn.y;
+  player.vx = 0;
+  player.vy = 0;
+  player.grounded = false;
+  player.invulUntil = now + TAG_SPAWN_INVUL_MS;
+  player.teleportCooldownUntil = now + TAG_TELEPORT_COOLDOWN_MS;
+  player.bounceCooldownUntil = now + TAG_BOUNCE_COOLDOWN_MS;
+  player.launcherCooldownUntil = now + 350;
+}
+
+function moveTagPlayer(player, map, dt, now) {
   const input = player.input || createTagInput();
   const speed = player.isIt ? TAG_CHASER_SPEED : TAG_RUN_SPEED;
   const wasGrounded = player.grounded;
+  const targetVx = input.left === input.right ? 0 : input.left ? -speed : speed;
 
-  player.vx = input.left === input.right ? 0 : input.left ? -speed : speed;
+  player.vx = approachNumber(
+    player.vx,
+    targetVx,
+    (targetVx === 0 ? TAG_DECELERATION : TAG_ACCELERATION) * dt
+  );
 
-  if (input.jump && !player.jumpWasDown && wasGrounded) {
+  if (input.down && input.jump && !player.jumpWasDown && wasGrounded) {
+    player.dropThroughUntil = now + 220;
+    player.grounded = false;
+    player.y += 6;
+  } else if (input.jump && !player.jumpWasDown && wasGrounded) {
     player.vy = TAG_JUMP_VELOCITY;
     player.grounded = false;
   }
 
   player.jumpWasDown = input.jump;
-  player.vy = Math.min(player.vy + TAG_GRAVITY * dt, 980);
+  player.vy = Math.min(player.vy + TAG_GRAVITY * dt, TAG_MAX_FALL_SPEED);
 
+  const platforms = getTagPlatforms(map, now);
   const previousX = player.x;
   player.x += player.vx * dt;
 
-  for (const platform of map.platforms) {
+  for (const platform of platforms) {
+    if (platform.oneWay) {
+      continue;
+    }
+
     if (!rectsOverlap(tagPlayerRect(player), platform)) {
       continue;
     }
@@ -658,8 +802,10 @@ function moveTagPlayer(player, map, dt) {
   player.y += player.vy * dt;
   player.grounded = false;
 
-  for (const platform of map.platforms) {
-    if (!rectsOverlap(tagPlayerRect(player), platform)) {
+  for (const platform of platforms) {
+    const overlap = rectOverlap(tagPlayerRect(player), platform);
+
+    if (!overlap) {
       continue;
     }
 
@@ -667,6 +813,11 @@ function moveTagPlayer(player, map, dt) {
     const previousTop = previousY - TAG_PLAYER_HEIGHT / 2;
     const platformTop = platform.y - platform.h / 2;
     const platformBottom = platform.y + platform.h / 2;
+    const droppingThrough = platform.oneWay && now < (player.dropThroughUntil || 0);
+
+    if (platform.oneWay && (droppingThrough || player.vy < 0 || previousBottom > platformTop + 4)) {
+      continue;
+    }
 
     if (previousBottom <= platformTop && player.vy >= 0) {
       player.y = platformTop - TAG_PLAYER_HEIGHT / 2;
@@ -679,13 +830,33 @@ function moveTagPlayer(player, map, dt) {
   }
 
   clampTagPlayerToWorld(player);
+
+  if (player.y > TAG_WORLD_HEIGHT + TAG_PLAYER_HEIGHT) {
+    respawnTagPlayer(player, map, now);
+  }
 }
 
 function applyTagSpecialObjects(player, map, now) {
-  for (const pad of map.bouncePads) {
-    if (rectsOverlap(tagPlayerRect(player), pad) && player.vy >= 0) {
+  for (const pad of map.bouncePads || []) {
+    if (
+      now >= (player.bounceCooldownUntil || 0) &&
+      rectsOverlap(tagPlayerRect(player), pad) &&
+      player.vy >= 0
+    ) {
       player.vy = TAG_BOUNCE_VELOCITY;
       player.grounded = false;
+      player.bounceCooldownUntil = now + TAG_BOUNCE_COOLDOWN_MS;
+      player.flashUntil = Math.max(player.flashUntil || 0, now + 120);
+    }
+  }
+
+  for (const launcher of map.launchers || []) {
+    if (now >= (player.launcherCooldownUntil || 0) && rectsOverlap(tagPlayerRect(player), launcher)) {
+      player.vx = launcher.vx || 0;
+      player.vy = launcher.vy || TAG_JUMP_VELOCITY;
+      player.grounded = false;
+      player.launcherCooldownUntil = now + 450;
+      player.flashUntil = Math.max(player.flashUntil || 0, now + 140);
     }
   }
 
@@ -693,13 +864,13 @@ function applyTagSpecialObjects(player, map, now) {
     return;
   }
 
-  const teleporter = map.teleporters.find((entry) => rectsOverlap(tagPlayerRect(player), entry));
+  const teleporter = (map.teleporters || []).find((entry) => rectsOverlap(tagPlayerRect(player), entry));
 
   if (!teleporter) {
     return;
   }
 
-  const target = map.teleporters.find((entry) => entry.id === teleporter.target);
+  const target = (map.teleporters || []).find((entry) => entry.id === teleporter.target);
 
   if (!target) {
     return;
@@ -707,18 +878,67 @@ function applyTagSpecialObjects(player, map, now) {
 
   player.x = target.x;
   player.y = target.y - 50;
-  player.vx = 0;
-  player.vy = -260;
+  player.vx = Math.abs(player.vx) > 80 ? player.vx : target.x > teleporter.x ? 220 : -220;
+  player.vy = Math.min(player.vy, -260);
   player.teleportCooldownUntil = now + TAG_TELEPORT_COOLDOWN_MS;
+  player.flashUntil = Math.max(player.flashUntil || 0, now + 180);
+}
+
+function closeCurrentTagHistory(room, now) {
+  const state = room.tag;
+
+  if (!state?.itPlayerId || !state.currentItStartedAt) {
+    return;
+  }
+
+  const endAt = Math.max(now, state.currentItStartedAt);
+
+  state.itHistory.push({
+    playerId: state.itPlayerId,
+    startAt: state.currentItStartedAt,
+    endAt,
+    durationMs: endAt - state.currentItStartedAt
+  });
+  state.currentItStartedAt = null;
+}
+
+function getTagDurationTotals(room, now = Date.now()) {
+  const totals = Object.fromEntries(room.players.map((player) => [player.playerId, 0]));
+  const history = room.tag?.itHistory || [];
+
+  for (const entry of history) {
+    totals[entry.playerId] = (totals[entry.playerId] || 0) + Math.max(0, entry.durationMs || 0);
+  }
+
+  if (room.tag?.itPlayerId && room.tag.currentItStartedAt) {
+    totals[room.tag.itPlayerId] =
+      (totals[room.tag.itPlayerId] || 0) + Math.max(0, now - room.tag.currentItStartedAt);
+  }
+
+  return totals;
 }
 
 function finishTagRound(room, loserId) {
+  const now = Date.now();
+
+  closeCurrentTagHistory(room, now);
+
   const loser = findPlayerById(room, loserId);
+  const itDurations = getTagDurationTotals(room, now);
+  const ranking = room.players
+    .map((player) => ({
+      playerId: player.playerId,
+      name: player.name,
+      itTimeMs: Math.round(itDurations[player.playerId] || 0),
+      isLoser: player.playerId === loserId
+    }))
+    .sort((first, second) => first.itTimeMs - second.itTimeMs || first.name.localeCompare(second.name));
   const survivors = room.players
     .filter((player) => player.playerId !== loserId)
     .map((player) => ({
       playerId: player.playerId,
-      name: player.name
+      name: player.name,
+      itTimeMs: Math.round(itDurations[player.playerId] || 0)
     }));
 
   room.gameEnded = true;
@@ -733,11 +953,14 @@ function finishTagRound(room, loserId) {
   room.tag.result = {
     loser: loser
       ? {
-          playerId: loser.playerId,
-          name: loser.name
-        }
+        playerId: loser.playerId,
+        name: loser.name
+      }
       : null,
-    survivors
+    survivors,
+    ranking,
+    tagCount: room.tag.tagCount,
+    itDurations
   };
 }
 
@@ -746,7 +969,7 @@ function syncTagPlayers(room) {
     return;
   }
 
-  const map = TAG_MAPS[room.tag.mapId] || TAG_MAPS.grass;
+  const map = getTagMap(room.tag.mapId);
   const activePlayerIds = new Set(room.players.map((player) => player.playerId));
 
   for (const playerId of Object.keys(room.tag.players)) {
@@ -772,7 +995,13 @@ function syncTagPlayers(room) {
       grounded: false,
       input: createTagInput(),
       jumpWasDown: false,
-      teleportCooldownUntil: 0
+      tagCooldownUntil: 0,
+      invulUntil: Date.now() + TAG_SPAWN_INVUL_MS,
+      flashUntil: 0,
+      teleportCooldownUntil: 0,
+      bounceCooldownUntil: 0,
+      launcherCooldownUntil: 0,
+      dropThroughUntil: 0
     };
   });
 
@@ -787,16 +1016,22 @@ function syncTagPlayers(room) {
 
 function startTagRound(room) {
   const now = Date.now();
-  const map = TAG_MAPS[room.tag.mapId] || TAG_MAPS.grass;
+  const map = getTagMap(room.tag.mapId);
   const chaserIndex = Math.floor(Math.random() * room.players.length);
   const chaser = room.players[chaserIndex];
 
-  room.tag.phase = "playing";
-  room.tag.startedAt = now;
-  room.tag.endAt = now + room.tag.roundSeconds * 1000;
+  room.tag.phase = "countdown";
+  room.tag.countdownStartedAt = now;
+  room.tag.countdownEndAt = now + TAG_COUNTDOWN_MS;
+  room.tag.startedAt = null;
+  room.tag.endAt = null;
   room.tag.lastTickAt = now;
   room.tag.itPlayerId = chaser.playerId;
-  room.tag.tagCooldownUntil = now + TAG_TAG_COOLDOWN_MS;
+  room.tag.currentItStartedAt = null;
+  room.tag.tagCount = 0;
+  room.tag.lastTagAt = null;
+  room.tag.lastTaggedPlayerId = null;
+  room.tag.itHistory = [];
   room.tag.result = null;
   room.tag.players = {};
 
@@ -814,41 +1049,87 @@ function startTagRound(room) {
       grounded: false,
       input: createTagInput(),
       jumpWasDown: false,
-      teleportCooldownUntil: 0
+      tagCooldownUntil: 0,
+      invulUntil: now + TAG_SPAWN_INVUL_MS,
+      flashUntil: 0,
+      teleportCooldownUntil: 0,
+      bounceCooldownUntil: 0,
+      launcherCooldownUntil: 0,
+      dropThroughUntil: 0
     };
   });
 }
 
+function beginTagPlaying(room, now) {
+  room.tag.phase = "playing";
+  room.tag.startedAt = now;
+  room.tag.endAt = now + room.tag.roundSeconds * 1000;
+  room.tag.lastTickAt = now;
+  room.tag.currentItStartedAt = now;
+
+  for (const player of Object.values(room.tag.players)) {
+    player.isIt = player.playerId === room.tag.itPlayerId;
+    player.invulUntil = 0;
+    player.tagCooldownUntil = player.isIt ? now + 250 : 0;
+  }
+}
+
 function transferTag(room, nextItPlayerId, now) {
+  const previousItPlayerId = room.tag.itPlayerId;
+  const previousIt = room.tag.players[previousItPlayerId];
+  const nextIt = room.tag.players[nextItPlayerId];
+
+  if (!nextIt || nextItPlayerId === previousItPlayerId) {
+    return;
+  }
+
+  closeCurrentTagHistory(room, now);
   room.tag.itPlayerId = nextItPlayerId;
-  room.tag.tagCooldownUntil = now + TAG_TAG_COOLDOWN_MS;
+  room.tag.currentItStartedAt = now;
+  room.tag.tagCount += 1;
+  room.tag.lastTagAt = now;
+  room.tag.lastTaggedPlayerId = nextItPlayerId;
 
   for (const player of Object.values(room.tag.players)) {
     player.isIt = player.playerId === nextItPlayerId;
   }
+
+  nextIt.tagCooldownUntil = now + TAG_NEW_IT_COOLDOWN_MS;
+  nextIt.invulUntil = 0;
+  nextIt.flashUntil = now + TAG_FLASH_MS;
+  nextIt.vy = Math.min(nextIt.vy, -190);
+
+  if (previousIt) {
+    previousIt.invulUntil = now + TAG_FREED_INVUL_MS;
+    previousIt.flashUntil = now + TAG_FLASH_MS;
+  }
 }
 
 function processTagCollisions(room, now) {
-  if (now < (room.tag.tagCooldownUntil || 0)) {
-    return;
-  }
-
   const chaser = room.tag.players[room.tag.itPlayerId];
 
-  if (!chaser) {
+  if (!chaser || now < (chaser.tagCooldownUntil || 0)) {
     return;
   }
 
-  for (const runner of Object.values(room.tag.players)) {
-    if (runner.playerId === chaser.playerId) {
-      continue;
-    }
+  const chaserRect = tagPlayerRect(chaser);
+  const candidates = Object.values(room.tag.players)
+    .filter((runner) => runner.playerId !== chaser.playerId && now >= (runner.invulUntil || 0))
+    .map((runner) => {
+      const overlap = rectOverlap(chaserRect, tagPlayerRect(runner));
 
-    if (rectsOverlap(tagPlayerRect(chaser), tagPlayerRect(runner))) {
-      transferTag(room, runner.playerId, now);
-      runner.vy = Math.min(runner.vy, -190);
-      break;
-    }
+      return {
+        runner,
+        overlap,
+        distance:
+          Math.hypot(chaser.x - runner.x, chaser.y - runner.y)
+      };
+    })
+    .filter((candidate) => candidate.overlap && Math.min(candidate.overlap.x, candidate.overlap.y) >= TAG_MIN_TAG_OVERLAP)
+    .sort((first, second) => first.distance - second.distance);
+
+  if (candidates[0]) {
+    transferTag(room, candidates[0].runner.playerId, now);
   }
 }
 
@@ -1210,6 +1491,7 @@ function serializeTag(room) {
 
   const state = room.tag || createTagState();
   const now = Date.now();
+  const itDurations = getTagDurationTotals(room, now);
 
   return {
     phase: state.phase,
@@ -1219,12 +1501,19 @@ function serializeTag(room) {
       width: TAG_WORLD_WIDTH,
       height: TAG_WORLD_HEIGHT
     },
+    countdownLeftMs:
+      state.phase === "countdown" && state.countdownEndAt
+        ? Math.max(0, state.countdownEndAt - now)
+        : 0,
     timeLeftMs:
       state.phase === "playing" && state.endAt
         ? Math.max(0, state.endAt - now)
         : state.roundSeconds * 1000,
     itPlayerId: state.itPlayerId,
-    tagCooldownUntil: state.tagCooldownUntil,
+    tagCount: state.tagCount || 0,
+    lastTagAt: state.lastTagAt,
+    lastTaggedPlayerId: state.lastTaggedPlayerId,
+    itDurations,
     players: Object.values(state.players || {}).map((player) => ({
       playerId: player.playerId,
       name: player.name,
@@ -1233,7 +1522,10 @@ function serializeTag(room) {
       vx: Math.round(player.vx),
       vy: Math.round(player.vy),
       isIt: player.playerId === state.itPlayerId,
-      grounded: Boolean(player.grounded)
+      grounded: Boolean(player.grounded),
+      invulMs: Math.max(0, Math.round((player.invulUntil || 0) - now)),
+      tagCooldownMs: Math.max(0, Math.round((player.tagCooldownUntil || 0) - now)),
+      flash: now < (player.flashUntil || 0)
     })),
     result: state.result
   };
@@ -1685,7 +1977,11 @@ export function submitTagInput({ socketId, roomCode, input }) {
     throw new Error("You are not in this room.");
   }
 
-  if (!room.gameStarted || room.gameEnded || room.tag.phase !== "playing") {
+  if (
+    !room.gameStarted ||
+    room.gameEnded ||
+    (room.tag.phase !== "countdown" && room.tag.phase !== "playing")
+  ) {
     return room;
   }
 
@@ -1708,7 +2004,7 @@ export function tickTagRoom({ roomCode, now = Date.now() }) {
     };
   }
 
-  if (room.tag.phase !== "playing") {
+  if (room.tag.phase === "result") {
     return {
       room,
       active: false
@@ -1717,18 +2013,43 @@ export function tickTagRoom({ roomCode, now = Date.now() }) {
 
   syncTagPlayers(room);
 
-  const map = TAG_MAPS[room.tag.mapId] || TAG_MAPS.grass;
+  if (room.tag.phase === "countdown") {
+    room.tag.lastTickAt = now;
+
+    if (room.tag.countdownEndAt && now >= room.tag.countdownEndAt) {
+      beginTagPlaying(room, now);
+      touch(room);
+    }
+
+    return {
+      room,
+      active: true
+    };
+  }
+
+  if (room.tag.phase !== "playing") {
+    return {
+      room,
+      active: false
+    };
+  }
+
+  const map = getTagMap(room.tag.mapId);
   const lastTickAt = room.tag.lastTickAt || now;
-  const dt = Math.max(0.001, Math.min(0.05, (now - lastTickAt) / 1000));
+  const elapsed = Math.max(0.001, Math.min(0.08, (now - lastTickAt) / 1000));
+  const stepCount = Math.max(1, Math.ceil(elapsed / (1 / 60)));
+  const dt = elapsed / stepCount;
 
   room.tag.lastTickAt = now;
 
-  for (const player of Object.values(room.tag.players)) {
-    moveTagPlayer(player, map, dt);
-    applyTagSpecialObjects(player, map, now);
-  }
+  for (let step = 0; step < stepCount; step += 1) {
+    for (const player of Object.values(room.tag.players)) {
+      moveTagPlayer(player, map, dt, now);
+      applyTagSpecialObjects(player, map, now);
+    }
 
-  processTagCollisions(room, now);
+    processTagCollisions(room, now);
+  }
 
   if (room.tag.endAt && now >= room.tag.endAt) {
     finishTagRound(room, room.tag.itPlayerId);

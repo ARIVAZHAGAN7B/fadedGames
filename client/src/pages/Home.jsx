@@ -39,12 +39,13 @@ const games = [
 ];
 
 const tagMaps = [
-  { id: "grass", label: "Grass" },
-  { id: "winter", label: "Winter" },
-  { id: "desert", label: "Desert" }
+  { id: "classic", label: "The Classic" },
+  { id: "tower", label: "The Tower" },
+  { id: "maze", label: "The Maze" },
+  { id: "arena", label: "The Arena" }
 ];
 
-const tagRoundOptions = [60, 120, 180];
+const tagRoundOptions = [60, 90, 120];
 
 function getGameById(gameId) {
   return games.find((game) => game.id === gameId) || null;
@@ -103,8 +104,8 @@ export default function Home({
   const [roomName, setRoomName] = useState(initialSelectedGame?.defaultRoomName || "Friends Game");
   const [maxPlayers, setMaxPlayers] = useState(initialSelectedGame?.maxPlayers || 4);
   const [tagPlayerCount, setTagPlayerCount] = useState(2);
-  const [tagMapId, setTagMapId] = useState("grass");
-  const [tagRoundSeconds, setTagRoundSeconds] = useState(120);
+  const [tagMapId, setTagMapId] = useState("classic");
+  const [tagRoundSeconds, setTagRoundSeconds] = useState(60);
   const [roomCode, setRoomCode] = useState(normalizeRoomCode(initialRoomCode));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -134,8 +135,8 @@ export default function Home({
     setHandCricketMode("classic");
     setHandCricketTeamMembers(2);
     setTagPlayerCount(2);
-    setTagMapId("grass");
-    setTagRoundSeconds(120);
+    setTagMapId("classic");
+    setTagRoundSeconds(60);
     setMode(nextMode);
     setError("");
 
