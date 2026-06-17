@@ -46,6 +46,12 @@ const SUPPORTED_GAME_TYPES = new Set(["bingo", "hand-cricket", "tag"]);
 const HAND_CRICKET_MODES = new Set(["classic", "team"]);
 const HAND_CRICKET_TEAMS = ["red", "blue"];
 const HAND_CRICKET_NUMBERS = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+const TAG_BOUNDARY_PLATFORMS = [
+  { x: 1200, y: 1176, w: 2400, h: 48, wall: true },
+  { x: 1200, y: 24, w: 2400, h: 48, wall: true },
+  { x: 24, y: 600, w: 48, h: 1200, wall: true },
+  { x: 2376, y: 600, w: 48, h: 1200, wall: true }
+];
 const TAG_MAPS = {
   classic: {
     name: "The Classic",
@@ -56,29 +62,45 @@ const TAG_MAPS = {
       { x: 1500, y: 1030 }
     ],
     platforms: [
-      { x: 1200, y: 1160, w: 2400, h: 34 },
+      ...TAG_BOUNDARY_PLATFORMS,
+      { x: 360, y: 1040, w: 260, h: 24 },
+      { x: 700, y: 970, w: 260, h: 24 },
+      { x: 1040, y: 895, w: 300, h: 24, oneWay: true },
+      { x: 1360, y: 895, w: 300, h: 24, oneWay: true },
+      { x: 1700, y: 970, w: 260, h: 24 },
+      { x: 2040, y: 1040, w: 260, h: 24 },
       { x: 650, y: 770, w: 760, h: 24, oneWay: true },
       { x: 1750, y: 770, w: 760, h: 24, oneWay: true },
+      { x: 1200, y: 680, w: 320, h: 24 },
       { x: 520, y: 510, w: 420, h: 24, oneWay: true },
       { x: 1200, y: 500, w: 520, h: 24, oneWay: true },
       { x: 1880, y: 510, w: 420, h: 24, oneWay: true },
-      { x: 890, y: 930, w: 420, h: 24 },
-      { x: 1510, y: 930, w: 420, h: 24 }
+      { x: 770, y: 355, w: 250, h: 24 },
+      { x: 1630, y: 355, w: 250, h: 24 },
+      { x: 1200, y: 270, w: 360, h: 24 },
+      { x: 1200, y: 1015, w: 34, h: 245, wall: true },
+      { x: 515, y: 690, w: 34, h: 155, wall: true },
+      { x: 1885, y: 690, w: 34, h: 155, wall: true }
     ],
     bouncePads: [
-      { x: 1200, y: 1125, w: 76, h: 14 },
-      { x: 320, y: 1125, w: 76, h: 14 },
-      { x: 2080, y: 1125, w: 76, h: 14 }
+      { x: 1200, y: 1138, w: 76, h: 14 },
+      { x: 320, y: 1010, w: 76, h: 14 },
+      { x: 2080, y: 1010, w: 76, h: 14 },
+      { x: 1200, y: 650, w: 76, h: 14 }
     ],
     teleporters: [
       { id: "left", target: "right", x: 280, y: 718, w: 48, h: 68 },
       { id: "right", target: "left", x: 2120, y: 718, w: 48, h: 68 }
     ],
     launchers: [
-      { x: 1030, y: 1130, w: 66, h: 26, vx: -640, vy: -650 },
-      { x: 1370, y: 1130, w: 66, h: 26, vx: 640, vy: -650 }
+      { x: 1030, y: 1134, w: 66, h: 26, vx: -640, vy: -650 },
+      { x: 1370, y: 1134, w: 66, h: 26, vx: 640, vy: -650 },
+      { x: 620, y: 740, w: 66, h: 26, vx: 720, vy: -430 },
+      { x: 1780, y: 740, w: 66, h: 26, vx: -720, vy: -430 }
     ],
-    movingPlatforms: []
+    movingPlatforms: [
+      { x: 1200, y: 805, w: 240, h: 22, axis: "x", distance: 180, periodMs: 3000 }
+    ]
   },
   tower: {
     name: "The Tower",
@@ -89,19 +111,31 @@ const TAG_MAPS = {
       { x: 1410, y: 850 }
     ],
     platforms: [
-      { x: 1200, y: 1160, w: 2400, h: 34 },
+      ...TAG_BOUNDARY_PLATFORMS,
+      { x: 420, y: 1050, w: 320, h: 24 },
+      { x: 1980, y: 1050, w: 320, h: 24 },
       { x: 670, y: 920, w: 520, h: 24 },
       { x: 1730, y: 920, w: 520, h: 24 },
+      { x: 520, y: 805, w: 250, h: 24, oneWay: true },
+      { x: 1880, y: 805, w: 250, h: 24, oneWay: true },
       { x: 900, y: 730, w: 460, h: 24, oneWay: true },
       { x: 1500, y: 730, w: 460, h: 24, oneWay: true },
+      { x: 760, y: 620, w: 260, h: 24, oneWay: true },
+      { x: 1640, y: 620, w: 260, h: 24, oneWay: true },
       { x: 1110, y: 545, w: 390, h: 24, oneWay: true },
       { x: 1290, y: 545, w: 390, h: 24, oneWay: true },
+      { x: 1000, y: 450, w: 260, h: 24, oneWay: true },
+      { x: 1400, y: 450, w: 260, h: 24, oneWay: true },
       { x: 1200, y: 360, w: 420, h: 24, oneWay: true },
-      { x: 1200, y: 205, w: 310, h: 24 }
+      { x: 1200, y: 205, w: 310, h: 24 },
+      { x: 1200, y: 1010, w: 34, h: 275, wall: true },
+      { x: 1200, y: 630, w: 34, h: 150, wall: true },
+      { x: 955, y: 305, w: 34, h: 110, wall: true },
+      { x: 1445, y: 305, w: 34, h: 110, wall: true }
     ],
     bouncePads: [
-      { x: 370, y: 1125, w: 76, h: 14 },
-      { x: 2030, y: 1125, w: 76, h: 14 },
+      { x: 370, y: 1138, w: 76, h: 14 },
+      { x: 2030, y: 1138, w: 76, h: 14 },
       { x: 1200, y: 890, w: 76, h: 14 }
     ],
     teleporters: [
@@ -110,10 +144,13 @@ const TAG_MAPS = {
     ],
     launchers: [
       { x: 760, y: 890, w: 66, h: 26, vx: 700, vy: -590 },
-      { x: 1640, y: 890, w: 66, h: 26, vx: -700, vy: -590 }
+      { x: 1640, y: 890, w: 66, h: 26, vx: -700, vy: -590 },
+      { x: 1030, y: 520, w: 66, h: 26, vx: -520, vy: -520 },
+      { x: 1370, y: 520, w: 66, h: 26, vx: 520, vy: -520 }
     ],
     movingPlatforms: [
-      { x: 1200, y: 875, w: 300, h: 22, axis: "x", distance: 250, periodMs: 3200 }
+      { x: 1200, y: 875, w: 300, h: 22, axis: "x", distance: 250, periodMs: 3200 },
+      { x: 1200, y: 635, w: 240, h: 22, axis: "y", distance: 95, periodMs: 2600 }
     ]
   },
   maze: {
@@ -125,27 +162,45 @@ const TAG_MAPS = {
       { x: 1790, y: 590 }
     ],
     platforms: [
-      { x: 1200, y: 1160, w: 2400, h: 34 },
+      ...TAG_BOUNDARY_PLATFORMS,
+      { x: 280, y: 1060, w: 260, h: 24 },
+      { x: 740, y: 1060, w: 260, h: 24 },
+      { x: 1660, y: 1060, w: 260, h: 24 },
+      { x: 2120, y: 1060, w: 260, h: 24 },
       { x: 360, y: 940, w: 440, h: 24 },
       { x: 940, y: 940, w: 400, h: 24 },
       { x: 1500, y: 940, w: 400, h: 24 },
       { x: 2040, y: 940, w: 440, h: 24 },
+      { x: 1200, y: 845, w: 250, h: 24 },
       { x: 620, y: 760, w: 390, h: 24, oneWay: true },
       { x: 1200, y: 760, w: 420, h: 24, oneWay: true },
       { x: 1780, y: 760, w: 390, h: 24, oneWay: true },
+      { x: 250, y: 690, w: 230, h: 24, oneWay: true },
+      { x: 2150, y: 690, w: 230, h: 24, oneWay: true },
       { x: 360, y: 580, w: 360, h: 24, oneWay: true },
       { x: 870, y: 580, w: 360, h: 24, oneWay: true },
       { x: 1530, y: 580, w: 360, h: 24, oneWay: true },
       { x: 2040, y: 580, w: 360, h: 24, oneWay: true },
+      { x: 380, y: 480, w: 220, h: 24, oneWay: true },
+      { x: 2020, y: 480, w: 220, h: 24, oneWay: true },
       { x: 640, y: 390, w: 360, h: 24, oneWay: true },
       { x: 1200, y: 390, w: 420, h: 24, oneWay: true },
       { x: 1760, y: 390, w: 360, h: 24, oneWay: true },
-      { x: 1200, y: 220, w: 380, h: 24 }
+      { x: 900, y: 270, w: 230, h: 24 },
+      { x: 1500, y: 270, w: 230, h: 24 },
+      { x: 1200, y: 220, w: 380, h: 24 },
+      { x: 650, y: 870, w: 34, h: 120, wall: true },
+      { x: 1750, y: 870, w: 34, h: 120, wall: true },
+      { x: 1200, y: 610, w: 34, h: 150, wall: true },
+      { x: 470, y: 310, w: 34, h: 105, wall: true },
+      { x: 1930, y: 310, w: 34, h: 105, wall: true }
     ],
     bouncePads: [
-      { x: 270, y: 1125, w: 76, h: 14 },
-      { x: 2130, y: 1125, w: 76, h: 14 },
-      { x: 1200, y: 735, w: 76, h: 14 }
+      { x: 270, y: 1138, w: 76, h: 14 },
+      { x: 2130, y: 1138, w: 76, h: 14 },
+      { x: 1200, y: 735, w: 76, h: 14 },
+      { x: 520, y: 555, w: 76, h: 14 },
+      { x: 1880, y: 555, w: 76, h: 14 }
     ],
     teleporters: [
       { id: "low-left", target: "high-right", x: 420, y: 900, w: 48, h: 68 },
@@ -153,10 +208,13 @@ const TAG_MAPS = {
     ],
     launchers: [
       { x: 890, y: 735, w: 66, h: 26, vx: 650, vy: -540 },
-      { x: 1510, y: 735, w: 66, h: 26, vx: -650, vy: -540 }
+      { x: 1510, y: 735, w: 66, h: 26, vx: -650, vy: -540 },
+      { x: 700, y: 915, w: 66, h: 26, vx: 520, vy: -430 },
+      { x: 1700, y: 915, w: 66, h: 26, vx: -520, vy: -430 }
     ],
     movingPlatforms: [
-      { x: 1200, y: 1060, w: 330, h: 22, axis: "y", distance: 95, periodMs: 2600 }
+      { x: 1200, y: 1060, w: 330, h: 22, axis: "y", distance: 95, periodMs: 2600 },
+      { x: 1200, y: 505, w: 280, h: 22, axis: "x", distance: 210, periodMs: 3300 }
     ]
   },
   arena: {
@@ -168,31 +226,48 @@ const TAG_MAPS = {
       { x: 1970, y: 520 }
     ],
     platforms: [
-      { x: 1200, y: 1160, w: 2400, h: 34 },
+      ...TAG_BOUNDARY_PLATFORMS,
+      { x: 520, y: 1040, w: 300, h: 24 },
+      { x: 1880, y: 1040, w: 300, h: 24 },
       { x: 360, y: 900, w: 350, h: 24 },
       { x: 2040, y: 900, w: 350, h: 24 },
+      { x: 880, y: 910, w: 260, h: 24, oneWay: true },
+      { x: 1520, y: 910, w: 260, h: 24, oneWay: true },
       { x: 360, y: 680, w: 350, h: 24, oneWay: true },
       { x: 2040, y: 680, w: 350, h: 24, oneWay: true },
+      { x: 760, y: 650, w: 230, h: 24, oneWay: true },
+      { x: 1640, y: 650, w: 230, h: 24, oneWay: true },
       { x: 360, y: 455, w: 350, h: 24, oneWay: true },
       { x: 2040, y: 455, w: 350, h: 24, oneWay: true },
       { x: 1200, y: 790, w: 520, h: 24 },
-      { x: 1200, y: 520, w: 360, h: 24, oneWay: true }
+      { x: 1200, y: 520, w: 360, h: 24, oneWay: true },
+      { x: 1200, y: 350, w: 260, h: 24 },
+      { x: 1200, y: 965, w: 34, h: 185, wall: true },
+      { x: 585, y: 790, w: 34, h: 150, wall: true },
+      { x: 1815, y: 790, w: 34, h: 150, wall: true },
+      { x: 980, y: 450, w: 34, h: 120, wall: true },
+      { x: 1420, y: 450, w: 34, h: 120, wall: true }
     ],
     bouncePads: [
-      { x: 650, y: 1125, w: 76, h: 14 },
-      { x: 1750, y: 1125, w: 76, h: 14 },
-      { x: 1200, y: 760, w: 76, h: 14 }
+      { x: 650, y: 1138, w: 76, h: 14 },
+      { x: 1750, y: 1138, w: 76, h: 14 },
+      { x: 1200, y: 760, w: 76, h: 14 },
+      { x: 360, y: 875, w: 76, h: 14 },
+      { x: 2040, y: 875, w: 76, h: 14 }
     ],
     teleporters: [
       { id: "left-wall", target: "right-wall", x: 300, y: 420, w: 48, h: 68 },
       { id: "right-wall", target: "left-wall", x: 2100, y: 420, w: 48, h: 68 }
     ],
     launchers: [
-      { x: 1095, y: 1130, w: 66, h: 26, vx: -800, vy: -460 },
-      { x: 1305, y: 1130, w: 66, h: 26, vx: 800, vy: -460 }
+      { x: 1095, y: 1134, w: 66, h: 26, vx: -800, vy: -460 },
+      { x: 1305, y: 1134, w: 66, h: 26, vx: 800, vy: -460 },
+      { x: 760, y: 625, w: 66, h: 26, vx: 570, vy: -430 },
+      { x: 1640, y: 625, w: 66, h: 26, vx: -570, vy: -430 }
     ],
     movingPlatforms: [
-      { x: 1200, y: 1015, w: 420, h: 22, axis: "x", distance: 360, periodMs: 3600 }
+      { x: 1200, y: 1015, w: 420, h: 22, axis: "x", distance: 360, periodMs: 3600 },
+      { x: 1200, y: 640, w: 300, h: 22, axis: "y", distance: 105, periodMs: 2800 }
     ]
   }
 };

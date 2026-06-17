@@ -1,21 +1,91 @@
 import {
   Copy,
-  Crown,
   DoorOpen,
   RotateCcw,
-  Timer,
-  Trophy,
-  Users,
-  Zap
+  Timer
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildRoomLink } from "../utils/roomLink.js";
 
 const WORLD_WIDTH = 2400;
 const WORLD_HEIGHT = 1200;
-const CAMERA_FOLLOW_EASE = 0.045;
 
-const playerColors = ["#e05d44", "#2f7de1", "#f2bd45", "#2f9f88"];
+const countryBalls = [
+  {
+    id: "india",
+    name: "India",
+    accent: "#ff9933",
+    draw(ctx, size) {
+      const stripe = size / 3;
+
+      ctx.fillStyle = "#ff9933";
+      ctx.fillRect(0, 0, size, stripe);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, stripe, size, stripe);
+      ctx.fillStyle = "#138808";
+      ctx.fillRect(0, stripe * 2, size, stripe);
+      ctx.strokeStyle = "#000080";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, 7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  },
+  {
+    id: "japan",
+    name: "Japan",
+    accent: "#bc002d",
+    draw(ctx, size) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = "#bc002d";
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, 15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  {
+    id: "brazil",
+    name: "Brazil",
+    accent: "#009b3a",
+    draw(ctx, size) {
+      ctx.fillStyle = "#009b3a";
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = "#ffdf00";
+      ctx.beginPath();
+      ctx.moveTo(size / 2, 8);
+      ctx.lineTo(size - 8, size / 2);
+      ctx.lineTo(size / 2, size - 8);
+      ctx.lineTo(8, size / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#002776";
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, 12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  {
+    id: "france",
+    name: "France",
+    accent: "#0055a4",
+    draw(ctx, size) {
+      ctx.fillStyle = "#0055a4";
+      ctx.fillRect(0, 0, size / 3, size);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(size / 3, 0, size / 3, size);
+      ctx.fillStyle = "#ef4135";
+      ctx.fillRect((size / 3) * 2, 0, size / 3, size);
+    }
+  }
+];
+
+const TAG_BOUNDARY_PLATFORMS = [
+  { x: 1200, y: 1176, w: 2400, h: 48, wall: true },
+  { x: 1200, y: 24, w: 2400, h: 48, wall: true },
+  { x: 24, y: 600, w: 48, h: 1200, wall: true },
+  { x: 2376, y: 600, w: 48, h: 1200, wall: true }
+];
 
 const mapConfigs = {
   classic: {
@@ -29,29 +99,45 @@ const mapConfigs = {
     launcher: 0xe05d44,
     accent: 0xfff5ce,
     platforms: [
-      { x: 1200, y: 1160, w: 2400, h: 34 },
+      ...TAG_BOUNDARY_PLATFORMS,
+      { x: 360, y: 1040, w: 260, h: 24 },
+      { x: 700, y: 970, w: 260, h: 24 },
+      { x: 1040, y: 895, w: 300, h: 24, oneWay: true },
+      { x: 1360, y: 895, w: 300, h: 24, oneWay: true },
+      { x: 1700, y: 970, w: 260, h: 24 },
+      { x: 2040, y: 1040, w: 260, h: 24 },
       { x: 650, y: 770, w: 760, h: 24, oneWay: true },
       { x: 1750, y: 770, w: 760, h: 24, oneWay: true },
+      { x: 1200, y: 680, w: 320, h: 24 },
       { x: 520, y: 510, w: 420, h: 24, oneWay: true },
       { x: 1200, y: 500, w: 520, h: 24, oneWay: true },
       { x: 1880, y: 510, w: 420, h: 24, oneWay: true },
-      { x: 890, y: 930, w: 420, h: 24 },
-      { x: 1510, y: 930, w: 420, h: 24 }
+      { x: 770, y: 355, w: 250, h: 24 },
+      { x: 1630, y: 355, w: 250, h: 24 },
+      { x: 1200, y: 270, w: 360, h: 24 },
+      { x: 1200, y: 1015, w: 34, h: 245, wall: true },
+      { x: 515, y: 690, w: 34, h: 155, wall: true },
+      { x: 1885, y: 690, w: 34, h: 155, wall: true }
     ],
     bouncePads: [
-      { x: 1200, y: 1125, w: 76, h: 14 },
-      { x: 320, y: 1125, w: 76, h: 14 },
-      { x: 2080, y: 1125, w: 76, h: 14 }
+      { x: 1200, y: 1138, w: 76, h: 14 },
+      { x: 320, y: 1010, w: 76, h: 14 },
+      { x: 2080, y: 1010, w: 76, h: 14 },
+      { x: 1200, y: 650, w: 76, h: 14 }
     ],
     teleporters: [
       { id: "left", target: "right", x: 280, y: 718, w: 48, h: 68 },
       { id: "right", target: "left", x: 2120, y: 718, w: 48, h: 68 }
     ],
     launchers: [
-      { x: 1030, y: 1130, w: 66, h: 26, vx: -640, vy: -650 },
-      { x: 1370, y: 1130, w: 66, h: 26, vx: 640, vy: -650 }
+      { x: 1030, y: 1134, w: 66, h: 26, vx: -640, vy: -650 },
+      { x: 1370, y: 1134, w: 66, h: 26, vx: 640, vy: -650 },
+      { x: 620, y: 740, w: 66, h: 26, vx: 720, vy: -430 },
+      { x: 1780, y: 740, w: 66, h: 26, vx: -720, vy: -430 }
     ],
-    movingPlatforms: []
+    movingPlatforms: [
+      { x: 1200, y: 805, w: 240, h: 22, axis: "x", distance: 180, periodMs: 3000 }
+    ]
   },
   tower: {
     name: "The Tower",
@@ -64,19 +150,31 @@ const mapConfigs = {
     launcher: 0xe05d44,
     accent: 0xdff6ff,
     platforms: [
-      { x: 1200, y: 1160, w: 2400, h: 34 },
+      ...TAG_BOUNDARY_PLATFORMS,
+      { x: 420, y: 1050, w: 320, h: 24 },
+      { x: 1980, y: 1050, w: 320, h: 24 },
       { x: 670, y: 920, w: 520, h: 24 },
       { x: 1730, y: 920, w: 520, h: 24 },
+      { x: 520, y: 805, w: 250, h: 24, oneWay: true },
+      { x: 1880, y: 805, w: 250, h: 24, oneWay: true },
       { x: 900, y: 730, w: 460, h: 24, oneWay: true },
       { x: 1500, y: 730, w: 460, h: 24, oneWay: true },
+      { x: 760, y: 620, w: 260, h: 24, oneWay: true },
+      { x: 1640, y: 620, w: 260, h: 24, oneWay: true },
       { x: 1110, y: 545, w: 390, h: 24, oneWay: true },
       { x: 1290, y: 545, w: 390, h: 24, oneWay: true },
+      { x: 1000, y: 450, w: 260, h: 24, oneWay: true },
+      { x: 1400, y: 450, w: 260, h: 24, oneWay: true },
       { x: 1200, y: 360, w: 420, h: 24, oneWay: true },
-      { x: 1200, y: 205, w: 310, h: 24 }
+      { x: 1200, y: 205, w: 310, h: 24 },
+      { x: 1200, y: 1010, w: 34, h: 275, wall: true },
+      { x: 1200, y: 630, w: 34, h: 150, wall: true },
+      { x: 955, y: 305, w: 34, h: 110, wall: true },
+      { x: 1445, y: 305, w: 34, h: 110, wall: true }
     ],
     bouncePads: [
-      { x: 370, y: 1125, w: 76, h: 14 },
-      { x: 2030, y: 1125, w: 76, h: 14 },
+      { x: 370, y: 1138, w: 76, h: 14 },
+      { x: 2030, y: 1138, w: 76, h: 14 },
       { x: 1200, y: 890, w: 76, h: 14 }
     ],
     teleporters: [
@@ -85,10 +183,13 @@ const mapConfigs = {
     ],
     launchers: [
       { x: 760, y: 890, w: 66, h: 26, vx: 700, vy: -590 },
-      { x: 1640, y: 890, w: 66, h: 26, vx: -700, vy: -590 }
+      { x: 1640, y: 890, w: 66, h: 26, vx: -700, vy: -590 },
+      { x: 1030, y: 520, w: 66, h: 26, vx: -520, vy: -520 },
+      { x: 1370, y: 520, w: 66, h: 26, vx: 520, vy: -520 }
     ],
     movingPlatforms: [
-      { x: 1200, y: 875, w: 300, h: 22, axis: "x", distance: 250, periodMs: 3200 }
+      { x: 1200, y: 875, w: 300, h: 22, axis: "x", distance: 250, periodMs: 3200 },
+      { x: 1200, y: 635, w: 240, h: 22, axis: "y", distance: 95, periodMs: 2600 }
     ]
   },
   maze: {
@@ -102,27 +203,45 @@ const mapConfigs = {
     launcher: 0xe05d44,
     accent: 0xfff5ce,
     platforms: [
-      { x: 1200, y: 1160, w: 2400, h: 34 },
+      ...TAG_BOUNDARY_PLATFORMS,
+      { x: 280, y: 1060, w: 260, h: 24 },
+      { x: 740, y: 1060, w: 260, h: 24 },
+      { x: 1660, y: 1060, w: 260, h: 24 },
+      { x: 2120, y: 1060, w: 260, h: 24 },
       { x: 360, y: 940, w: 440, h: 24 },
       { x: 940, y: 940, w: 400, h: 24 },
       { x: 1500, y: 940, w: 400, h: 24 },
       { x: 2040, y: 940, w: 440, h: 24 },
+      { x: 1200, y: 845, w: 250, h: 24 },
       { x: 620, y: 760, w: 390, h: 24, oneWay: true },
       { x: 1200, y: 760, w: 420, h: 24, oneWay: true },
       { x: 1780, y: 760, w: 390, h: 24, oneWay: true },
+      { x: 250, y: 690, w: 230, h: 24, oneWay: true },
+      { x: 2150, y: 690, w: 230, h: 24, oneWay: true },
       { x: 360, y: 580, w: 360, h: 24, oneWay: true },
       { x: 870, y: 580, w: 360, h: 24, oneWay: true },
       { x: 1530, y: 580, w: 360, h: 24, oneWay: true },
       { x: 2040, y: 580, w: 360, h: 24, oneWay: true },
+      { x: 380, y: 480, w: 220, h: 24, oneWay: true },
+      { x: 2020, y: 480, w: 220, h: 24, oneWay: true },
       { x: 640, y: 390, w: 360, h: 24, oneWay: true },
       { x: 1200, y: 390, w: 420, h: 24, oneWay: true },
       { x: 1760, y: 390, w: 360, h: 24, oneWay: true },
-      { x: 1200, y: 220, w: 380, h: 24 }
+      { x: 900, y: 270, w: 230, h: 24 },
+      { x: 1500, y: 270, w: 230, h: 24 },
+      { x: 1200, y: 220, w: 380, h: 24 },
+      { x: 650, y: 870, w: 34, h: 120, wall: true },
+      { x: 1750, y: 870, w: 34, h: 120, wall: true },
+      { x: 1200, y: 610, w: 34, h: 150, wall: true },
+      { x: 470, y: 310, w: 34, h: 105, wall: true },
+      { x: 1930, y: 310, w: 34, h: 105, wall: true }
     ],
     bouncePads: [
-      { x: 270, y: 1125, w: 76, h: 14 },
-      { x: 2130, y: 1125, w: 76, h: 14 },
-      { x: 1200, y: 735, w: 76, h: 14 }
+      { x: 270, y: 1138, w: 76, h: 14 },
+      { x: 2130, y: 1138, w: 76, h: 14 },
+      { x: 1200, y: 735, w: 76, h: 14 },
+      { x: 520, y: 555, w: 76, h: 14 },
+      { x: 1880, y: 555, w: 76, h: 14 }
     ],
     teleporters: [
       { id: "low-left", target: "high-right", x: 420, y: 900, w: 48, h: 68 },
@@ -130,10 +249,13 @@ const mapConfigs = {
     ],
     launchers: [
       { x: 890, y: 735, w: 66, h: 26, vx: 650, vy: -540 },
-      { x: 1510, y: 735, w: 66, h: 26, vx: -650, vy: -540 }
+      { x: 1510, y: 735, w: 66, h: 26, vx: -650, vy: -540 },
+      { x: 700, y: 915, w: 66, h: 26, vx: 520, vy: -430 },
+      { x: 1700, y: 915, w: 66, h: 26, vx: -520, vy: -430 }
     ],
     movingPlatforms: [
-      { x: 1200, y: 1060, w: 330, h: 22, axis: "y", distance: 95, periodMs: 2600 }
+      { x: 1200, y: 1060, w: 330, h: 22, axis: "y", distance: 95, periodMs: 2600 },
+      { x: 1200, y: 505, w: 280, h: 22, axis: "x", distance: 210, periodMs: 3300 }
     ]
   },
   arena: {
@@ -147,31 +269,48 @@ const mapConfigs = {
     launcher: 0xe05d44,
     accent: 0xd8f6ff,
     platforms: [
-      { x: 1200, y: 1160, w: 2400, h: 34 },
+      ...TAG_BOUNDARY_PLATFORMS,
+      { x: 520, y: 1040, w: 300, h: 24 },
+      { x: 1880, y: 1040, w: 300, h: 24 },
       { x: 360, y: 900, w: 350, h: 24 },
       { x: 2040, y: 900, w: 350, h: 24 },
+      { x: 880, y: 910, w: 260, h: 24, oneWay: true },
+      { x: 1520, y: 910, w: 260, h: 24, oneWay: true },
       { x: 360, y: 680, w: 350, h: 24, oneWay: true },
       { x: 2040, y: 680, w: 350, h: 24, oneWay: true },
+      { x: 760, y: 650, w: 230, h: 24, oneWay: true },
+      { x: 1640, y: 650, w: 230, h: 24, oneWay: true },
       { x: 360, y: 455, w: 350, h: 24, oneWay: true },
       { x: 2040, y: 455, w: 350, h: 24, oneWay: true },
       { x: 1200, y: 790, w: 520, h: 24 },
-      { x: 1200, y: 520, w: 360, h: 24, oneWay: true }
+      { x: 1200, y: 520, w: 360, h: 24, oneWay: true },
+      { x: 1200, y: 350, w: 260, h: 24 },
+      { x: 1200, y: 965, w: 34, h: 185, wall: true },
+      { x: 585, y: 790, w: 34, h: 150, wall: true },
+      { x: 1815, y: 790, w: 34, h: 150, wall: true },
+      { x: 980, y: 450, w: 34, h: 120, wall: true },
+      { x: 1420, y: 450, w: 34, h: 120, wall: true }
     ],
     bouncePads: [
-      { x: 650, y: 1125, w: 76, h: 14 },
-      { x: 1750, y: 1125, w: 76, h: 14 },
-      { x: 1200, y: 760, w: 76, h: 14 }
+      { x: 650, y: 1138, w: 76, h: 14 },
+      { x: 1750, y: 1138, w: 76, h: 14 },
+      { x: 1200, y: 760, w: 76, h: 14 },
+      { x: 360, y: 875, w: 76, h: 14 },
+      { x: 2040, y: 875, w: 76, h: 14 }
     ],
     teleporters: [
       { id: "left-wall", target: "right-wall", x: 300, y: 420, w: 48, h: 68 },
       { id: "right-wall", target: "left-wall", x: 2100, y: 420, w: 48, h: 68 }
     ],
     launchers: [
-      { x: 1095, y: 1130, w: 66, h: 26, vx: -800, vy: -460 },
-      { x: 1305, y: 1130, w: 66, h: 26, vx: 800, vy: -460 }
+      { x: 1095, y: 1134, w: 66, h: 26, vx: -800, vy: -460 },
+      { x: 1305, y: 1134, w: 66, h: 26, vx: 800, vy: -460 },
+      { x: 760, y: 625, w: 66, h: 26, vx: 570, vy: -430 },
+      { x: 1640, y: 625, w: 66, h: 26, vx: -570, vy: -430 }
     ],
     movingPlatforms: [
-      { x: 1200, y: 1015, w: 420, h: 22, axis: "x", distance: 360, periodMs: 3600 }
+      { x: 1200, y: 1015, w: 420, h: 22, axis: "x", distance: 360, periodMs: 3600 },
+      { x: 1200, y: 640, w: 300, h: 22, axis: "y", distance: 105, periodMs: 2800 }
     ]
   }
 };
@@ -180,67 +319,70 @@ mapConfigs.grass = mapConfigs.classic;
 mapConfigs.winter = mapConfigs.tower;
 mapConfigs.desert = mapConfigs.maze;
 
-const controlSchemes = [
-  {
-    label: "Arrows",
-    left: "ArrowLeft",
-    right: "ArrowRight",
-    down: "ArrowDown",
-    jump: ["ArrowUp", "Space"]
-  },
-  {
-    label: "WASD",
-    left: "KeyA",
-    right: "KeyD",
-    down: "KeyS",
-    jump: ["KeyW"]
-  },
-  {
-    label: "IJKL",
-    left: "KeyJ",
-    right: "KeyL",
-    down: "KeyK",
-    jump: ["KeyI"]
-  },
-  {
-    label: "Numpad",
-    left: "Numpad4",
-    right: "Numpad6",
-    down: "Numpad5",
-    jump: ["Numpad8"]
-  }
-];
+const sharedControlCodes = {
+  left: ["ArrowLeft", "KeyA"],
+  right: ["ArrowRight", "KeyD"],
+  down: ["ArrowDown", "KeyS"],
+  jump: ["ArrowUp", "KeyW", "Space"]
+};
 
-const supportedControlCodes = new Set(
-  controlSchemes.flatMap((scheme) => [
-    scheme.left,
-    scheme.right,
-    scheme.down,
-    ...scheme.jump
-  ])
-);
+const supportedControlCodes = new Set(Object.values(sharedControlCodes).flat());
 
-function createPlayerTexture(scene, key, color) {
+function hexToNumber(hex) {
+  return Number.parseInt(hex.slice(1), 16);
+}
+
+function createCountryBallTexture(scene, key, country) {
   if (scene.textures.exists(key)) {
     return;
   }
 
-  const graphics = scene.make.graphics({ x: 0, y: 0, add: false });
-  const colorNumber = Number.parseInt(color.slice(1), 16);
+  const size = 64;
+  const radius = 26;
+  const texture = scene.textures.createCanvas(key, size, size);
+  const canvas = texture.getSourceImage();
+  const ctx = canvas.getContext("2d");
 
-  graphics.fillStyle(0x17212b, 1);
-  graphics.fillRoundedRect(7, 12, 34, 34, 10);
-  graphics.fillStyle(colorNumber, 1);
-  graphics.fillRoundedRect(9, 8, 30, 36, 10);
-  graphics.fillStyle(0xffffff, 1);
-  graphics.fillCircle(19, 21, 4);
-  graphics.fillCircle(30, 21, 4);
-  graphics.fillStyle(0x17212b, 1);
-  graphics.fillCircle(20, 21, 1.6);
-  graphics.fillCircle(31, 21, 1.6);
-  graphics.fillRoundedRect(17, 33, 15, 3, 2);
-  graphics.generateTexture(key, 48, 50);
-  graphics.destroy();
+  ctx.clearRect(0, 0, size, size);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, radius, 0, Math.PI * 2);
+  ctx.clip();
+  country.draw(ctx, size);
+  ctx.restore();
+
+  const gradient = ctx.createRadialGradient(22, 18, 8, size / 2, size / 2, radius);
+  gradient.addColorStop(0, "rgba(255,255,255,0.4)");
+  gradient.addColorStop(0.58, "rgba(255,255,255,0)");
+  gradient.addColorStop(1, "rgba(0,0,0,0.18)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#17212b";
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.ellipse(24, 28, 7, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(40, 28, 7, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#17212b";
+  ctx.beginPath();
+  ctx.arc(25, 29, 2.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(41, 29, 2.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  texture.refresh();
 }
 
 function movingPlatformPosition(platform, time) {
@@ -253,28 +395,20 @@ function movingPlatformPosition(platform, time) {
   };
 }
 
-function createTagScene(Phaser, mapId, followPlayerId, onReady) {
+function createTagScene(Phaser, mapId, onReady) {
   return class TagRenderScene extends Phaser.Scene {
     constructor() {
       super("tag-render-scene");
       this.playerObjects = new Map();
       this.roomState = null;
-      this.followPlayerId = followPlayerId;
       this.movingPlatformObjects = [];
       this.lastTagAt = 0;
-      this.targetCamera = {
-        x: WORLD_WIDTH / 2,
-        y: WORLD_HEIGHT / 2,
-        zoom: 0.82
-      };
     }
 
     create() {
       this.map = mapConfigs[mapId] || mapConfigs.classic;
-      this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
       this.cameras.main.setBackgroundColor(this.map.sky);
-      this.cameras.main.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT * 0.55);
-      this.cameras.main.setZoom(this.targetCamera.zoom);
+      this.applyStaticCamera();
       this.drawMap();
 
       if (typeof onReady === "function") {
@@ -305,12 +439,33 @@ function createTagScene(Phaser, mapId, followPlayerId, onReady) {
     }
 
     drawPlatform(platform) {
-      const edge = this.add.rectangle(platform.x, platform.y, platform.w, platform.h, this.map.edge);
-      const top = this.add.rectangle(platform.x, platform.y - 9, platform.w, 12, this.map.ground);
-      edge.setDepth(2);
-      top.setDepth(3);
+      const isWall = Boolean(platform.wall);
+      const fill = isWall ? 0x22303a : this.map.edge;
+      const face = isWall ? 0x334654 : this.map.ground;
+      const body = this.add.rectangle(platform.x, platform.y, platform.w, platform.h, fill);
+      const faceHeight = Math.min(12, Math.max(4, platform.h * 0.45));
+      const faceY = platform.y - platform.h / 2 + faceHeight / 2;
+      const faceTop = this.add.rectangle(platform.x, faceY, platform.w, faceHeight, face, 0.95);
+      const seams = this.add.graphics().setDepth(isWall ? 6 : 4);
+      const startX = platform.x - platform.w / 2;
+      const endX = platform.x + platform.w / 2;
+      const startY = platform.y - platform.h / 2;
+      const endY = platform.y + platform.h / 2;
 
-      if (platform.oneWay) {
+      body.setDepth(isWall ? 5 : 2);
+      faceTop.setDepth(isWall ? 7 : 3);
+      seams.lineStyle(2, 0xffffff, isWall ? 0.13 : 0.16);
+
+      for (let y = startY + 10; y < endY; y += 18) {
+        seams.lineBetween(startX + 4, y, endX - 4, y);
+      }
+
+      for (let x = startX + 28; x < endX; x += 56) {
+        const offset = Math.floor((x - startX) / 56) % 2 ? 0 : 9;
+        seams.lineBetween(x, startY + 5 + offset, x, endY - 5);
+      }
+
+      if (platform.oneWay && !isWall) {
         const hint = this.add.rectangle(platform.x, platform.y + 7, platform.w - 16, 3, 0xffffff, 0.34);
         hint.setDepth(4);
       }
@@ -328,17 +483,36 @@ function createTagScene(Phaser, mapId, followPlayerId, onReady) {
     }
 
     drawBouncePad(pad) {
-      this.add.rectangle(pad.x, pad.y, pad.w, pad.h, this.map.pad).setDepth(10);
+      const padBody = this.add.rectangle(pad.x, pad.y, pad.w, pad.h, this.map.pad).setDepth(10);
       this.add.rectangle(pad.x, pad.y + 10, pad.w + 18, 8, 0x17212b, 0.22).setDepth(9);
-      this.add.triangle(pad.x, pad.y - 16, 0, 16, 18, 16, 9, 0, 0xffffff, 0.8).setDepth(11);
+      const arrow = this.add.triangle(pad.x, pad.y - 16, 0, 16, 18, 16, 9, 0, 0xffffff, 0.8).setDepth(11);
+
+      this.tweens.add({
+        targets: [padBody, arrow],
+        y: "-=4",
+        duration: 560,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut"
+      });
     }
 
     drawTeleporter(teleporter) {
       const ring = this.add.ellipse(teleporter.x, teleporter.y, 48, 70, this.map.teleporter, 0.2);
       ring.setStrokeStyle(5, this.map.teleporter, 1);
       ring.setDepth(10);
-      this.add.ellipse(teleporter.x, teleporter.y, 21, 34, 0xffffff, 0.78).setDepth(11);
-      this.add.ellipse(teleporter.x, teleporter.y, 11, 20, this.map.pad, 0.86).setDepth(12);
+      const core = this.add.ellipse(teleporter.x, teleporter.y, 21, 34, 0xffffff, 0.78).setDepth(11);
+      const spark = this.add.ellipse(teleporter.x, teleporter.y, 11, 20, this.map.pad, 0.86).setDepth(12);
+
+      this.tweens.add({
+        targets: [ring, core, spark],
+        scaleX: 1.1,
+        scaleY: 0.92,
+        duration: 760,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut"
+      });
     }
 
     drawLauncher(launcher) {
@@ -359,6 +533,14 @@ function createTagScene(Phaser, mapId, followPlayerId, onReady) {
 
       base.setDepth(10);
       arrow.setDepth(11);
+      this.tweens.add({
+        targets: arrow,
+        y: "-=7",
+        duration: 480,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut"
+      });
     }
 
     updateFromRoom(room) {
@@ -368,28 +550,17 @@ function createTagScene(Phaser, mapId, followPlayerId, onReady) {
 
       players.forEach((player, index) => {
         let entry = this.playerObjects.get(player.playerId);
-        const color = playerColors[index % playerColors.length];
+        const country = countryBalls[index % countryBalls.length];
 
         if (!entry) {
-          const textureKey = `tag-player-${player.playerId}`;
-          createPlayerTexture(this, textureKey, color);
+          const textureKey = `tag-player-${player.playerId}-${country.id}`;
+          createCountryBallTexture(this, textureKey, country);
 
-          const shadow = this.add.ellipse(player.x, player.y + 24, 42, 12, 0x000000, 0.18).setDepth(18);
-          const glow = this.add.ellipse(player.x, player.y, 64, 78, 0xfff2a6, 0.34).setDepth(19);
-          const shield = this.add.ellipse(player.x, player.y, 58, 68, 0xffffff, 0.2).setDepth(20);
+          const shadow = this.add.ellipse(player.x, player.y + 26, 46, 13, 0x000000, 0.18).setDepth(18);
+          const glow = this.add.ellipse(player.x, player.y, 70, 78, hexToNumber(country.accent), 0.34).setDepth(19);
+          const shield = this.add.ellipse(player.x, player.y, 64, 70, 0xffffff, 0.2).setDepth(20);
           shield.setStrokeStyle(4, 0xffffff, 0.8);
           const sprite = this.add.sprite(player.x, player.y, textureKey).setDepth(21);
-          const label = this.add
-            .text(player.x, player.y + 36, player.name, {
-              color: "#17212b",
-              fontFamily: "Manrope, Arial",
-              fontSize: "13px",
-              fontStyle: "800",
-              stroke: "#ffffff",
-              strokeThickness: 4
-            })
-            .setOrigin(0.5)
-            .setDepth(24);
           const badge = this.add
             .text(player.x, player.y - 52, "IT", {
               color: "#17212b",
@@ -402,7 +573,7 @@ function createTagScene(Phaser, mapId, followPlayerId, onReady) {
             .setOrigin(0.5)
             .setDepth(25);
 
-          entry = { shadow, glow, shield, sprite, label, badge };
+          entry = { shadow, glow, shield, sprite, badge };
           this.playerObjects.set(player.playerId, entry);
         }
 
@@ -418,8 +589,6 @@ function createTagScene(Phaser, mapId, followPlayerId, onReady) {
           entry.sprite.setTint(0xffffff);
         }
 
-        entry.label.setText(player.name);
-        entry.label.setPosition(player.x, player.y + 38);
         entry.badge.setPosition(player.x, player.y - 54);
         entry.badge.setVisible(player.isIt);
         entry.glow.setVisible(player.isIt);
@@ -444,7 +613,6 @@ function createTagScene(Phaser, mapId, followPlayerId, onReady) {
         this.lastTagAt = lastTagAt;
       }
 
-      this.updateCameraTarget(players);
     }
 
     emitTagBurst(x, y) {
@@ -466,58 +634,15 @@ function createTagScene(Phaser, mapId, followPlayerId, onReady) {
       }
     }
 
-    updateCameraTarget(players) {
-      if (!players.length) {
-        this.targetCamera = {
-          x: WORLD_WIDTH / 2,
-          y: WORLD_HEIGHT * 0.54,
-          zoom: 0.82
-        };
-        return;
-      }
+    applyStaticCamera() {
+      const camera = this.cameras.main;
+      const zoom = Math.min(this.scale.width / WORLD_WIDTH, this.scale.height / WORLD_HEIGHT) * 0.98;
 
-      const bounds = players.reduce(
-        (box, player) => ({
-          minX: Math.min(box.minX, player.x),
-          maxX: Math.max(box.maxX, player.x),
-          minY: Math.min(box.minY, player.y),
-          maxY: Math.max(box.maxY, player.y)
-        }),
-        {
-          minX: players[0].x,
-          maxX: players[0].x,
-          minY: players[0].y,
-          maxY: players[0].y
-        }
-      );
-      const width = Math.max(600, bounds.maxX - bounds.minX + 430);
-      const height = Math.max(380, bounds.maxY - bounds.minY + 330);
-      const zoom = Phaser.Math.Clamp(Math.min(this.scale.width / width, this.scale.height / height), 0.54, 0.9);
-      const visibleWorldWidth = this.scale.width / zoom;
-      const visibleWorldHeight = this.scale.height / zoom;
-      const minCameraX = visibleWorldWidth / 2;
-      const maxCameraX = WORLD_WIDTH - visibleWorldWidth / 2;
-      const minCameraY = visibleWorldHeight / 2;
-      const maxCameraY = WORLD_HEIGHT - visibleWorldHeight / 2;
-      const centerX = (bounds.minX + bounds.maxX) / 2;
-      const centerY = (bounds.minY + bounds.maxY) / 2;
-
-      this.targetCamera = {
-        x:
-          minCameraX >= maxCameraX
-            ? WORLD_WIDTH / 2
-            : Phaser.Math.Clamp(centerX, minCameraX, maxCameraX),
-        y:
-          minCameraY >= maxCameraY
-            ? WORLD_HEIGHT / 2
-            : Phaser.Math.Clamp(centerY, minCameraY, maxCameraY),
-        zoom
-      };
+      camera.setZoom(zoom);
+      camera.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
     }
 
     update(time) {
-      const camera = this.cameras.main;
-
       for (const entry of this.movingPlatformObjects) {
         const position = movingPlatformPosition(entry.platform, time);
 
@@ -533,18 +658,12 @@ function createTagScene(Phaser, mapId, followPlayerId, onReady) {
         }
       }
 
-      camera.zoom = Phaser.Math.Linear(camera.zoom, this.targetCamera.zoom, CAMERA_FOLLOW_EASE);
-      const currentCenterX = camera.scrollX + camera.width / (2 * camera.zoom);
-      const currentCenterY = camera.scrollY + camera.height / (2 * camera.zoom);
-      const nextX = Phaser.Math.Linear(currentCenterX, this.targetCamera.x, CAMERA_FOLLOW_EASE);
-      const nextY = Phaser.Math.Linear(currentCenterY, this.targetCamera.y, CAMERA_FOLLOW_EASE);
-
-      camera.centerOn(nextX, nextY);
+      this.applyStaticCamera();
     }
   };
 }
 
-function TagCanvas({ room, followPlayerId }) {
+function TagCanvas({ room }) {
   const containerRef = useRef(null);
   const gameRef = useRef(null);
   const sceneRef = useRef(null);
@@ -564,7 +683,7 @@ function TagCanvas({ room, followPlayerId }) {
           return;
         }
 
-        const Scene = createTagScene(Phaser, mapId, followPlayerId, (scene) => {
+        const Scene = createTagScene(Phaser, mapId, (scene) => {
           sceneRef.current = scene;
           scene.updateFromRoom(room);
         });
@@ -599,7 +718,7 @@ function TagCanvas({ room, followPlayerId }) {
         gameRef.current = null;
       }
     };
-  }, [followPlayerId, mapId]);
+  }, [mapId]);
 
   useEffect(() => {
     if (sceneRef.current) {
@@ -630,13 +749,16 @@ function getTagControlKey(event) {
   return "";
 }
 
-function getInputFromKeys(keys, playerIndex, gamepadInput) {
-  const scheme = controlSchemes[playerIndex % controlSchemes.length];
+function hasAnyKey(keys, codes) {
+  return codes.some((code) => keys.has(code));
+}
+
+function getInputFromKeys(keys, gamepadInput) {
   const keyboardInput = {
-    left: keys.has(scheme.left),
-    right: keys.has(scheme.right),
-    down: keys.has(scheme.down),
-    jump: scheme.jump.some((code) => keys.has(code))
+    left: hasAnyKey(keys, sharedControlCodes.left),
+    right: hasAnyKey(keys, sharedControlCodes.right),
+    down: hasAnyKey(keys, sharedControlCodes.down),
+    jump: hasAnyKey(keys, sharedControlCodes.jump)
   };
 
   return {
@@ -684,10 +806,6 @@ function formatClock(ms) {
   const seconds = totalSeconds % 60;
 
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-function formatDuration(ms) {
-  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
 }
 
 function getCountdownLabel(tag) {
@@ -740,33 +858,15 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
   const tag = room.tag || {};
   const players = tag.players || [];
   const meIndex = Math.max(0, players.findIndex((player) => player.playerId === session.playerId));
-  const me = players[meIndex];
-  const itPlayer = players.find((player) => player.playerId === tag.itPlayerId);
   const result = tag.result;
   const countdownLabel = getCountdownLabel(tag);
   const timeLeftMs = tag.timeLeftMs ?? (tag.roundSeconds || 60) * 1000;
   const tension = tag.phase === "playing" && timeLeftMs <= 10000;
   const mapName = (mapConfigs[tag.mapId] || mapConfigs.classic).name;
-  const ranking = useMemo(() => {
-    if (result?.ranking?.length) {
-      return result.ranking;
-    }
-
-    return players
-      .map((player) => ({
-        playerId: player.playerId,
-        name: player.name,
-        isLoser: player.playerId === tag.itPlayerId && tag.phase === "result",
-        itTimeMs: Math.round(tag.itDurations?.[player.playerId] || 0)
-      }))
-      .sort((first, second) => first.itTimeMs - second.itTimeMs || first.name.localeCompare(second.name));
-  }, [players, result, tag.itDurations, tag.itPlayerId, tag.phase]);
-
-  const controlLabel = controlSchemes[meIndex % controlSchemes.length]?.label || "Keyboard";
 
   useEffect(() => {
     const sendInput = () => {
-      const input = getInputFromKeys(pressedKeys.current, meIndex, readGamepadInput(meIndex));
+      const input = getInputFromKeys(pressedKeys.current, readGamepadInput(meIndex));
 
       if (!sameInput(input, lastInput.current)) {
         lastInput.current = input;
@@ -888,10 +988,6 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
               <Timer className="h-4 w-4" aria-hidden="true" />
               {tag.phase === "countdown" ? countdownLabel || "3" : formatClock(timeLeftMs)}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-ink/65">
-              <Zap className="h-4 w-4 text-coral" aria-hidden="true" />
-              {tag.tagCount || 0}
-            </span>
             <button
               type="button"
               className="compact-button border border-ink/15 bg-paper font-extrabold"
@@ -900,6 +996,16 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
             >
               <Copy className="h-4 w-4" aria-hidden="true" />
               {room.roomCode}
+            </button>
+            <button
+              type="button"
+              className="compact-button bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
+              onClick={handleRestart}
+              disabled={!isHost}
+              title="Restart"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Restart
             </button>
             <button
               type="button"
@@ -913,162 +1019,31 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
           </div>
         </header>
 
-        <section className="grid gap-3 lg:grid-cols-[1fr_21rem]">
-          <section className="surface overflow-hidden bg-ink p-2">
-            <div className={`relative overflow-hidden rounded-md bg-ink ${tension ? "tag-tension-frame" : ""}`}>
-              <TagCanvas room={room} followPlayerId={session.playerId} />
+        {status ? <p className="text-xs font-bold text-coral">{status}</p> : null}
 
-              {countdownLabel ? (
-                <div className="absolute inset-0 grid place-items-center bg-ink/20">
-                  <div className="tag-countdown-pop text-8xl font-extrabold text-white drop-shadow-lg sm:text-9xl">
-                    {countdownLabel}
-                  </div>
+        <section className="surface overflow-hidden bg-ink p-2">
+          <div className={`relative overflow-hidden rounded-md bg-ink ${tension ? "tag-tension-frame" : ""}`}>
+            <TagCanvas room={room} />
+
+            {countdownLabel ? (
+              <div className="absolute inset-0 grid place-items-center bg-ink/20">
+                <div className="tag-countdown-pop text-8xl font-extrabold text-white drop-shadow-lg sm:text-9xl">
+                  {countdownLabel}
                 </div>
-              ) : null}
-
-              {result ? (
-                <div className="absolute inset-0 grid place-items-center bg-ink/72 px-4 text-center text-white">
-                  <div className="result-card max-w-lg rounded-md border border-white/20 bg-ink/80 p-5 shadow-soft">
-                    <Trophy className="winner-trophy mx-auto mb-3 h-10 w-10 text-honey" aria-hidden="true" />
-                    <p className="text-xs font-extrabold uppercase text-white/60">Round Over</p>
-                    <h2 className="mt-1 text-3xl font-extrabold">
-                      {result.loser?.name || "Someone"} was IT
-                    </h2>
-                    <p className="mt-2 text-sm font-bold text-white/70">
-                      {result.tagCount || 0} tag{(result.tagCount || 0) === 1 ? "" : "s"} this round
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </section>
-
-          <aside className="space-y-3">
-            <section className="surface p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-extrabold uppercase text-mint">
-                    {tag.phase === "countdown" ? "Countdown" : tag.phase === "result" ? "Result" : "Live Round"}
-                  </p>
-                  <h2 className="text-base font-extrabold">TAG</h2>
-                </div>
-                <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-extrabold text-ink/65">
-                  {players.length}/{room.maxPlayers}
-                </span>
               </div>
-
-              <div className="rounded-md bg-coral px-3 py-3 text-white">
-                <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase text-white/70">
-                  <Crown className="h-4 w-4" aria-hidden="true" />
-                  Current IT
-                </p>
-                <p className="truncate text-2xl font-extrabold">{itPlayer?.name || "-"}</p>
-              </div>
-
-              {me ? (
-                <p className="mt-2 text-xs font-bold text-ink/50">
-                  P{meIndex + 1} / {controlLabel} / gamepad {meIndex + 1}
-                </p>
-              ) : null}
-            </section>
-
-            <section className="surface p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-base font-extrabold">Players</h2>
-                <Users className="h-4 w-4 text-mint" aria-hidden="true" />
-              </div>
-              <div className="space-y-2">
-                {players.map((player, index) => {
-                  const isMe = player.playerId === session.playerId;
-
-                  return (
-                    <div
-                      key={player.playerId}
-                      className={`rounded-md border px-3 py-2 ${
-                        player.isIt ? "border-coral bg-coral/10" : "border-ink/10 bg-paper"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate text-sm font-extrabold">
-                          {player.name}
-                          {isMe ? " (You)" : ""}
-                        </span>
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[11px] font-extrabold text-white"
-                          style={{ backgroundColor: player.isIt ? "#e05d44" : playerColors[index % playerColors.length] }}
-                        >
-                          {player.isIt ? "IT" : player.invulMs > 0 ? "SAFE" : "RUN"}
-                        </span>
-                      </div>
-                      {player.tagCooldownMs > 0 || player.invulMs > 0 ? (
-                        <p className="mt-1 text-[11px] font-extrabold uppercase text-ink/45">
-                          {player.tagCooldownMs > 0
-                            ? `Cooldown ${formatDuration(player.tagCooldownMs)}`
-                            : `Grace ${formatDuration(player.invulMs)}`}
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="surface p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-base font-extrabold">IT Time</h2>
-                <span className="rounded-full bg-paper px-2 py-0.5 text-[11px] font-extrabold text-ink/55">
-                  low wins
-                </span>
-              </div>
-              <div className="space-y-2">
-                {ranking.map((player, index) => {
-                  const maxMs = Math.max(...ranking.map((entry) => entry.itTimeMs), 1000);
-                  const width = `${Math.max(5, (player.itTimeMs / maxMs) * 100)}%`;
-
-                  return (
-                    <div key={player.playerId} className="rounded-md bg-paper px-3 py-2">
-                      <div className="mb-1 flex items-center justify-between gap-2 text-sm font-extrabold">
-                        <span className="truncate">
-                          {index + 1}. {player.name}
-                        </span>
-                        <span className={player.isLoser ? "text-coral" : "text-ink/60"}>
-                          {formatDuration(player.itTimeMs)}
-                        </span>
-                      </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-ink/10">
-                        <div className="h-full rounded-full bg-mint" style={{ width }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+            ) : null}
 
             {result ? (
-              <section className="surface result-card border-honey p-3">
-                <Trophy className="winner-trophy mb-2 h-8 w-8 text-honey" aria-hidden="true" />
-                <p className="text-xs font-extrabold uppercase text-ink/50">Round Result</p>
-                <h2 className="text-2xl font-extrabold">
-                  {result.loser?.name || "Round"} loses
-                </h2>
-              </section>
+              <div className="absolute inset-0 grid place-items-center bg-ink/72 px-4 text-center text-white">
+                <div className="result-card max-w-lg rounded-md border border-white/20 bg-ink/80 p-5 shadow-soft">
+                  <p className="text-xs font-extrabold uppercase text-white/60">Round Over</p>
+                  <h2 className="mt-1 text-3xl font-extrabold">
+                    {result.loser?.name || "Someone"} was IT
+                  </h2>
+                </div>
+              </div>
             ) : null}
-
-            {status ? <p className="text-xs font-bold text-coral">{status}</p> : null}
-
-            <button
-              type="button"
-              className="compact-button w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-              onClick={handleRestart}
-              disabled={!isHost}
-            >
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Restart
-            </button>
-            {!isHost ? (
-              <p className="text-center text-xs font-bold text-ink/50">Waiting for host</p>
-            ) : null}
-          </aside>
+          </div>
         </section>
       </div>
     </main>
