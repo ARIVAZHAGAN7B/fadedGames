@@ -1,6 +1,6 @@
 import Cell from "./Cell.jsx";
 
-export default function Board({ board, boardSize, calledNumbers, isMyTurn, gameEnded, onCallNumber }) {
+export default function Board({ board, boardSize, calledNumbers, isMyTurn, gameEnded, onCallNumber, animateCalls = true }) {
   const inferredBoardSize = Number.isInteger(boardSize) && boardSize > 0
     ? boardSize
     : Math.max(1, Math.round(Math.sqrt(board.length)));
@@ -26,6 +26,7 @@ export default function Board({ board, boardSize, calledNumbers, isMyTurn, gameE
             latest={isLatest}
             clickable={clickable}
             onClick={onCallNumber}
+            animateCall={animateCalls}
           />
         );
       })}

@@ -1,12 +1,43 @@
-import { Check, Clock3, Copy, DoorOpen, Home, RefreshCw, RotateCcw, Trophy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Check, Clock3, Copy, DoorOpen, Home, RefreshCw, RotateCcw, Sparkles, Trophy } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { buildRoomLink } from "../utils/roomLink.js";
 
 const calculatorNumbers = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, 10];
+const PICK_ANIMATION_STORAGE_KEY = "hand-cricket-pick-animations";
+const KEYBOARD_TEN_DELAY_MS = 220;
 const teamLabels = {
   red: "Team Red",
   blue: "Team Blue"
 };
+
+function readPickAnimationPreference() {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  return window.localStorage.getItem(PICK_ANIMATION_STORAGE_KEY) !== "off";
+}
+
+function isEditableTarget(target) {
+  const element = target instanceof HTMLElement ? target : null;
+
+  if (!element) {
+    return false;
+  }
+
+  return (
+    element.isContentEditable ||
+    ["INPUT", "TEXTAREA", "SELECT"].includes(element.tagName)
+  );
+}
+
+function getDigitFromKeyboardEvent(event) {
+  if (event.key.length === 1 && event.key >= "0" && event.key <= "9") {
+    return Number(event.key);
+  }
+
+  return null;
+}
 
 function hasPick(picks, playerId) {
   return Object.prototype.hasOwnProperty.call(picks || {}, playerId);
@@ -98,7 +129,7 @@ function getAvailableTeamBatsmen(state) {
   );
 }
 
-function NumberPad({ disabled, onPick, role, secondsLeft, timerProgress, selectedNumber }) {
+function NumberPad({ disabled, onPick, role, secondsLeft, timerProgress, selectedNumber, animatePick }) {
   const label = role === "bat" ? "Choose runs" : role === "bowl" ? "Choose bowl" : "Waiting";
 
   return (
@@ -129,11 +160,13 @@ function NumberPad({ disabled, onPick, role, secondsLeft, timerProgress, selecte
             <button
               key={number}
               type="button"
-              className={`relative h-12 rounded-md border text-lg font-extrabold shadow-sm transition active:scale-95 disabled:cursor-not-allowed sm:h-14 ${
+              className={`relative h-12 rounded-md border text-lg font-extrabold shadow-sm transition disabled:cursor-not-allowed sm:h-14 ${
+                animatePick ? "active:scale-95" : ""
+              } ${
                 number === 10 ? "col-span-2" : ""
               } ${
                 isSelected
-                  ? "pick-pop border-coral bg-coral text-white shadow-md"
+                  ? `${animatePick ? "pick-pop " : ""}border-coral bg-coral text-white shadow-md`
                   : "border-ink/15 bg-white text-ink hover:border-coral hover:text-coral disabled:bg-ink/10 disabled:text-ink/35"
               } ${selectedNumber !== null && !isSelected ? "opacity-45" : ""}`}
               disabled={disabled}
@@ -148,7 +181,7 @@ function NumberPad({ disabled, onPick, role, secondsLeft, timerProgress, selecte
   );
 }
 
-function TossNumberPad({ disabled, onPick, selectedNumber, secondsLeft, timerProgress }) {
+function TossNumberPad({ disabled, onPick, selectedNumber, secondsLeft, timerProgress, animatePick }) {
   return (
     <div className="mx-auto max-w-xs rounded-md border border-ink/10 bg-paper p-2.5">
       <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-ink/10">
@@ -177,11 +210,13 @@ function TossNumberPad({ disabled, onPick, selectedNumber, secondsLeft, timerPro
             <button
               key={number}
               type="button"
-              className={`relative h-12 rounded-md border text-lg font-extrabold shadow-sm transition active:scale-95 disabled:cursor-not-allowed sm:h-14 ${
+              className={`relative h-12 rounded-md border text-lg font-extrabold shadow-sm transition disabled:cursor-not-allowed sm:h-14 ${
+                animatePick ? "active:scale-95" : ""
+              } ${
                 number === 10 ? "col-span-2" : ""
               } ${
                 isSelected
-                  ? "pick-pop border-coral bg-coral text-white shadow-md"
+                  ? `${animatePick ? "pick-pop " : ""}border-coral bg-coral text-white shadow-md`
                   : "border-ink/15 bg-white text-ink hover:border-coral hover:text-coral disabled:bg-ink/10 disabled:text-ink/35"
               } ${selectedNumber !== null && !isSelected ? "opacity-45" : ""}`}
               disabled={disabled}
@@ -518,6 +553,9 @@ export default function HandCricket({
   const [now, setNow] = useState(Date.now());
   const [selectedPick, setSelectedPick] = useState(null);
   const [selectedTossPick, setSelectedTossPick] = useState(null);
+  const [pickAnimationsEnabled, setPickAnimationsEnabled] = useState(readPickAnimationPreference);
+  const keyboardPickTimerRef = useRef(null);
+  const keyboardPendingOneRef = useRef(false);
   const state = room.handCricket || {};
   const isHost = room.host === session.playerId;
   const isTeamMode = state.mode === "team";
@@ -617,6 +655,15 @@ export default function HandCricket({
       ? Math.max(0, Math.min(100, (selectionTimeLeftMs / selectionDurationMs) * 100))
       : 100;
 
+  function clearKeyboardPickTimer() {
+    if (keyboardPickTimerRef.current) {
+      window.clearTimeout(keyboardPickTimerRef.current);
+      keyboardPickTimerRef.current = null;
+    }
+
+    keyboardPendingOneRef.current = false;
+  }
+
   useEffect(() => {
     const hasInningsTimer = state.phase === "innings" && state.moveDeadlineAt;
     const hasCountdownTimer = state.phase === "countdown" && state.countdownDeadlineAt;
@@ -685,6 +732,20 @@ export default function HandCricket({
     }
   };
 
+  const togglePickAnimations = () => {
+    setPickAnimationsEnabled((current) => {
+      const next = !current;
+
+      try {
+        window.localStorage.setItem(PICK_ANIMATION_STORAGE_KEY, next ? "on" : "off");
+      } catch {
+        // Animation preference is optional.
+      }
+
+      return next;
+    });
+  };
+
   const runAction = async (action) => {
     setStatus("");
     const result = await action();
@@ -722,6 +783,79 @@ export default function HandCricket({
     }
   };
 
+  useEffect(() => {
+    const canPickActiveNumber =
+      (state.phase === "toss-throw" && canPickToss && selectedTossPick === null) ||
+      (state.phase === "innings" && canPickBall && selectedPick === null);
+
+    if (!canPickActiveNumber) {
+      clearKeyboardPickTimer();
+      return undefined;
+    }
+
+    const commitKeyboardPick = (number) => {
+      if (state.phase === "toss-throw") {
+        handlePickTossNumber(number);
+      } else if (state.phase === "innings") {
+        handlePickNumber(number);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        isEditableTarget(event.target)
+      ) {
+        return;
+      }
+
+      const digit = getDigitFromKeyboardEvent(event);
+
+      if (digit === null) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (keyboardPendingOneRef.current && digit === 0) {
+        clearKeyboardPickTimer();
+        commitKeyboardPick(10);
+        return;
+      }
+
+      clearKeyboardPickTimer();
+
+      if (digit === 1) {
+        keyboardPendingOneRef.current = true;
+        keyboardPickTimerRef.current = window.setTimeout(() => {
+          keyboardPickTimerRef.current = null;
+          keyboardPendingOneRef.current = false;
+          commitKeyboardPick(1);
+        }, KEYBOARD_TEN_DELAY_MS);
+        return;
+      }
+
+      commitKeyboardPick(digit);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      clearKeyboardPickTimer();
+    };
+  }, [
+    canPickBall,
+    canPickToss,
+    selectedPick,
+    selectedTossPick,
+    state.phase,
+    state.moveId
+  ]);
+
   const handleSelectTeamPlayer = async (payload) => {
     const result = await runAction(() => onSelectTeamPlayer(payload));
 
@@ -748,6 +882,18 @@ export default function HandCricket({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className={`compact-button border border-ink/15 ${
+                pickAnimationsEnabled ? "bg-honey text-ink" : "bg-white text-ink/55"
+              }`}
+              onClick={togglePickAnimations}
+              title={pickAnimationsEnabled ? "Disable click animation" : "Enable click animation"}
+              aria-label={pickAnimationsEnabled ? "Disable click animation" : "Enable click animation"}
+              aria-pressed={pickAnimationsEnabled}
+            >
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+            </button>
             <button
               type="button"
               className="compact-button border border-ink/15 bg-paper font-extrabold"
@@ -828,6 +974,7 @@ export default function HandCricket({
                       selectedNumber={selectedTossPick}
                       secondsLeft={tossSecondsLeft}
                       timerProgress={tossTimerProgress}
+                      animatePick={pickAnimationsEnabled}
                       onPick={handlePickTossNumber}
                     />
                   ) : myTossPicked ? (
@@ -960,6 +1107,7 @@ export default function HandCricket({
                     secondsLeft={secondsLeft}
                     timerProgress={timerProgress}
                     selectedNumber={selectedPick}
+                    animatePick={pickAnimationsEnabled}
                     onPick={handlePickNumber}
                   />
 

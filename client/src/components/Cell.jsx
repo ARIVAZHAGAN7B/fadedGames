@@ -1,6 +1,6 @@
 import { X as XIcon } from "lucide-react";
 
-export default function Cell({ number, called, latest, clickable, onClick }) {
+export default function Cell({ number, called, latest, clickable, onClick, animateCall = true }) {
   const baseClasses =
     "relative aspect-square w-full overflow-hidden rounded-md border text-center text-base font-extrabold transition sm:text-xl";
   const stateClasses = called
@@ -12,7 +12,7 @@ export default function Cell({ number, called, latest, clickable, onClick }) {
   return (
     <button
       type="button"
-      className={`${baseClasses} ${stateClasses} ${latest ? "strike-pop" : ""}`}
+      className={`${baseClasses} ${stateClasses} ${latest && animateCall ? "strike-pop" : ""}`}
       disabled={!clickable}
       onClick={() => onClick(number)}
       aria-label={called ? `${number} called` : `Call ${number}`}
@@ -20,7 +20,7 @@ export default function Cell({ number, called, latest, clickable, onClick }) {
       {called ? (
         <>
           <XIcon className="mx-auto h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
-          {latest ? (
+          {latest && animateCall ? (
             <span
               className="pointer-events-none absolute left-0 top-1/2 h-1 w-full rounded-full bg-white/85"
               style={{ animation: "strike-line 360ms ease-out both" }}
