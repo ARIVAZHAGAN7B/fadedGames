@@ -231,7 +231,7 @@ export default function Home({
             </div>
           </header>
 
-          <section className="grid flex-1 items-center gap-3 sm:grid-cols-3">
+          <section className="grid flex-1 content-center gap-3 sm:grid-cols-4 xl:grid-cols-8">
             {games.map((game) => (
               <button
                 key={game.id}
