@@ -21,12 +21,17 @@ import {
   resolveHandCricketReveal,
   resolveHandCricketTeamSelectionTimeout,
   resolveHandCricketTossTimeout,
+  resolveWordGuessTimeout,
   serializeRoom,
   selectHandCricketTeamPlayer,
+  setGuessNumberSecret,
   setPlayerBoard,
+  setWordGuessSecret,
   startGame,
   submitHandCricketNumber,
+  submitGuessNumberGuess,
   submitTagInput,
+  submitWordGuessGuess,
   tickTagRoom,
   updateRoomSettings
 } from "../roomManager/index.js";
@@ -38,6 +43,7 @@ const disconnectTimers = new Map();
 const botTurnTimers = new Map();
 const handCricketMoveTimers = new Map();
 const tagRoomLoops = new Map();
+const wordGuessTimers = new Map();
 
 function timerKey(roomCode, playerId) {
   return `${roomCode}:${playerId}`;
@@ -67,11 +73,13 @@ function scheduleDisconnectCleanup(io, roomCode, playerId) {
         room: serializeRoom(result.room)
       });
       emitRoomUpdate(io, result.room);
+      scheduleWordGuessTimer(io, result.room);
       emitActiveRooms(io);
     } else if (result?.deleted) {
       cancelBotTurn(roomCode);
       cancelHandCricketMove(roomCode);
       cancelTagLoop(roomCode);
+      cancelWordGuessTimer(roomCode);
       emitActiveRooms(io);
     }
   }, DISCONNECT_GRACE_MS);
@@ -146,6 +154,68 @@ function cancelTagLoop(roomCode) {
     clearInterval(loop);
     tagRoomLoops.delete(roomCode);
   }
+}
+
+function cancelWordGuessTimer(roomCode) {
+  const timer = wordGuessTimers.get(roomCode);
+
+  if (timer) {
+    clearTimeout(timer);
+    wordGuessTimers.delete(roomCode);
+  }
+}
+
+function scheduleWordGuessTimer(io, room) {
+  cancelWordGuessTimer(room.roomCode);
+
+  const state = room.wordGuess;
+
+  if (
+    room.gameType !== "word-guess" ||
+    !room.gameStarted ||
+    room.gameEnded ||
+    !state
+  ) {
+    return;
+  }
+
+  const deadlineAt =
+    state.phase === "locked"
+      ? state.lockDeadlineAt
+      : state.phase === "guessing"
+        ? state.roundDeadlineAt
+        : null;
+
+  if (!deadlineAt) {
+    return;
+  }
+
+  const roomCode = room.roomCode;
+  const moveId = state.moveId;
+  const delay = Math.max(0, deadlineAt - Date.now()) + 25;
+  const timer = setTimeout(() => {
+    wordGuessTimers.delete(roomCode);
+
+    try {
+      const result = resolveWordGuessTimeout({ roomCode, moveId });
+
+      if (!result.changed) {
+        scheduleWordGuessTimer(io, result.room);
+        return;
+      }
+
+      if (!emitGameEndedIfNeeded(io, result.room)) {
+        emitRoomUpdate(io, result.room);
+        scheduleWordGuessTimer(io, result.room);
+      } else {
+        cancelWordGuessTimer(roomCode);
+      }
+    } catch {
+      cancelWordGuessTimer(roomCode);
+    }
+  }, delay);
+
+  wordGuessTimers.set(roomCode, timer);
 }
 
 function scheduleTagLoop(io, room) {
@@ -332,6 +402,7 @@ function leaveCurrentRoom(io, socket, { broadcastActiveRooms = true } = {}) {
     cancelBotTurn(result.roomCode);
     cancelHandCricketMove(result.roomCode);
     cancelTagLoop(result.roomCode);
+    cancelWordGuessTimer(result.roomCode);
     if (broadcastActiveRooms) {
       emitActiveRooms(io);
     }
@@ -347,6 +418,7 @@ function leaveCurrentRoom(io, socket, { broadcastActiveRooms = true } = {}) {
     io.to(result.room.roomCode).emit("player-left", payload);
     emitRoomUpdate(io, result.room);
     scheduleBotTurn(io, result.room);
+    scheduleWordGuessTimer(io, result.room);
   }
 
   if (broadcastActiveRooms) {
@@ -447,6 +519,7 @@ export function registerSocketHandlers(io) {
         emitRoomUpdate(io, room);
         scheduleHandCricketMove(io, room);
         scheduleTagLoop(io, room);
+        scheduleWordGuessTimer(io, room);
         emitActiveRooms(io);
 
         callbackSuccess(callback, {
@@ -650,6 +723,7 @@ export function registerSocketHandlers(io) {
         scheduleBotTurn(io, room);
         scheduleHandCricketMove(io, room);
         scheduleTagLoop(io, room);
+        scheduleWordGuessTimer(io, room);
         emitActiveRooms(io);
 
         callbackSuccess(callback, {
@@ -671,6 +745,100 @@ export function registerSocketHandlers(io) {
         scheduleBotTurn(io, result.room);
 
         callbackSuccess(callback, {
+          room: roomState
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("guess-number-set-secret", (payload, callback) => {
+      try {
+        const room = setGuessNumberSecret({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          number: payload?.number
+        });
+        const roomState = serializeRoom(room);
+
+        io.to(room.roomCode).emit("room-updated", {
+          room: roomState
+        });
+
+        callbackSuccess(callback, {
+          room: roomState
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("guess-number-submit-guess", (payload, callback) => {
+      try {
+        const result = submitGuessNumberGuess({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          number: payload?.number
+        });
+        const roomState = serializeRoom(result.room);
+
+        if (!emitGameEndedIfNeeded(io, result.room)) {
+          io.to(result.room.roomCode).emit("room-updated", {
+            room: roomState
+          });
+        }
+
+        callbackSuccess(callback, {
+          guess: result.guess,
+          room: roomState
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("word-guess-set-secret", (payload, callback) => {
+      try {
+        const room = setWordGuessSecret({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          word: payload?.word
+        });
+        const roomState = serializeRoom(room);
+
+        io.to(room.roomCode).emit("room-updated", {
+          room: roomState
+        });
+        scheduleWordGuessTimer(io, room);
+
+        callbackSuccess(callback, {
+          room: roomState
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("word-guess-submit-guess", (payload, callback) => {
+      try {
+        const result = submitWordGuessGuess({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          word: payload?.word
+        });
+        const roomState = serializeRoom(result.room);
+
+        if (!emitGameEndedIfNeeded(io, result.room)) {
+          io.to(result.room.roomCode).emit("room-updated", {
+            room: roomState
+          });
+          scheduleWordGuessTimer(io, result.room);
+        } else {
+          cancelWordGuessTimer(result.room.roomCode);
+        }
+
+        callbackSuccess(callback, {
+          guess: result.guess,
           room: roomState
         });
       } catch (error) {
@@ -746,6 +914,7 @@ export function registerSocketHandlers(io) {
         cancelBotTurn(room.roomCode);
         cancelHandCricketMove(room.roomCode);
         cancelTagLoop(room.roomCode);
+        cancelWordGuessTimer(room.roomCode);
         io.to(room.roomCode).emit("room-restarted", {
           room: roomState
         });
@@ -775,6 +944,7 @@ export function registerSocketHandlers(io) {
       if (result) {
         scheduleDisconnectCleanup(io, result.room.roomCode, result.player.playerId);
         emitRoomUpdate(io, result.room);
+        scheduleWordGuessTimer(io, result.room);
       }
     });
   });

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Guess Number">
+  <rect width="512" height="512" fill="#17212b"/>
+  <circle cx="256" cy="256" r="190" fill="#f7f4ee"/>
+  <circle cx="256" cy="256" r="150" fill="#2f9f88"/>
+  <path fill="#f2bd45" d="M145 337c20 32 61 54 111 54s91-22 111-54H145Z"/>
+  <path fill="#ffffff" d="M167 150h178c38 0 69 31 69 69v20c0 38-31 69-69 69h-38l-53 54-53-54h-34c-38 0-69-31-69-69v-20c0-38 31-69 69-69Z"/>
+  <path fill="#17212b" d="M228 236c0-36 44-38 44-60 0-13-11-21-27-21-18 0-33 9-45 23l-28-31c19-23 47-36 79-36 44 0 75 21 75 59 0 43-48 48-48 73v7h-50v-14Zm-4 54c0-17 13-30 31-30s31 13 31 30-13 30-31 30-31-13-31-30Z"/>
+  <circle cx="148" cy="362" r="31" fill="#e05d44"/>
+  <circle cx="364" cy="362" r="31" fill="#e05d44"/>
+  <path fill="#ffffff" d="M142 349h12v27h-12zM358 349h12v27h-12z"/>
+</svg>

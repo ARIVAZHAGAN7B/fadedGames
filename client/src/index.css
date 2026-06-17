@@ -177,6 +177,17 @@ button:disabled {
   }
 }
 
+@keyframes word-guess-banner {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 159, 136, 0.28);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(47, 159, 136, 0.12);
+  }
+}
+
 @keyframes tag-countdown-pop {
   0% {
     opacity: 0;
@@ -320,6 +331,40 @@ button:disabled {
 
   .result-card {
     animation: result-rise 520ms ease-out both;
+  }
+
+  .word-cell-correct-hc {
+    background: repeating-linear-gradient(
+      135deg,
+      #0f766e 0,
+      #0f766e 7px,
+      #134e4a 7px,
+      #134e4a 14px
+    );
+  }
+
+  .word-cell-present-hc {
+    background: repeating-linear-gradient(
+      45deg,
+      #f2bd45 0,
+      #f2bd45 6px,
+      #f59e0b 6px,
+      #f59e0b 12px
+    );
+  }
+
+  .word-cell-absent-hc {
+    background: repeating-linear-gradient(
+      90deg,
+      #64748b 0,
+      #64748b 6px,
+      #475569 6px,
+      #475569 12px
+    );
+  }
+
+  .word-guess-banner {
+    animation: word-guess-banner 900ms ease-in-out infinite;
   }
 
   .winner-trophy {

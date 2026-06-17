@@ -4,7 +4,15 @@ export function normalizeRoomCode(roomCode) {
 
 export function normalizeGameType(gameType) {
   const value = String(gameType || "").trim().toLowerCase();
-  return value === "bingo" || value === "hand-cricket" || value === "tag" ? value : "";
+  return (
+    value === "bingo" ||
+    value === "hand-cricket" ||
+    value === "tag" ||
+    value === "guess-number" ||
+    value === "word-guess"
+  )
+    ? value
+    : "";
 }
 
 export function getRoomCodeFromUrl() {

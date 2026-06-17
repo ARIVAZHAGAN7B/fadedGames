@@ -42,10 +42,274 @@ const TAG_BOUNCE_COOLDOWN_MS = 300;
 const TAG_TELEPORT_COOLDOWN_MS = 1200;
 const TAG_MIN_TAG_OVERLAP = 14;
 const TAG_FLASH_MS = 260;
-const SUPPORTED_GAME_TYPES = new Set(["bingo", "hand-cricket", "tag"]);
+const GUESS_NUMBER_PLAYERS = 2;
+const GUESS_NUMBER_MIN = 1;
+const GUESS_NUMBER_MAX = 100;
+const WORD_GUESS_PLAYERS = 2;
+const WORD_GUESS_WORD_LENGTH = 5;
+const WORD_GUESS_WORDS_PER_PLAYER = 10;
+const WORD_GUESS_MAX_ATTEMPTS = 6;
+const WORD_GUESS_GUESS_MS = 30000;
+const WORD_GUESS_LOCK_REVEAL_MS = 5000;
+const SUPPORTED_GAME_TYPES = new Set(["bingo", "hand-cricket", "tag", "guess-number", "word-guess"]);
 const HAND_CRICKET_MODES = new Set(["classic", "team"]);
 const HAND_CRICKET_TEAMS = ["red", "blue"];
 const HAND_CRICKET_NUMBERS = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+const WORD_GUESS_WORD_BANK = [
+  "ABOUT",
+  "ADAPT",
+  "ADMIT",
+  "ADORE",
+  "AGILE",
+  "ALARM",
+  "ALBUM",
+  "ALERT",
+  "ALIVE",
+  "ALLOY",
+  "AMBER",
+  "AMPLE",
+  "ANGLE",
+  "APPLE",
+  "APRON",
+  "ARENA",
+  "ARGUE",
+  "ARISE",
+  "ARMOR",
+  "ASIDE",
+  "ATLAS",
+  "AUDIO",
+  "AWARD",
+  "BASIC",
+  "BEACH",
+  "BEARD",
+  "BLEND",
+  "BLOCK",
+  "BLOOM",
+  "BOARD",
+  "BRAIN",
+  "BRAND",
+  "BRAVE",
+  "BREAD",
+  "BRICK",
+  "BRIDE",
+  "BRIEF",
+  "BRING",
+  "BROAD",
+  "BROWN",
+  "BUILD",
+  "CABIN",
+  "CABLE",
+  "CANDY",
+  "CANOE",
+  "CARRY",
+  "CAUSE",
+  "CHAIR",
+  "CHARM",
+  "CHART",
+  "CHECK",
+  "CHEST",
+  "CHILL",
+  "CHIME",
+  "CLASP",
+  "CLEAN",
+  "CLEAR",
+  "CLIMB",
+  "CLOCK",
+  "CLOUD",
+  "COACH",
+  "COAST",
+  "COLOR",
+  "COMET",
+  "CRAFT",
+  "CREAM",
+  "CREST",
+  "CROWN",
+  "DANCE",
+  "DECOR",
+  "DELTA",
+  "DREAM",
+  "DRIFT",
+  "DRINK",
+  "DRIVE",
+  "EARTH",
+  "EAGER",
+  "ELBOW",
+  "ELITE",
+  "ENJOY",
+  "ENTRY",
+  "EQUAL",
+  "EVENT",
+  "FAITH",
+  "FANCY",
+  "FIELD",
+  "FLAME",
+  "FLAIR",
+  "FLASH",
+  "FLEET",
+  "FLOOD",
+  "FLOOR",
+  "FOCUS",
+  "FORCE",
+  "FORGE",
+  "FRAME",
+  "FRESH",
+  "FRONT",
+  "FROST",
+  "FRUIT",
+  "GLASS",
+  "GLOBE",
+  "GRACE",
+  "GRAIN",
+  "GRAND",
+  "GRANT",
+  "GRAPE",
+  "GRAPH",
+  "GREEN",
+  "GROVE",
+  "GUARD",
+  "GUEST",
+  "GUIDE",
+  "HEART",
+  "HONEY",
+  "HOUSE",
+  "HUMAN",
+  "HUMOR",
+  "IDEAL",
+  "IMAGE",
+  "INDEX",
+  "INNER",
+  "INPUT",
+  "ISSUE",
+  "JOLLY",
+  "JUDGE",
+  "JUICE",
+  "KNIFE",
+  "LABEL",
+  "LASER",
+  "LAYER",
+  "LIGHT",
+  "LIMIT",
+  "LODGE",
+  "MAGIC",
+  "MAJOR",
+  "MANGO",
+  "MAPLE",
+  "MATCH",
+  "METAL",
+  "MIGHT",
+  "MODEL",
+  "MONEY",
+  "MOTOR",
+  "MOUNT",
+  "MUSIC",
+  "NOBLE",
+  "NORTH",
+  "OCEAN",
+  "OLIVE",
+  "ONION",
+  "OPERA",
+  "ORBIT",
+  "ORDER",
+  "PAINT",
+  "PANEL",
+  "PARTY",
+  "PEACE",
+  "PEARL",
+  "PHONE",
+  "PIANO",
+  "PIECE",
+  "PILOT",
+  "PLACE",
+  "PLANT",
+  "PLATE",
+  "POINT",
+  "POWER",
+  "PRIME",
+  "PRINT",
+  "PRIZE",
+  "PROUD",
+  "QUART",
+  "QUEEN",
+  "QUICK",
+  "QUIET",
+  "RADIO",
+  "RAISE",
+  "RANCH",
+  "RANGE",
+  "RATIO",
+  "READY",
+  "RIVER",
+  "ROUGH",
+  "ROUND",
+  "ROYAL",
+  "SCALE",
+  "SCENE",
+  "SCOPE",
+  "SCORE",
+  "SENSE",
+  "SHARE",
+  "SHARP",
+  "SHEET",
+  "SHELF",
+  "SHIFT",
+  "SHINE",
+  "SHIRT",
+  "SKILL",
+  "SLATE",
+  "SMART",
+  "SMILE",
+  "SOLAR",
+  "SOUND",
+  "SPACE",
+  "SPARE",
+  "SPICE",
+  "STACK",
+  "STAGE",
+  "STAIR",
+  "STAND",
+  "STONE",
+  "STORE",
+  "STORM",
+  "STORY",
+  "STRIP",
+  "STYLE",
+  "SUGAR",
+  "TABLE",
+  "TASTE",
+  "TEACH",
+  "THEME",
+  "THINK",
+  "THORN",
+  "THOSE",
+  "TITLE",
+  "TOAST",
+  "TONIC",
+  "TOUCH",
+  "TRACE",
+  "TRACK",
+  "TRADE",
+  "TRAIL",
+  "TRAIN",
+  "TREND",
+  "TRIAL",
+  "TRUST",
+  "UNION",
+  "UNITY",
+  "URBAN",
+  "VALUE",
+  "VIDEO",
+  "VITAL",
+  "VOICE",
+  "WATER",
+  "WHEEL",
+  "WIDTH",
+  "WORLD",
+  "WORTH",
+  "WRITE",
+  "YEARN",
+  "YOUTH",
+  "ZESTY"
+];
 const TAG_BOUNDARY_PLATFORMS = [
   { x: 1200, y: 1176, w: 2400, h: 48, wall: true },
   { x: 1200, y: 24, w: 2400, h: 48, wall: true },
@@ -365,6 +629,79 @@ function cleanTagRoundSeconds(roundSeconds) {
   return TAG_ROUND_SECONDS.has(value) ? value : TAG_DEFAULT_ROUND_SECONDS;
 }
 
+function cleanGuessNumberValue(number) {
+  const value = Number(number);
+
+  if (!Number.isInteger(value) || value < GUESS_NUMBER_MIN || value > GUESS_NUMBER_MAX) {
+    throw new Error(`Choose a number from ${GUESS_NUMBER_MIN} to ${GUESS_NUMBER_MAX}.`);
+  }
+
+  return value;
+}
+
+function cleanWordGuessValue(word) {
+  const value = String(word || "").trim().toUpperCase();
+
+  if (!new RegExp(`^[A-Z]{${WORD_GUESS_WORD_LENGTH}}$`).test(value)) {
+    throw new Error(`Choose a ${WORD_GUESS_WORD_LENGTH}-letter word.`);
+  }
+
+  return value;
+}
+
+function shuffleWords(words) {
+  const shuffled = [...words];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+function createWordGuessWordPacks(players) {
+  const shuffled = shuffleWords(WORD_GUESS_WORD_BANK);
+
+  return Object.fromEntries(
+    players.map((player, index) => [
+      player.playerId,
+      shuffled.slice(
+        index * WORD_GUESS_WORDS_PER_PLAYER,
+        index * WORD_GUESS_WORDS_PER_PLAYER + WORD_GUESS_WORDS_PER_PLAYER
+      )
+    ])
+  );
+}
+
+function scoreWordGuess(guess, target) {
+  const result = Array.from({ length: WORD_GUESS_WORD_LENGTH }, () => "absent");
+  const remaining = {};
+
+  for (let index = 0; index < WORD_GUESS_WORD_LENGTH; index += 1) {
+    if (guess[index] === target[index]) {
+      result[index] = "correct";
+    } else {
+      remaining[target[index]] = (remaining[target[index]] || 0) + 1;
+    }
+  }
+
+  for (let index = 0; index < WORD_GUESS_WORD_LENGTH; index += 1) {
+    const letter = guess[index];
+
+    if (result[index] === "correct") {
+      continue;
+    }
+
+    if (remaining[letter] > 0) {
+      result[index] = "present";
+      remaining[letter] -= 1;
+    }
+  }
+
+  return result;
+}
+
 function getHandCricketMaxPlayers(mode, teamSize = HAND_CRICKET_DEFAULT_TEAM_SIZE) {
   return mode === "team"
     ? cleanHandCricketTeamSize(teamSize) * 2
@@ -383,6 +720,14 @@ function cleanMaxPlayersForGame(
 
   if (gameType === "tag") {
     return cleanTagMaxPlayers(maxPlayers);
+  }
+
+  if (gameType === "guess-number") {
+    return GUESS_NUMBER_PLAYERS;
+  }
+
+  if (gameType === "word-guess") {
+    return WORD_GUESS_PLAYERS;
   }
 
   return cleanMaxPlayers(maxPlayers);
@@ -710,6 +1055,135 @@ function createTagState(phase = "waiting", mapId = "classic", roundSeconds = TAG
     players: {},
     result: null
   };
+}
+
+function createGuessNumberState(phase = "waiting") {
+  return {
+    phase,
+    min: GUESS_NUMBER_MIN,
+    max: GUESS_NUMBER_MAX,
+    secrets: {},
+    guesses: [],
+    startedAt: null,
+    endedAt: null
+  };
+}
+
+function createWordGuessState(phase = "waiting", matchWins = {}) {
+  return {
+    phase,
+    wordLength: WORD_GUESS_WORD_LENGTH,
+    wordsPerPlayer: WORD_GUESS_WORDS_PER_PLAYER,
+    maxAttempts: WORD_GUESS_MAX_ATTEMPTS,
+    guessDurationMs: WORD_GUESS_GUESS_MS,
+    lockRevealDurationMs: WORD_GUESS_LOCK_REVEAL_MS,
+    wordPacks: {},
+    selectedWords: {},
+    matchWins: { ...matchWins },
+    guesses: [],
+    round: 0,
+    moveId: 0,
+    lockStartedAt: null,
+    lockDeadlineAt: null,
+    roundStartedAt: null,
+    roundDeadlineAt: null,
+    result: null,
+    startedAt: null,
+    endedAt: null
+  };
+}
+
+function startWordGuessRound(room) {
+  const state = room.wordGuess;
+  const now = Date.now();
+
+  state.phase = "guessing";
+  state.round = (state.round || 0) + 1;
+  state.moveId = (state.moveId || 0) + 1;
+  state.roundStartedAt = now;
+  state.roundDeadlineAt = now + WORD_GUESS_GUESS_MS;
+}
+
+function getWordGuessRoundEntries(state) {
+  return (state.guesses || []).filter((entry) => entry.round === state.round);
+}
+
+function getWordGuessPlayerRoundEntry(state, playerId) {
+  return getWordGuessRoundEntries(state).find((entry) => entry.playerId === playerId) || null;
+}
+
+function createWordGuessTimeoutEntry(room, player, targetPlayer) {
+  const state = room.wordGuess;
+
+  return {
+    id: `${Date.now()}:${player.playerId}:${state.guesses.length}:timeout`,
+    round: state.round,
+    playerId: player.playerId,
+    playerName: player.name,
+    targetPlayerId: targetPlayer?.playerId || null,
+    targetPlayerName: targetPlayer?.name || null,
+    guess: "",
+    feedback: [],
+    status: "timeout",
+    correct: false,
+    createdAt: Date.now()
+  };
+}
+
+function finishWordGuessRound(room, winner, resultType = "winner") {
+  const state = room.wordGuess;
+  const now = Date.now();
+
+  state.phase = "result";
+  state.endedAt = now;
+  state.result = {
+    type: resultType,
+    round: state.round,
+    winnerPlayerId: winner?.playerId || null
+  };
+  room.gameEnded = true;
+
+  if (winner) {
+    state.matchWins[winner.playerId] = (state.matchWins[winner.playerId] || 0) + 1;
+    room.winner = {
+      playerId: winner.playerId,
+      socketId: winner.socketId,
+      name: winner.name,
+      attempts: state.round,
+      word: state.selectedWords[getOpponent(room, winner.playerId)?.playerId]
+    };
+  } else {
+    room.winner = {
+      playerId: null,
+      name: "Draw",
+      isDraw: true,
+      attempts: state.round
+    };
+  }
+}
+
+function resolveWordGuessRound(room) {
+  const state = room.wordGuess;
+  const entries = getWordGuessRoundEntries(state);
+  const correctEntries = entries.filter((entry) => entry.correct);
+
+  if (correctEntries.length === 1) {
+    const winner = findPlayerById(room, correctEntries[0].playerId);
+    finishWordGuessRound(room, winner, "winner");
+    return;
+  }
+
+  if (correctEntries.length > 1) {
+    finishWordGuessRound(room, null, "same-round-draw");
+    return;
+  }
+
+  if (state.round >= WORD_GUESS_MAX_ATTEMPTS) {
+    finishWordGuessRound(room, null, "no-solve-draw");
+    return;
+  }
+
+  startWordGuessRound(room);
 }
 
 function createTagInput(input = {}) {
@@ -1606,6 +2080,74 @@ function serializeTag(room) {
   };
 }
 
+function serializeGuessNumber(room) {
+  if (room.gameType !== "guess-number") {
+    return null;
+  }
+
+  const state = room.guessNumber || createGuessNumberState();
+  const playersById = Object.fromEntries(room.players.map((player) => [player.playerId, player]));
+  const readyPlayerIds = Object.keys(state.secrets || {}).filter((playerId) => playersById[playerId]);
+  const revealedSecrets = room.gameEnded
+    ? room.players.map((player) => ({
+        playerId: player.playerId,
+        name: player.name,
+        number: state.secrets?.[player.playerId] ?? null
+      }))
+    : [];
+
+  return {
+    phase: state.phase,
+    min: state.min,
+    max: state.max,
+    readyPlayerIds,
+    guesses: [...(state.guesses || [])],
+    revealedSecrets,
+    startedAt: state.startedAt,
+    endedAt: state.endedAt
+  };
+}
+
+function serializeWordGuess(room) {
+  if (room.gameType !== "word-guess") {
+    return null;
+  }
+
+  const state = room.wordGuess || createWordGuessState();
+  const playersById = Object.fromEntries(room.players.map((player) => [player.playerId, player]));
+  const readyPlayerIds = Object.keys(state.selectedWords || {}).filter((playerId) => playersById[playerId]);
+  const revealedSecrets = room.gameEnded
+    ? room.players.map((player) => ({
+        playerId: player.playerId,
+        name: player.name,
+        word: state.selectedWords?.[player.playerId] ?? null
+      }))
+    : [];
+
+  return {
+    phase: state.phase,
+    wordLength: state.wordLength || WORD_GUESS_WORD_LENGTH,
+    wordsPerPlayer: state.wordsPerPlayer || WORD_GUESS_WORDS_PER_PLAYER,
+    maxAttempts: state.maxAttempts || WORD_GUESS_MAX_ATTEMPTS,
+    guessDurationMs: state.guessDurationMs || WORD_GUESS_GUESS_MS,
+    lockRevealDurationMs: state.lockRevealDurationMs || WORD_GUESS_LOCK_REVEAL_MS,
+    wordPacks: state.wordPacks || {},
+    matchWins: state.matchWins || {},
+    readyPlayerIds,
+    guesses: [...(state.guesses || [])],
+    revealedSecrets,
+    round: state.round || 0,
+    moveId: state.moveId || 0,
+    lockStartedAt: state.lockStartedAt,
+    lockDeadlineAt: state.lockDeadlineAt,
+    roundStartedAt: state.roundStartedAt,
+    roundDeadlineAt: state.roundDeadlineAt,
+    result: state.result,
+    startedAt: state.startedAt,
+    endedAt: state.endedAt
+  };
+}
+
 function publicPlayer(player, room) {
   return {
     playerId: player.playerId,
@@ -1639,7 +2181,9 @@ export function serializeRoom(room) {
     gameEnded: room.gameEnded,
     winner: room.winner,
     handCricket: serializeHandCricket(room),
-    tag: serializeTag(room)
+    tag: serializeTag(room),
+    guessNumber: serializeGuessNumber(room),
+    wordGuess: serializeWordGuess(room)
   };
 }
 
@@ -1707,6 +2251,8 @@ export function createRoom({
     boards: {},
     handCricket: type === "hand-cricket" ? createHandCricketState("waiting", cricketMode) : null,
     tag: type === "tag" ? createTagState("waiting", cleanTagMap, cleanTagRound) : null,
+    guessNumber: type === "guess-number" ? createGuessNumberState("waiting") : null,
+    wordGuess: type === "word-guess" ? createWordGuessState("waiting") : null,
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
@@ -1770,7 +2316,11 @@ export function updateRoomSettings({
       ? getHandCricketMaxPlayers(room.handCricketMode, nextTeamSize)
       : room.gameType === "tag"
         ? cleanTagMaxPlayers(maxPlayers)
-      : cleanRoomSize(maxPlayers);
+        : room.gameType === "guess-number"
+          ? GUESS_NUMBER_PLAYERS
+          : room.gameType === "word-guess"
+            ? WORD_GUESS_PLAYERS
+            : cleanRoomSize(maxPlayers);
 
   if (!player || room.host !== player.playerId) {
     throw new Error("Only the host can change room settings.");
@@ -1924,6 +2474,46 @@ export function startGame({ socketId, roomCode }) {
     throw new Error("Only the host can start the game.");
   }
 
+  if (room.gameType === "guess-number") {
+    if (room.players.length !== GUESS_NUMBER_PLAYERS) {
+      throw new Error("Guess Number needs exactly 2 players.");
+    }
+
+    room.calledNumbers = [];
+    room.currentTurn = 1;
+    room.gameStarted = true;
+    room.gameEnded = false;
+    room.winner = null;
+    room.guessNumber = {
+      ...createGuessNumberState("secret"),
+      startedAt: Date.now()
+    };
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "word-guess") {
+    if (room.players.length !== WORD_GUESS_PLAYERS) {
+      throw new Error("Word Guess needs exactly 2 players.");
+    }
+
+    const previousMatchWins = room.wordGuess?.matchWins || {};
+    room.calledNumbers = [];
+    room.currentTurn = 0;
+    room.gameStarted = true;
+    room.gameEnded = false;
+    room.winner = null;
+    room.wordGuess = {
+      ...createWordGuessState("selecting", previousMatchWins),
+      wordPacks: createWordGuessWordPacks(room.players),
+      startedAt: Date.now()
+    };
+    touch(room);
+
+    return room;
+  }
+
   if (room.gameType === "tag") {
     if (room.players.length < TAG_MIN_PLAYERS) {
       throw new Error(`TAG needs at least ${TAG_MIN_PLAYERS} players.`);
@@ -2026,6 +2616,20 @@ export function restartGame({ socketId, roomCode }) {
     return room;
   }
 
+  if (room.gameType === "guess-number") {
+    room.guessNumber = createGuessNumberState("waiting");
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "word-guess") {
+    room.wordGuess = createWordGuessState("waiting", room.wordGuess?.matchWins || {});
+    touch(room);
+
+    return room;
+  }
+
   for (const entry of room.players) {
     if (entry.isBot) {
       const boardSize = getSetupBingoBoardSize(room);
@@ -2038,6 +2642,269 @@ export function restartGame({ socketId, roomCode }) {
   touch(room);
 
   return room;
+}
+
+export function setGuessNumberSecret({ socketId, roomCode, number }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.guessNumber;
+  const value = cleanGuessNumberValue(number);
+
+  if (room.gameType !== "guess-number" || !state) {
+    throw new Error("Guess Number is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "secret") {
+    throw new Error("Secret numbers are not being set right now.");
+  }
+
+  if (state.secrets[player.playerId] !== undefined) {
+    throw new Error("Your secret number is already locked.");
+  }
+
+  state.secrets[player.playerId] = value;
+
+  if (room.players.every((entry) => state.secrets[entry.playerId] !== undefined)) {
+    state.phase = "guessing";
+    room.currentTurn = room.players.length > 1 ? 1 : 0;
+  }
+
+  touch(room);
+
+  return room;
+}
+
+export function submitGuessNumberGuess({ socketId, roomCode, number }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.guessNumber;
+  const value = cleanGuessNumberValue(number);
+  const currentPlayer = room.players[room.currentTurn];
+
+  if (room.gameType !== "guess-number" || !state) {
+    throw new Error("Guess Number is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "guessing") {
+    throw new Error("Guessing is not active.");
+  }
+
+  if (!currentPlayer || currentPlayer.playerId !== player.playerId) {
+    throw new Error("It is not your turn.");
+  }
+
+  const opponent = getOpponent(room, player.playerId);
+
+  if (!opponent || state.secrets[opponent.playerId] === undefined) {
+    throw new Error("Opponent secret is not ready.");
+  }
+
+  const target = state.secrets[opponent.playerId];
+  const hint = value === target ? "correct" : value < target ? "low" : "high";
+  const guess = {
+    id: `${Date.now()}:${player.playerId}:${state.guesses.length}`,
+    playerId: player.playerId,
+    playerName: player.name,
+    targetPlayerId: opponent.playerId,
+    targetPlayerName: opponent.name,
+    guess: value,
+    hint,
+    createdAt: Date.now()
+  };
+
+  state.guesses.push(guess);
+
+  if (hint === "correct") {
+    state.phase = "result";
+    state.endedAt = Date.now();
+    room.gameEnded = true;
+    room.winner = {
+      playerId: player.playerId,
+      socketId,
+      name: player.name,
+      guess: value,
+      attempts: state.guesses.filter((entry) => entry.playerId === player.playerId).length
+    };
+  } else {
+    room.currentTurn = room.players.length > 0 ? (room.currentTurn + 1) % room.players.length : 0;
+  }
+
+  touch(room);
+
+  return {
+    room,
+    guess
+  };
+}
+
+export function setWordGuessSecret({ socketId, roomCode, word }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.wordGuess;
+  const value = cleanWordGuessValue(word);
+
+  if (room.gameType !== "word-guess" || !state) {
+    throw new Error("Word Guess is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "selecting") {
+    throw new Error("Words are not being selected right now.");
+  }
+
+  if (state.selectedWords[player.playerId] !== undefined) {
+    throw new Error("Your word is already locked.");
+  }
+
+  if (!(state.wordPacks[player.playerId] || []).includes(value)) {
+    throw new Error("Choose one of your word cards.");
+  }
+
+  state.selectedWords[player.playerId] = value;
+
+  if (room.players.every((entry) => state.selectedWords[entry.playerId] !== undefined)) {
+    const now = Date.now();
+    state.phase = "locked";
+    state.moveId = (state.moveId || 0) + 1;
+    state.lockStartedAt = now;
+    state.lockDeadlineAt = now + WORD_GUESS_LOCK_REVEAL_MS;
+  }
+
+  touch(room);
+
+  return room;
+}
+
+export function submitWordGuessGuess({ socketId, roomCode, word }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.wordGuess;
+  const value = cleanWordGuessValue(word);
+
+  if (room.gameType !== "word-guess" || !state) {
+    throw new Error("Word Guess is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "guessing") {
+    throw new Error("Guessing is not active.");
+  }
+
+  if (state.roundDeadlineAt && Date.now() > state.roundDeadlineAt) {
+    throw new Error("Time is up for this guess.");
+  }
+
+  if (getWordGuessPlayerRoundEntry(state, player.playerId)) {
+    throw new Error("You already guessed this attempt.");
+  }
+
+  const opponent = getOpponent(room, player.playerId);
+
+  if (!opponent || state.selectedWords[opponent.playerId] === undefined) {
+    throw new Error("Opponent word is not ready.");
+  }
+
+  const target = state.selectedWords[opponent.playerId];
+  const feedback = scoreWordGuess(value, target);
+  const guess = {
+    id: `${Date.now()}:${player.playerId}:${state.guesses.length}`,
+    round: state.round,
+    playerId: player.playerId,
+    playerName: player.name,
+    targetPlayerId: opponent.playerId,
+    targetPlayerName: opponent.name,
+    guess: value,
+    feedback,
+    status: "submitted",
+    correct: value === target,
+    createdAt: Date.now()
+  };
+
+  state.guesses.push(guess);
+
+  if (room.players.every((entry) => getWordGuessPlayerRoundEntry(state, entry.playerId))) {
+    resolveWordGuessRound(room);
+  }
+
+  touch(room);
+
+  return {
+    room,
+    guess
+  };
+}
+
+export function resolveWordGuessTimeout({ roomCode, moveId }) {
+  const room = requireRoom(roomCode);
+  const state = room.wordGuess;
+
+  if (room.gameType !== "word-guess" || !state || room.gameEnded || state.moveId !== moveId) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if (state.phase === "locked") {
+    if (!state.lockDeadlineAt || Date.now() < state.lockDeadlineAt) {
+      return {
+        room,
+        changed: false
+      };
+    }
+
+    startWordGuessRound(room);
+    touch(room);
+
+    return {
+      room,
+      changed: true
+    };
+  }
+
+  if (state.phase === "guessing") {
+    if (!state.roundDeadlineAt || Date.now() < state.roundDeadlineAt) {
+      return {
+        room,
+        changed: false
+      };
+    }
+
+    for (const player of room.players) {
+      if (getWordGuessPlayerRoundEntry(state, player.playerId)) {
+        continue;
+      }
+
+      state.guesses.push(createWordGuessTimeoutEntry(room, player, getOpponent(room, player.playerId)));
+    }
+
+    resolveWordGuessRound(room);
+    touch(room);
+
+    return {
+      room,
+      changed: true
+    };
+  }
+
+  return {
+    room,
+    changed: false
+  };
 }
 
 export function submitTagInput({ socketId, roomCode, input }) {
@@ -2884,6 +3751,56 @@ function removePlayerAtIndex(room, leavingIndex) {
           name: entry.name
         }))
       };
+    }
+  }
+
+  if (room.gameType === "guess-number") {
+    room.guessNumber = room.guessNumber || createGuessNumberState("result");
+
+    if (room.guessNumber?.secrets) {
+      delete room.guessNumber.secrets[player.playerId];
+    }
+
+    if (room.gameStarted && !room.gameEnded && room.players.length < GUESS_NUMBER_PLAYERS) {
+      const remainingPlayer = room.players[0] || null;
+
+      room.gameEnded = true;
+      room.guessNumber.phase = "result";
+      room.guessNumber.endedAt = Date.now();
+      room.winner = remainingPlayer
+        ? {
+            playerId: remainingPlayer.playerId,
+            name: remainingPlayer.name,
+            byForfeit: true
+          }
+        : null;
+    }
+  }
+
+  if (room.gameType === "word-guess") {
+    room.wordGuess = room.wordGuess || createWordGuessState("result");
+
+    delete room.wordGuess.wordPacks?.[player.playerId];
+    delete room.wordGuess.selectedWords?.[player.playerId];
+
+    if (room.gameStarted && !room.gameEnded && room.players.length < WORD_GUESS_PLAYERS) {
+      const remainingPlayer = room.players[0] || null;
+
+      room.gameEnded = true;
+      room.wordGuess.phase = "result";
+      room.wordGuess.endedAt = Date.now();
+      room.wordGuess.result = {
+        type: "forfeit",
+        round: room.wordGuess.round || 0,
+        winnerPlayerId: remainingPlayer?.playerId || null
+      };
+      room.winner = remainingPlayer
+        ? {
+            playerId: remainingPlayer.playerId,
+            name: remainingPlayer.name,
+            byForfeit: true
+          }
+        : null;
     }
   }
 

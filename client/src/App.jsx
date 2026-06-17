@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Game from "./pages/Game.jsx";
+import GuessNumber from "./pages/GuessNumber.jsx";
 import HandCricket from "./pages/HandCricket.jsx";
 import Home from "./pages/Home.jsx";
 import Lobby from "./pages/Lobby.jsx";
 import Result from "./pages/Result.jsx";
 import TagGame from "./pages/TagGame.jsx";
+import WordGuess from "./pages/WordGuess.jsx";
 import { socket } from "./socket/client.js";
 import { getGameTypeFromUrl, getRoomCodeFromUrl, setRoomCodeInUrl } from "./utils/roomLink.js";
 import { getBoardSize } from "./game/board.js";
@@ -51,6 +53,14 @@ function emitWithAck(event, payload) {
 }
 
 function viewForRoom(room, fallback = "lobby") {
+  if (room.gameType === "guess-number" && (room.gameStarted || room.gameEnded)) {
+    return "guess-number";
+  }
+
+  if (room.gameType === "word-guess" && (room.gameStarted || room.gameEnded)) {
+    return "word-guess";
+  }
+
   if (room.gameType === "tag" && (room.gameStarted || room.gameEnded)) {
     return "tag";
   }
@@ -419,6 +429,60 @@ export default function App() {
     return response;
   };
 
+  const handleGuessNumberSetSecret = async (number) => {
+    const response = await emitWithAck("guess-number-set-secret", {
+      roomCode: session.roomCode,
+      number
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+    }
+
+    return response;
+  };
+
+  const handleGuessNumberSubmitGuess = async (number) => {
+    const response = await emitWithAck("guess-number-submit-guess", {
+      roomCode: session.roomCode,
+      number
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
+  const handleWordGuessSetSecret = async (word) => {
+    const response = await emitWithAck("word-guess-set-secret", {
+      roomCode: session.roomCode,
+      word
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+    }
+
+    return response;
+  };
+
+  const handleWordGuessSubmitGuess = async (word) => {
+    const response = await emitWithAck("word-guess-submit-guess", {
+      roomCode: session.roomCode,
+      word
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
   const handleRestartGame = async () => {
     const response = await emitWithAck("restart-game", {
       roomCode: session.roomCode
@@ -482,6 +546,32 @@ export default function App() {
         onChooseDecision={handleHandCricketDecision}
         onSelectTeamPlayer={handleHandCricketSelectPlayer}
         onRequestTeamChange={handleHandCricketRequestChange}
+        onRestartGame={handleRestartGame}
+        onLeaveRoom={handleLeaveRoom}
+      />
+    );
+  }
+
+  if (view === "guess-number" && room) {
+    return (
+      <GuessNumber
+        room={room}
+        session={session}
+        onSetSecret={handleGuessNumberSetSecret}
+        onSubmitGuess={handleGuessNumberSubmitGuess}
+        onRestartGame={handleRestartGame}
+        onLeaveRoom={handleLeaveRoom}
+      />
+    );
+  }
+
+  if (view === "word-guess" && room) {
+    return (
+      <WordGuess
+        room={room}
+        session={session}
+        onSetSecret={handleWordGuessSetSecret}
+        onSubmitGuess={handleWordGuessSubmitGuess}
         onRestartGame={handleRestartGame}
         onLeaveRoom={handleLeaveRoom}
       />

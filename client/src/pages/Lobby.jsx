@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Copy, DoorOpen, Play, Settings, Users } from "lucide-react";
+import { Bot, Clock, Copy, DoorOpen, KeyRound, Keyboard, Play, Settings, Users } from "lucide-react";
 import BoardSetup from "../components/BoardSetup.jsx";
 import PlayerList from "../components/PlayerList.jsx";
 import { buildRoomLink } from "../utils/roomLink.js";
@@ -162,6 +162,68 @@ function TagSetup({ room }) {
   );
 }
 
+function GuessNumberSetup({ room }) {
+  return (
+    <section className="surface p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-extrabold uppercase text-mint">Number Duel</p>
+          <h2 className="text-lg font-extrabold">Guess Number</h2>
+        </div>
+        <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-extrabold text-ink/65">
+          {room.players.length}/2
+        </span>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <KeyRound className="mb-2 h-5 w-5 text-coral" aria-hidden="true" />
+          <p className="text-sm font-extrabold text-ink">Lock a secret number from 1 to 100.</p>
+        </div>
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <Clock className="mb-2 h-5 w-5 text-mint" aria-hidden="true" />
+          <p className="text-sm font-extrabold text-ink">Take turns guessing the other number.</p>
+        </div>
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <Users className="mb-2 h-5 w-5 text-honey" aria-hidden="true" />
+          <p className="text-sm font-extrabold text-ink">Each guess returns higher, lower, or correct.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WordGuessSetup({ room }) {
+  return (
+    <section className="surface p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-extrabold uppercase text-mint">Word Guess</p>
+          <h2 className="text-lg font-extrabold">Blind Word Match</h2>
+        </div>
+        <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-extrabold text-ink/65">
+          {room.players.length}/2
+        </span>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <KeyRound className="mb-2 h-5 w-5 text-coral" aria-hidden="true" />
+          <p className="text-sm font-extrabold text-ink">Pick one word from your private pack.</p>
+        </div>
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <Clock className="mb-2 h-5 w-5 text-mint" aria-hidden="true" />
+          <p className="text-sm font-extrabold text-ink">Both players guess on the same clock.</p>
+        </div>
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <Keyboard className="mb-2 h-5 w-5 text-honey" aria-hidden="true" />
+          <p className="text-sm font-extrabold text-ink">Six attempts with Wordle-style feedback.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Lobby({
   room,
   session,
@@ -183,6 +245,8 @@ export default function Lobby({
   const isBingo = room.gameType === "bingo";
   const isHandCricket = room.gameType === "hand-cricket";
   const isTag = room.gameType === "tag";
+  const isGuessNumber = room.gameType === "guess-number";
+  const isWordGuess = room.gameType === "word-guess";
   const isTeamHandCricket = room.handCricketMode === "team";
   const teamSize = room.handCricketTeamSize || 2;
   const teams = room.handCricket?.teams || {};
@@ -193,13 +257,17 @@ export default function Lobby({
     () => room.players.length > 0 && room.players.every((player) => player.hasBoard),
     [room.players]
   );
-  const canStart = isTag
-    ? room.players.length >= 2
-    : isHandCricket
-      ? isTeamHandCricket
-        ? room.players.length === teamSize * 2 && teamsReady
-        : room.players.length === 2
-      : allReady;
+  const canStart = isGuessNumber
+    ? room.players.length === 2
+    : isWordGuess
+      ? room.players.length === 2
+      : isTag
+        ? room.players.length >= 2
+        : isHandCricket
+          ? isTeamHandCricket
+            ? room.players.length === teamSize * 2 && teamsReady
+            : room.players.length === 2
+          : allReady;
 
   useEffect(() => {
     setRoomName(room.roomName);
@@ -253,11 +321,19 @@ export default function Lobby({
         <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-              {isTag ? "TG" : isHandCricket ? "HC" : "BI"}
+              {isWordGuess ? "WG" : isGuessNumber ? "GN" : isTag ? "TG" : isHandCricket ? "HC" : "BI"}
             </div>
             <div>
               <p className="text-xs font-extrabold uppercase text-mint">
-                {isTag ? "TAG Lobby" : isHandCricket ? "Hand Cricket Lobby" : "Bingo Lobby"}
+                {isGuessNumber
+                  ? "Guess Number Lobby"
+                  : isWordGuess
+                    ? "Word Guess Lobby"
+                    : isTag
+                      ? "TAG Lobby"
+                      : isHandCricket
+                        ? "Hand Cricket Lobby"
+                        : "Bingo Lobby"}
               </p>
               <h1 className="text-2xl font-extrabold text-ink">{room.roomName}</h1>
             </div>
@@ -415,13 +491,20 @@ export default function Lobby({
               </button>
             ) : null}
 
-            {isHandCricket || isTag ? (
+            {isHandCricket || isTag || isGuessNumber || isWordGuess ? (
               <div className="surface p-3 text-sm font-bold text-ink/70">
                 {canStart
-                  ? isTag
-                    ? "Ready to chase"
-                    : "Ready for toss"
-                  : `Waiting for ${Math.max(0, (isTag ? 2 : room.maxPlayers) - room.players.length)} player(s)`}
+                  ? isGuessNumber
+                    ? "Ready to guess"
+                    : isWordGuess
+                      ? "Ready to duel"
+                      : isTag
+                        ? "Ready to chase"
+                        : "Ready for toss"
+                  : `Waiting for ${Math.max(
+                      0,
+                      (isTag || isGuessNumber || isWordGuess ? 2 : room.maxPlayers) - room.players.length
+                    )} player(s)`}
               </div>
             ) : null}
 
@@ -447,6 +530,10 @@ export default function Lobby({
             <BoardSetup initialBoard={board} numPlayers={room.players.length} onSave={onBoardSaved} />
           ) : isTag ? (
             <TagSetup room={room} />
+          ) : isGuessNumber ? (
+            <GuessNumberSetup room={room} />
+          ) : isWordGuess ? (
+            <WordGuessSetup room={room} />
           ) : (
             <TeamSetup
               room={room}

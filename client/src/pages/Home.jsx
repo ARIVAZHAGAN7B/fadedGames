@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, LogIn, Plus, Wifi, WifiOff } from "lucide-react";
 import bingoLogo from "../images/bingo.png";
+import guessNumberLogo from "../images/guessNumber.svg";
 import handCricketLogo from "../images/handCricket.png";
 import tagLogo from "../images/tag.png";
+import wordGuessLogo from "../images/wordGuess.svg";
 import { normalizeGameType, normalizeRoomCode } from "../utils/roomLink.js";
 
 const games = [
@@ -35,6 +37,26 @@ const games = [
     maxPlayers: 4,
     logo: tagLogo,
     summary: "Same-keyboard platform chase where the player marked It must pass it on."
+  },
+  {
+    id: "guess-number",
+    name: "Guess Number",
+    status: "Ready",
+    available: true,
+    defaultRoomName: "Guess Number Duel",
+    maxPlayers: 2,
+    logo: guessNumberLogo,
+    summary: "Two players lock secret numbers, then take turns guessing."
+  },
+  {
+    id: "word-guess",
+    name: "Word Guess",
+    status: "Ready",
+    available: true,
+    defaultRoomName: "Word Guess Match",
+    maxPlayers: 2,
+    logo: wordGuessLogo,
+    summary: "Two players lock hidden words, then race through Wordle-style guesses."
   }
 ];
 
@@ -78,6 +100,14 @@ function getActiveRoomMode(room) {
     return `${room.tagRoundSeconds || 60}s`;
   }
 
+  if (room.gameType === "guess-number") {
+    return "1-100";
+  }
+
+  if (room.gameType === "word-guess") {
+    return "5 letters";
+  }
+
   if (room.gameType !== "hand-cricket") {
     return "Bingo";
   }
@@ -114,6 +144,8 @@ export default function Home({
   const selectedGame = getGameById(selectedGameId);
   const isHandCricket = selectedGame?.id === "hand-cricket";
   const isTag = selectedGame?.id === "tag";
+  const isGuessNumber = selectedGame?.id === "guess-number";
+  const isWordGuess = selectedGame?.id === "word-guess";
   const teamMemberCount = Number(handCricketTeamMembers);
   const validTeamMembers =
     Number.isInteger(teamMemberCount) && teamMemberCount >= 2 && teamMemberCount <= 6;
@@ -225,7 +257,11 @@ export default function Home({
               ? handCricketPlayers
               : isTag
                 ? Number(tagPlayerCount)
-                : Number(maxPlayers),
+                : isGuessNumber
+                  ? 2
+                  : isWordGuess
+                    ? 2
+                    : Number(maxPlayers),
             gameType: selectedGame.id,
             handCricketMode: isHandCricket ? handCricketMode : undefined,
             handCricketTeamSize:
@@ -595,10 +631,12 @@ export default function Home({
                         <p className="text-sm font-extrabold text-ink">{handCricketPlayers}</p>
                       </div>
                     )
-                  ) : isTag ? (
+                  ) : isTag || isGuessNumber || isWordGuess ? (
                     <div className="rounded-md border border-ink/10 bg-white px-3 py-2">
                       <span className="compact-label">Players</span>
-                      <p className="text-sm font-extrabold text-ink">{tagPlayerCount}</p>
+                      <p className="text-sm font-extrabold text-ink">
+                        {isGuessNumber || isWordGuess ? 2 : tagPlayerCount}
+                      </p>
                     </div>
                   ) : (
                     <label className="block">
