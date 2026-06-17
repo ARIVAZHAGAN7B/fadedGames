@@ -2,15 +2,17 @@ import { useMemo, useState } from "react";
 import { Copy, DoorOpen, Trophy } from "lucide-react";
 import Board from "../components/Board.jsx";
 import TurnIndicator from "../components/TurnIndicator.jsx";
-import { countCompletedLines } from "../game/board.js";
+import { countCompletedLines, getBoardSize } from "../game/board.js";
 import { buildRoomLink } from "../utils/roomLink.js";
 
 export default function Game({ room, session, board, onCallNumber, onClaimBingo, onLeaveRoom }) {
   const [status, setStatus] = useState("");
   const isMyTurn = room.currentPlayerId === session.playerId && !room.gameEnded;
+  const boardSize = useMemo(() => room.boardSize || getBoardSize(room.players.length), [room.boardSize, room.players.length]);
+  const requiredLines = boardSize;
   const completedLines = useMemo(
-    () => countCompletedLines(board, room.calledNumbers),
-    [board, room.calledNumbers]
+    () => countCompletedLines(board, room.calledNumbers, boardSize),
+    [board, room.calledNumbers, boardSize]
   );
 
   const calledNumbers = [...room.calledNumbers].reverse();
@@ -43,7 +45,7 @@ export default function Game({ room, session, board, onCallNumber, onClaimBingo,
     }
 
     if (!result.valid) {
-      setStatus(`${result.completedLines}/5 lines`);
+      setStatus(`${result.completedLines}/${requiredLines} lines`);
     }
   };
 
@@ -87,6 +89,7 @@ export default function Game({ room, session, board, onCallNumber, onClaimBingo,
             <Board
               board={board}
               calledNumbers={room.calledNumbers}
+              boardSize={boardSize}
               isMyTurn={isMyTurn}
               gameEnded={room.gameEnded}
               onCallNumber={handleCallNumber}
@@ -100,7 +103,7 @@ export default function Game({ room, session, board, onCallNumber, onClaimBingo,
               <div className="mb-2 flex items-center justify-between">
                 <h2 className="text-base font-extrabold">Lines</h2>
                 <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-extrabold text-ink">
-                  {completedLines}/5
+                  {completedLines}/{requiredLines}
                 </span>
               </div>
               <button

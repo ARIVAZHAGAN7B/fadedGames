@@ -1,4 +1,4 @@
-import { Copy, DoorOpen, Home, RotateCcw, Trophy } from "lucide-react";
+import { Check, Clock3, Copy, DoorOpen, Home, RotateCcw, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buildRoomLink } from "../utils/roomLink.js";
 
@@ -91,6 +91,13 @@ function getActiveTeamName(state, teamKey) {
   return state.teams?.[teamKey]?.name || teamLabels[teamKey] || "-";
 }
 
+function getAvailableTeamBatsmen(state) {
+  const outPlayerIds = new Set(state.outPlayerIds || []);
+  return (state.teams?.[state.battingTeam]?.battingOrder || []).filter(
+    (playerId) => !outPlayerIds.has(playerId)
+  );
+}
+
 function NumberPad({ disabled, onPick, role, secondsLeft, timerProgress, selectedNumber }) {
   const label = role === "bat" ? "Choose runs" : role === "bowl" ? "Choose bowl" : "Waiting";
 
@@ -141,6 +148,81 @@ function NumberPad({ disabled, onPick, role, secondsLeft, timerProgress, selecte
   );
 }
 
+function TossNumberPad({ disabled, onPick, selectedNumber, secondsLeft, timerProgress }) {
+  return (
+    <div className="mx-auto max-w-xs rounded-md border border-ink/10 bg-paper p-2.5">
+      <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-ink/10">
+        <div
+          className={`h-full rounded-full transition-[width] duration-200 ${
+            secondsLeft <= 3 ? "bg-coral" : "bg-mint"
+          }`}
+          style={{ width: `${timerProgress}%` }}
+        />
+      </div>
+      <div className="mb-2 flex items-center justify-between px-1">
+        <p className="text-xs font-extrabold uppercase text-ink/50">Toss number</p>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${
+            secondsLeft <= 3 ? "bg-coral text-white" : "bg-white text-ink/60"
+          }`}
+        >
+          {secondsLeft}s
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {calculatorNumbers.map((number) => {
+          const isSelected = selectedNumber === number;
+
+          return (
+            <button
+              key={number}
+              type="button"
+              className={`relative h-12 rounded-md border text-lg font-extrabold shadow-sm transition active:scale-95 disabled:cursor-not-allowed sm:h-14 ${
+                number === 10 ? "col-span-2" : ""
+              } ${
+                isSelected
+                  ? "pick-pop border-coral bg-coral text-white shadow-md"
+                  : "border-ink/15 bg-white text-ink hover:border-coral hover:text-coral disabled:bg-ink/10 disabled:text-ink/35"
+              } ${selectedNumber !== null && !isSelected ? "opacity-45" : ""}`}
+              disabled={disabled}
+              onClick={() => onPick(number)}
+            >
+              {number}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StartCountdownClock({ label, progress, state, battingPlayer, bowlingPlayer, isTeamMode }) {
+  return (
+    <div className="text-center">
+      <p className="text-xs font-extrabold uppercase text-ink/50">Match starts</p>
+      <div
+        className="mx-auto my-4 flex h-44 w-44 items-center justify-center rounded-full p-2 shadow-soft"
+        style={{
+          background: `conic-gradient(#2f9f88 ${progress * 3.6}deg, rgba(23, 33, 43, 0.1) 0deg)`
+        }}
+      >
+        <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-white text-ink">
+          <Clock3 className="mb-1 h-8 w-8 text-mint" aria-hidden="true" />
+          <span className={`${typeof label === "number" ? "text-6xl" : "text-xl"} font-extrabold`}>
+            {label}
+          </span>
+        </div>
+      </div>
+      <h2 className="text-2xl font-extrabold">
+        {isTeamMode ? `${getActiveTeamName(state, state.battingTeam)} batting` : `${battingPlayer?.name} batting`}
+      </h2>
+      <p className="mt-1 text-sm font-bold text-ink/55">
+        {battingPlayer?.name} vs {bowlingPlayer?.name}
+      </p>
+    </div>
+  );
+}
+
 function BallRevealCard({ reveal, playersById }) {
   if (!reveal) {
     return null;
@@ -179,6 +261,159 @@ function BallRevealCard({ reveal, playersById }) {
   );
 }
 
+function TeamPlayerSelection({ state, session, playersById, onSelect, secondsLeft, timerProgress }) {
+  const battingTeam = state.battingTeam;
+  const bowlingTeam = state.bowlingTeam;
+  const myTeam = getTeamKeyForPlayer(state, session.playerId);
+  const battingCaptainId = state.teams?.[battingTeam]?.captainId;
+  const bowlingCaptainId = state.teams?.[bowlingTeam]?.captainId;
+  const canPickBatsman = myTeam === battingTeam && battingCaptainId === session.playerId;
+  const canPickBowler = myTeam === bowlingTeam && bowlingCaptainId === session.playerId;
+  const battingReady = Boolean(state.teamSelectionReady?.[battingTeam]);
+  const bowlingReady = Boolean(state.teamSelectionReady?.[bowlingTeam]);
+  const availableBatsmen = getAvailableTeamBatsmen(state);
+  const battingOrderCount = state.teams?.[battingTeam]?.battingOrder?.length || 0;
+  const bowlingPlayers = state.teams?.[bowlingTeam]?.players || [];
+
+  const renderPlayerButton = (playerId, selected, disabled, tone = "bat") => {
+    const player = playersById[playerId];
+    const selectedClass =
+      tone === "bowl"
+        ? "border-mint bg-mint text-white"
+        : "border-coral bg-coral text-white";
+
+    return (
+      <button
+        key={playerId}
+        type="button"
+        className={`flex min-h-11 items-center justify-between rounded-md border px-3 py-2 text-left text-sm font-bold transition ${
+          selected
+            ? selectedClass
+            : "border-ink/10 bg-white text-ink hover:border-coral hover:text-coral disabled:bg-ink/10 disabled:text-ink/35"
+        }`}
+        disabled={disabled}
+        onClick={() => onSelect({ playerId })}
+      >
+        <span className="min-w-0 truncate">{player?.name}</span>
+        {selected ? <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+      </button>
+    );
+  };
+
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-extrabold uppercase text-ink/50">Captain selection</p>
+          <h2 className="text-2xl font-extrabold">Choose players</h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {state.target ? (
+            <span className="rounded-full bg-honey px-3 py-1 text-sm font-extrabold text-ink">
+              Target {state.target}
+            </span>
+          ) : null}
+          <span
+            className={`rounded-full px-3 py-1 text-sm font-extrabold ${
+              secondsLeft <= 3 ? "bg-coral text-white" : "bg-white text-ink/60"
+            }`}
+          >
+            {secondsLeft}s
+          </span>
+        </div>
+      </div>
+      <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-ink/10">
+        <div
+          className={`h-full rounded-full transition-[width] duration-200 ${
+            secondsLeft <= 3 ? "bg-coral" : "bg-mint"
+          }`}
+          style={{ width: `${timerProgress}%` }}
+        />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-extrabold uppercase text-coral">
+                {getActiveTeamName(state, battingTeam)}
+              </p>
+              <h3 className="text-base font-extrabold">
+                Batsman {availableBatsmen.length}/{battingOrderCount}
+              </h3>
+            </div>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${
+                battingReady ? "bg-mint text-white" : "bg-white text-ink/55"
+              }`}
+            >
+              {battingReady ? "Ready" : "Waiting"}
+            </span>
+          </div>
+          <div className="grid gap-2">
+            {availableBatsmen.map((playerId) =>
+              renderPlayerButton(playerId, playerId === state.battingPlayerId, !canPickBatsman, "bat")
+            )}
+          </div>
+          {canPickBatsman ? (
+            <button
+              type="button"
+              className="compact-button mt-3 w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
+              disabled={battingReady || !state.battingPlayerId}
+              onClick={() => onSelect({ ready: true })}
+            >
+              <Check className="h-4 w-4" aria-hidden="true" />
+              Ready
+            </button>
+          ) : (
+            <p className="mt-3 text-xs font-bold text-ink/55">
+              Waiting for {playersById[battingCaptainId]?.name || "captain"}
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-extrabold uppercase text-mint">
+                {getActiveTeamName(state, bowlingTeam)}
+              </p>
+              <h3 className="text-base font-extrabold">Bowler</h3>
+            </div>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${
+                bowlingReady ? "bg-mint text-white" : "bg-white text-ink/55"
+              }`}
+            >
+              {bowlingReady ? "Ready" : "Waiting"}
+            </span>
+          </div>
+          <div className="grid gap-2">
+            {bowlingPlayers.map((playerId) =>
+              renderPlayerButton(playerId, playerId === state.bowlingPlayerId, !canPickBowler, "bowl")
+            )}
+          </div>
+          {canPickBowler ? (
+            <button
+              type="button"
+              className="compact-button mt-3 w-full bg-mint text-white hover:bg-mint/90 disabled:bg-ink/20"
+              disabled={bowlingReady || !state.bowlingPlayerId}
+              onClick={() => onSelect({ ready: true })}
+            >
+              <Check className="h-4 w-4" aria-hidden="true" />
+              Ready
+            </button>
+          ) : (
+            <p className="mt-3 text-xs font-bold text-ink/55">
+              Waiting for {playersById[bowlingCaptainId]?.name || "captain"}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TeamScorePanel({ state }) {
   if (state.mode !== "team") {
     return null;
@@ -191,6 +426,11 @@ function TeamScorePanel({ state }) {
         {["red", "blue"].map((teamKey) => {
           const active = state.battingTeam === teamKey;
           const teamName = getActiveTeamName(state, teamKey);
+          const teamScore = state.teamScores?.[teamKey] || 0;
+          const requiredRuns =
+            active && state.innings === 2 && state.target
+              ? Math.max(0, Number(state.target) - teamScore)
+              : null;
 
           return (
             <div
@@ -202,11 +442,13 @@ function TeamScorePanel({ state }) {
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-sm font-extrabold">{teamName}</span>
                 <span className="text-xl font-extrabold">
-                  {state.teamScores?.[teamKey] || 0}/{state.wickets?.[teamKey] || 0}
+                  {teamScore}/{state.wickets?.[teamKey] || 0}
                 </span>
               </div>
               {active ? (
-                <p className="mt-1 text-xs font-extrabold uppercase text-ink/55">Batting</p>
+                <p className="mt-1 text-xs font-extrabold uppercase text-ink/55">
+                  {requiredRuns === null ? "Batting" : `Need ${requiredRuns}`}
+                </p>
               ) : null}
             </div>
           );
@@ -216,33 +458,51 @@ function TeamScorePanel({ state }) {
   );
 }
 
+function getTeamRequiredRuns(state) {
+  if (state.mode !== "team" || state.innings !== 2 || !state.target || !state.battingTeam) {
+    return null;
+  }
+
+  return Math.max(0, Number(state.target) - (state.teamScores?.[state.battingTeam] || 0));
+}
+
 export default function HandCricket({
   room,
   session,
   onChooseToss,
   onPickNumber,
   onChooseDecision,
+  onSelectTeamPlayer,
   onRestartGame,
   onLeaveRoom
 }) {
   const [status, setStatus] = useState("");
   const [now, setNow] = useState(Date.now());
   const [selectedPick, setSelectedPick] = useState(null);
+  const [selectedTossPick, setSelectedTossPick] = useState(null);
   const state = room.handCricket || {};
   const isHost = room.host === session.playerId;
   const isTeamMode = state.mode === "team";
   const playersById = Object.fromEntries(room.players.map((player) => [player.playerId, player]));
   const tossChooser = playersById[state.tossChooserId];
+  const tossOpponent = playersById[state.tossOpponentId];
   const tossWinner = playersById[state.tossWinnerId];
   const battingPlayer = playersById[state.battingPlayerId];
   const bowlingPlayer = playersById[state.bowlingPlayerId];
   const myTeam = getTeamKeyForPlayer(state, session.playerId);
   const isCaptain = Boolean(myTeam && state.teams?.[myTeam]?.captainId === session.playerId);
   const lastBall = state.balls?.[state.balls.length - 1];
+  const requiredRuns = getTeamRequiredRuns(state);
   const myBallPicked = hasPick(state.currentBallPicks, session.playerId);
   const tossPlayerIds = Object.keys(state.tossPicks || {});
   const tossTotal = Object.values(state.tossPicks || {}).reduce((sum, value) => sum + Number(value), 0);
   const tossParity = tossTotal % 2 === 0 ? "even" : "odd";
+  const tossParticipantIds = [state.tossChooserId, state.tossOpponentId].filter(Boolean);
+  const myTossPicked = hasPick(state.tossPicks, session.playerId);
+  const canPickToss =
+    state.phase === "toss-throw" &&
+    tossParticipantIds.includes(session.playerId) &&
+    !myTossPicked;
   const canPickBall =
     state.phase === "innings" &&
     (session.playerId === state.battingPlayerId || session.playerId === state.bowlingPlayerId) &&
@@ -254,6 +514,16 @@ export default function HandCricket({
       : session.playerId === state.bowlingPlayerId
         ? "bowl"
         : null;
+  const batsmanPicked = hasPick(state.currentBallPicks, state.battingPlayerId);
+  const bowlerPicked = hasPick(state.currentBallPicks, state.bowlingPlayerId);
+  const ballWaitingText =
+    !batsmanPicked && !bowlerPicked
+      ? "Waiting for batsman and bowler"
+      : !batsmanPicked
+        ? "Waiting for batsman"
+        : !bowlerPicked
+          ? "Waiting for bowler"
+          : "Waiting for reveal";
   const moveDurationMs = state.moveDurationMs || 7000;
   const moveTimeLeftMs =
     state.phase === "innings" && state.moveDeadlineAt
@@ -264,9 +534,56 @@ export default function HandCricket({
     state.phase === "innings" && state.moveDeadlineAt
       ? Math.max(0, Math.min(100, (moveTimeLeftMs / moveDurationMs) * 100))
       : 100;
+  const countdownDurationMs = state.countdownDurationMs || 5000;
+  const countdownTimeLeftMs =
+    state.phase === "countdown" && state.countdownDeadlineAt
+      ? Math.max(0, Number(state.countdownDeadlineAt) - now)
+      : 0;
+  const countdownSecondsLeft = Math.ceil(countdownTimeLeftMs / 1000);
+  const countdownProgress =
+    state.phase === "countdown" && state.countdownDeadlineAt
+      ? Math.max(0, Math.min(100, (1 - countdownTimeLeftMs / countdownDurationMs) * 100))
+      : 100;
+  const countdownLabel = countdownSecondsLeft > 0 ? countdownSecondsLeft : "Let's start";
+  const tossDurationMs = state.tossDurationMs || 10000;
+  const tossTimeLeftMs =
+    state.phase === "toss-throw" && state.tossDeadlineAt
+      ? Math.max(0, Number(state.tossDeadlineAt) - now)
+      : 0;
+  const tossSecondsLeft = Math.ceil(tossTimeLeftMs / 1000);
+  const tossTimerProgress =
+    state.phase === "toss-throw" && state.tossDeadlineAt
+      ? Math.max(0, Math.min(100, (tossTimeLeftMs / tossDurationMs) * 100))
+      : 100;
+  const decisionDurationMs = state.decisionDurationMs || 15000;
+  const decisionTimeLeftMs =
+    state.phase === "decision" && state.decisionDeadlineAt
+      ? Math.max(0, Number(state.decisionDeadlineAt) - now)
+      : 0;
+  const decisionSecondsLeft = Math.ceil(decisionTimeLeftMs / 1000);
+  const decisionTimerProgress =
+    state.phase === "decision" && state.decisionDeadlineAt
+      ? Math.max(0, Math.min(100, (decisionTimeLeftMs / decisionDurationMs) * 100))
+      : 100;
+  const selectionDurationMs = state.teamSelectionDurationMs || 5000;
+  const selectionTimeLeftMs =
+    state.phase === "player-selection" && state.teamSelectionDeadlineAt
+      ? Math.max(0, Number(state.teamSelectionDeadlineAt) - now)
+      : 0;
+  const selectionSecondsLeft = Math.ceil(selectionTimeLeftMs / 1000);
+  const selectionTimerProgress =
+    state.phase === "player-selection" && state.teamSelectionDeadlineAt
+      ? Math.max(0, Math.min(100, (selectionTimeLeftMs / selectionDurationMs) * 100))
+      : 100;
 
   useEffect(() => {
-    if (state.phase !== "innings" || !state.moveDeadlineAt) {
+    const hasInningsTimer = state.phase === "innings" && state.moveDeadlineAt;
+    const hasCountdownTimer = state.phase === "countdown" && state.countdownDeadlineAt;
+    const hasTossTimer = state.phase === "toss-throw" && state.tossDeadlineAt;
+    const hasDecisionTimer = state.phase === "decision" && state.decisionDeadlineAt;
+    const hasSelectionTimer = state.phase === "player-selection" && state.teamSelectionDeadlineAt;
+
+    if (!hasInningsTimer && !hasCountdownTimer && !hasTossTimer && !hasDecisionTimer && !hasSelectionTimer) {
       return undefined;
     }
 
@@ -274,7 +591,15 @@ export default function HandCricket({
     const interval = window.setInterval(() => setNow(Date.now()), 200);
 
     return () => window.clearInterval(interval);
-  }, [state.phase, state.moveDeadlineAt, state.moveId]);
+  }, [
+    state.phase,
+    state.moveDeadlineAt,
+    state.countdownDeadlineAt,
+    state.tossDeadlineAt,
+    state.decisionDeadlineAt,
+    state.teamSelectionDeadlineAt,
+    state.moveId
+  ]);
 
   useEffect(() => {
     if (state.phase !== "innings") {
@@ -292,6 +617,23 @@ export default function HandCricket({
 
     return () => window.clearTimeout(timeout);
   }, [state.phase, state.moveId, selectedPick]);
+
+  useEffect(() => {
+    if (state.phase !== "toss-throw") {
+      setSelectedTossPick(null);
+      return undefined;
+    }
+
+    if (selectedTossPick === null) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setSelectedTossPick(null);
+    }, 560);
+
+    return () => window.clearTimeout(timeout);
+  }, [state.phase, selectedTossPick]);
 
   const handleCopy = async () => {
     try {
@@ -313,6 +655,19 @@ export default function HandCricket({
     return result;
   };
 
+  const handlePickTossNumber = async (number) => {
+    if (!canPickToss || selectedTossPick !== null) {
+      return;
+    }
+
+    setSelectedTossPick(number);
+    const result = await runAction(() => onPickNumber(number));
+
+    if (!result.ok) {
+      setSelectedTossPick(null);
+    }
+  };
+
   const handlePickNumber = async (number) => {
     if (!canPickBall || selectedPick !== null) {
       return;
@@ -324,6 +679,12 @@ export default function HandCricket({
     if (!result.ok) {
       setSelectedPick(null);
     }
+  };
+
+  const handleSelectTeamPlayer = async (payload) => {
+    const result = await runAction(() => onSelectTeamPlayer(payload));
+
+    return result;
   };
 
   return (
@@ -393,6 +754,43 @@ export default function HandCricket({
                 </div>
               ) : null}
 
+              {state.phase === "toss-throw" ? (
+                <div className="text-center">
+                  <p className="text-xs font-extrabold uppercase text-ink/50">
+                    {tossChooser?.name} chose {state.tossChoice}
+                  </p>
+                  <h2 className="mb-3 text-2xl font-extrabold">Pick a toss number</h2>
+                  <div className="mx-auto mb-3 grid max-w-md gap-2 sm:grid-cols-2">
+                    {tossParticipantIds.map((playerId) => {
+                      const pick = state.tossPicks?.[playerId];
+                      const label = pick === undefined ? "Waiting" : pick === true ? "Picked" : pick;
+
+                      return (
+                        <div key={playerId} className="rounded-md bg-paper p-3">
+                          <p className="truncate text-xs font-bold text-ink/55">
+                            {playersById[playerId]?.name}
+                          </p>
+                          <p className="text-2xl font-extrabold">{label}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {canPickToss ? (
+                    <TossNumberPad
+                      disabled={selectedTossPick !== null}
+                      selectedNumber={selectedTossPick}
+                      secondsLeft={tossSecondsLeft}
+                      timerProgress={tossTimerProgress}
+                      onPick={handlePickTossNumber}
+                    />
+                  ) : myTossPicked ? (
+                    <p className="font-bold text-ink/60">Waiting for {tossOpponent?.name || "opponent"}</p>
+                  ) : (
+                    <p className="font-bold text-ink/60">Waiting for toss numbers</p>
+                  )}
+                </div>
+              ) : null}
+
               {state.phase === "decision" ? (
                 <div className="text-center">
                   <p className="text-xs font-extrabold uppercase text-ink/50">
@@ -411,10 +809,27 @@ export default function HandCricket({
                     ))}
                   </div>
                   <p className="mb-1 text-sm font-extrabold text-ink/60">
-                    Total {tossTotal} · {tossParity}
+                    Total {tossTotal} - {tossParity}
                   </p>
                   <p className="text-xs font-extrabold uppercase text-ink/50">Toss winner</p>
                   <h2 className="mb-3 text-2xl font-extrabold">{tossWinner?.name}</h2>
+                  <div className="mx-auto mb-3 max-w-sm">
+                    <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-ink/10">
+                      <div
+                        className={`h-full rounded-full transition-[width] duration-200 ${
+                          decisionSecondsLeft <= 5 ? "bg-coral" : "bg-mint"
+                        }`}
+                        style={{ width: `${decisionTimerProgress}%` }}
+                      />
+                    </div>
+                    <span
+                      className={`rounded-full px-3 py-1 text-sm font-extrabold ${
+                        decisionSecondsLeft <= 5 ? "bg-coral text-white" : "bg-white text-ink/60"
+                      }`}
+                    >
+                      {decisionSecondsLeft}s
+                    </span>
+                  </div>
                   {session.playerId === state.tossWinnerId ? (
                     <div className="mx-auto grid max-w-sm grid-cols-2 gap-2">
                       <button
@@ -438,6 +853,28 @@ export default function HandCricket({
                 </div>
               ) : null}
 
+              {state.phase === "player-selection" ? (
+                <TeamPlayerSelection
+                  state={state}
+                  session={session}
+                  playersById={playersById}
+                  onSelect={handleSelectTeamPlayer}
+                  secondsLeft={selectionSecondsLeft}
+                  timerProgress={selectionTimerProgress}
+                />
+              ) : null}
+
+              {state.phase === "countdown" ? (
+                <StartCountdownClock
+                  label={countdownLabel}
+                  progress={countdownProgress}
+                  state={state}
+                  battingPlayer={battingPlayer}
+                  bowlingPlayer={bowlingPlayer}
+                  isTeamMode={isTeamMode}
+                />
+              ) : null}
+
               {state.phase === "innings" ? (
                 <div>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -456,11 +893,18 @@ export default function HandCricket({
                         </p>
                       ) : null}
                     </div>
-                    {state.target ? (
-                      <span className="rounded-full bg-honey px-3 py-1 text-sm font-extrabold text-ink">
-                        Target {state.target}
-                      </span>
-                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {state.target ? (
+                        <span className="rounded-full bg-honey px-3 py-1 text-sm font-extrabold text-ink">
+                          Target {state.target}
+                        </span>
+                      ) : null}
+                      {requiredRuns !== null ? (
+                        <span className="rounded-full bg-mint px-3 py-1 text-sm font-extrabold text-white">
+                          Need {requiredRuns}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <NumberPad
@@ -473,15 +917,11 @@ export default function HandCricket({
                   />
 
                   {myBallPicked ? (
-                    <p className="mt-3 text-sm font-bold text-ink/55">Waiting for opponent</p>
+                    <p className="mt-3 text-sm font-bold text-ink/55">{ballWaitingText}</p>
                   ) : !canPickBall && myRole ? (
-                    <p className="mt-3 text-sm font-bold text-ink/55">
-                      {bowlingPlayer?.name} bowling
-                    </p>
+                    <p className="mt-3 text-sm font-bold text-ink/55">{ballWaitingText}</p>
                   ) : !canPickBall ? (
-                    <p className="mt-3 text-sm font-bold text-ink/55">
-                      Waiting for active players
-                    </p>
+                    <p className="mt-3 text-sm font-bold text-ink/55">{ballWaitingText}</p>
                   ) : null}
                 </div>
               ) : null}
@@ -528,8 +968,8 @@ export default function HandCricket({
                 <p className="text-xs font-extrabold uppercase text-ink/50">Last ball</p>
                 <p className="text-sm font-bold">
                   {playersById[lastBall.battingPlayerId]?.name} {lastBall.batsmanNumber} vs{" "}
-                  {playersById[lastBall.bowlingPlayerId]?.name} {lastBall.bowlerNumber} ·{" "}
-                  {lastBall.out ? "OUT" : `+${lastBall.runs}`}
+                  {playersById[lastBall.bowlingPlayerId]?.name} {lastBall.bowlerNumber} -{" "}
+                  {lastBall.out ? "OUT" : `+${lastBall.runs} runs`}
                 </p>
               </section>
             ) : null}
@@ -548,12 +988,17 @@ export default function HandCricket({
                 {room.players.map((player) => {
                   const stats = getPlayerStats(state, player.playerId);
                   const playerTeam = getTeamKeyForPlayer(state, player.playerId);
+                  const activeRolePhase = ["player-selection", "countdown", "innings", "ball-reveal"].includes(
+                    state.phase
+                  );
+                  const isOut =
+                    isTeamMode &&
+                    playerTeam === state.battingTeam &&
+                    (state.outPlayerIds || []).includes(player.playerId);
                   const role =
-                    (state.phase === "innings" || state.phase === "ball-reveal") &&
-                    player.playerId === state.battingPlayerId
+                    activeRolePhase && player.playerId === state.battingPlayerId
                       ? "batting"
-                      : (state.phase === "innings" || state.phase === "ball-reveal") &&
-                          player.playerId === state.bowlingPlayerId
+                      : activeRolePhase && player.playerId === state.bowlingPlayerId
                         ? "bowling"
                         : null;
 
@@ -571,7 +1016,14 @@ export default function HandCricket({
                             ) : null}
                           </span>
                         </div>
-                        <span className="text-xl font-extrabold">{stats.score}</span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {isOut ? (
+                            <span className="rounded-full bg-coral px-2 py-0.5 text-[10px] font-extrabold uppercase text-white">
+                              OUT
+                            </span>
+                          ) : null}
+                          <span className="text-xl font-extrabold">{stats.score}</span>
+                        </div>
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-xs font-extrabold text-ink/55">
                         {role === "bowling" ? (

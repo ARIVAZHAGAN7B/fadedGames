@@ -1,4 +1,4 @@
-import { countCompletedLines, validateBoard } from "../gameEngine/index.js";
+import { countCompletedLines, validateBoard, getBoardSize } from "../gameEngine/index.js";
 import { chooseBotNumber, createBotName, generateBotBoard } from "../botPlayer/index.js";
 import { randomUUID } from "node:crypto";
 
@@ -10,6 +10,12 @@ const HAND_CRICKET_CLASSIC_PLAYERS = 2;
 const HAND_CRICKET_DEFAULT_TEAM_SIZE = 2;
 const HAND_CRICKET_MIN_TEAM_SIZE = 2;
 const HAND_CRICKET_MAX_TEAM_SIZE = 6;
+const HAND_CRICKET_START_COUNTDOWN_MS = 5000;
+const HAND_CRICKET_TOSS_THROW_MS = 10000;
+const HAND_CRICKET_DECISION_MS = 15000;
+const HAND_CRICKET_TEAM_SELECTION_START_MS = 15000;
+const HAND_CRICKET_TEAM_SELECTION_WICKET_MS = 12000;
+const HAND_CRICKET_TEAM_SELECTION_SWITCH_MS = 5000;
 const HAND_CRICKET_MOVE_MS = 7000;
 const HAND_CRICKET_REVEAL_MS = 1000;
 const TAG_MIN_PLAYERS = 2;
@@ -256,6 +262,48 @@ function cleanRoomSize(maxPlayers) {
   return value;
 }
 
+function getSetupBingoBoardSize(room) {
+  return getBoardSize(room.players.length);
+}
+
+function getActiveBingoBoardSize(room) {
+  return room.boardSize || getSetupBingoBoardSize(room);
+}
+
+function hasValidBingoBoard(room, player) {
+  if (room.gameType !== "bingo") {
+    return false;
+  }
+
+  return validateBoard(room.boards[player.playerId], getActiveBingoBoardSize(room)).valid;
+}
+
+function syncBingoBoardsForRoster(room) {
+  if (room.gameType !== "bingo" || room.gameStarted) {
+    return;
+  }
+
+  const boardSize = getSetupBingoBoardSize(room);
+  const playerIds = new Set(room.players.map((player) => player.playerId));
+
+  for (const playerId of Object.keys(room.boards)) {
+    if (!playerIds.has(playerId)) {
+      delete room.boards[playerId];
+    }
+  }
+
+  for (const player of room.players) {
+    if (player.isBot) {
+      room.boards[player.playerId] = generateBotBoard(boardSize);
+      continue;
+    }
+
+    if (!validateBoard(room.boards[player.playerId], boardSize).valid) {
+      delete room.boards[player.playerId];
+    }
+  }
+}
+
 function cleanHandCricketNumber(number) {
   const value = Number(number);
 
@@ -266,12 +314,8 @@ function cleanHandCricketNumber(number) {
   return value;
 }
 
-function getRandomHandCricketNumber() {
-  return Math.floor(Math.random() * 11);
-}
-
 function getRandomTimeoutHandCricketNumber() {
-  return Math.floor(Math.random() * 5);
+  return Math.floor(Math.random() * 11);
 }
 
 function cleanTossChoice(choice) {
@@ -463,10 +507,17 @@ function createHandCricketState(phase = "waiting", mode = "classic") {
     phase,
     teams: mode === "team" ? createEmptyHandCricketTeams() : null,
     tossChooserId: null,
+    tossOpponentId: null,
     tossChoice: null,
     tossPicks: {},
     tossWinnerId: null,
     tossDecision: null,
+    tossStartedAt: null,
+    tossDeadlineAt: null,
+    tossDurationMs: HAND_CRICKET_TOSS_THROW_MS,
+    decisionStartedAt: null,
+    decisionDeadlineAt: null,
+    decisionDurationMs: HAND_CRICKET_DECISION_MS,
     innings: 0,
     battingPlayerId: null,
     bowlingPlayerId: null,
@@ -479,10 +530,20 @@ function createHandCricketState(phase = "waiting", mode = "classic") {
     wickets: { red: 0, blue: 0 },
     target: null,
     currentBallPicks: {},
+    outPlayerIds: [],
+    teamSelectionReady: { red: false, blue: false },
+    teamSelectionCountdownRequired: false,
+    teamSelectionStartedAt: null,
+    teamSelectionDeadlineAt: null,
+    teamSelectionDurationMs: HAND_CRICKET_TEAM_SELECTION_SWITCH_MS,
+    teamSelectionReason: null,
     moveId: 0,
     moveStartedAt: null,
     moveDeadlineAt: null,
     moveDurationMs: HAND_CRICKET_MOVE_MS,
+    countdownStartedAt: null,
+    countdownDeadlineAt: null,
+    countdownDurationMs: HAND_CRICKET_START_COUNTDOWN_MS,
     ballReveal: null,
     revealStartedAt: null,
     revealDeadlineAt: null,
@@ -789,13 +850,68 @@ function processTagCollisions(room, now) {
   }
 }
 
+function clearHandCricketTossTimer(state) {
+  state.tossStartedAt = null;
+  state.tossDeadlineAt = null;
+}
+
+function clearHandCricketDecisionTimer(state) {
+  state.decisionStartedAt = null;
+  state.decisionDeadlineAt = null;
+}
+
+function clearHandCricketSelectionTimer(state) {
+  state.teamSelectionStartedAt = null;
+  state.teamSelectionDeadlineAt = null;
+  state.teamSelectionReason = null;
+}
+
+function clearHandCricketWaitingTimers(state) {
+  clearHandCricketTossTimer(state);
+  clearHandCricketDecisionTimer(state);
+  clearHandCricketSelectionTimer(state);
+}
+
+function beginHandCricketTossThrow(state, { chooserId, opponentId, choice }) {
+  const now = Date.now();
+
+  state.tossChoice = cleanTossChoice(choice);
+  state.tossChooserId = chooserId;
+  state.tossOpponentId = opponentId;
+  state.tossPicks = {};
+  state.tossWinnerId = null;
+  state.phase = "toss-throw";
+  state.moveId += 1;
+  state.tossStartedAt = now;
+  state.tossDeadlineAt = now + HAND_CRICKET_TOSS_THROW_MS;
+  state.tossDurationMs = HAND_CRICKET_TOSS_THROW_MS;
+  clearHandCricketDecisionTimer(state);
+  clearHandCricketSelectionTimer(state);
+}
+
+function beginHandCricketDecision(state) {
+  const now = Date.now();
+
+  state.phase = "decision";
+  state.moveId += 1;
+  state.decisionStartedAt = now;
+  state.decisionDeadlineAt = now + HAND_CRICKET_DECISION_MS;
+  state.decisionDurationMs = HAND_CRICKET_DECISION_MS;
+  clearHandCricketTossTimer(state);
+  clearHandCricketSelectionTimer(state);
+}
+
 function beginHandCricketMove(state) {
   const now = Date.now();
 
   state.currentBallPicks = {};
   state.ballReveal = null;
+  state.teamSelectionCountdownRequired = false;
   state.phase = "innings";
   state.moveId += 1;
+  clearHandCricketWaitingTimers(state);
+  state.countdownStartedAt = null;
+  state.countdownDeadlineAt = null;
   state.moveStartedAt = now;
   state.moveDeadlineAt = now + HAND_CRICKET_MOVE_MS;
   state.moveDurationMs = HAND_CRICKET_MOVE_MS;
@@ -804,11 +920,33 @@ function beginHandCricketMove(state) {
   state.revealDurationMs = HAND_CRICKET_REVEAL_MS;
 }
 
+function beginHandCricketCountdown(state) {
+  const now = Date.now();
+
+  state.currentBallPicks = {};
+  state.ballReveal = null;
+  state.phase = "countdown";
+  state.teamSelectionCountdownRequired = false;
+  state.moveId += 1;
+  clearHandCricketWaitingTimers(state);
+  state.countdownStartedAt = now;
+  state.countdownDeadlineAt = now + HAND_CRICKET_START_COUNTDOWN_MS;
+  state.countdownDurationMs = HAND_CRICKET_START_COUNTDOWN_MS;
+  state.moveStartedAt = null;
+  state.moveDeadlineAt = null;
+  state.revealStartedAt = null;
+  state.revealDeadlineAt = null;
+}
+
 function clearHandCricketMove(state) {
   state.currentBallPicks = {};
   state.moveStartedAt = null;
   state.moveDeadlineAt = null;
+  state.countdownStartedAt = null;
+  state.countdownDeadlineAt = null;
   state.ballReveal = null;
+  state.teamSelectionCountdownRequired = false;
+  clearHandCricketWaitingTimers(state);
   state.revealStartedAt = null;
   state.revealDeadlineAt = null;
 }
@@ -847,6 +985,7 @@ function beginHandCricketReveal(state) {
 
   state.ballReveal = createHandCricketBallReveal(state);
   state.phase = "ball-reveal";
+  clearHandCricketWaitingTimers(state);
   state.moveStartedAt = null;
   state.moveDeadlineAt = null;
   state.revealStartedAt = now;
@@ -862,16 +1001,80 @@ function getTeamBowlingOrder(state, teamKey) {
   return state.teams?.[teamKey]?.players || [];
 }
 
+function getTeamOutPlayerIds(state) {
+  return new Set(state.outPlayerIds || []);
+}
+
+function getAvailableTeamBatsmen(state, teamKey = state.battingTeam) {
+  const outPlayerIds = getTeamOutPlayerIds(state);
+  return getTeamBattingOrder(state, teamKey).filter((playerId) => !outPlayerIds.has(playerId));
+}
+
+function setTeamBatsman(state, playerId) {
+  const battingOrder = getTeamBattingOrder(state, state.battingTeam);
+
+  if (!battingOrder.includes(playerId) || getTeamOutPlayerIds(state).has(playerId)) {
+    throw new Error("Choose a batter who is still available.");
+  }
+
+  state.battingPlayerId = playerId;
+  state.currentBatsmanIndex = battingOrder.indexOf(playerId);
+}
+
+function setTeamBowler(state, playerId) {
+  const bowlingOrder = getTeamBowlingOrder(state, state.bowlingTeam);
+
+  if (!bowlingOrder.includes(playerId)) {
+    throw new Error("Choose a bowler from the bowling team.");
+  }
+
+  state.bowlingPlayerId = playerId;
+  state.currentBowlerIndex = bowlingOrder.indexOf(playerId);
+}
+
+function setDefaultTeamBatsman(state, preferredPlayerId = state.battingPlayerId) {
+  const availableBatsmen = getAvailableTeamBatsmen(state);
+  const nextBatsmanId = availableBatsmen.includes(preferredPlayerId)
+    ? preferredPlayerId
+    : availableBatsmen[0] || null;
+
+  if (nextBatsmanId) {
+    setTeamBatsman(state, nextBatsmanId);
+  } else {
+    state.battingPlayerId = null;
+    state.currentBatsmanIndex = 0;
+  }
+}
+
+function setDefaultTeamBowler(state, preferredPlayerId = state.bowlingPlayerId) {
+  const bowlingOrder = getTeamBowlingOrder(state, state.bowlingTeam);
+  const nextBowlerId = bowlingOrder.includes(preferredPlayerId)
+    ? preferredPlayerId
+    : bowlingOrder[0] || null;
+
+  if (nextBowlerId) {
+    setTeamBowler(state, nextBowlerId);
+  } else {
+    state.bowlingPlayerId = null;
+    state.currentBowlerIndex = 0;
+  }
+}
+
+function setTeamCaptainsAsCurrentPlayers(state) {
+  const battingCaptainId = state.teams?.[state.battingTeam]?.captainId;
+  const bowlingCaptainId = state.teams?.[state.bowlingTeam]?.captainId;
+
+  setDefaultTeamBatsman(state, battingCaptainId);
+  setDefaultTeamBowler(state, bowlingCaptainId);
+}
+
 function setCurrentTeamPlayers(state) {
   if (state.mode !== "team") {
     return;
   }
 
-  const battingOrder = getTeamBattingOrder(state, state.battingTeam);
-  const bowlingOrder = getTeamBowlingOrder(state, state.bowlingTeam);
-
-  state.battingPlayerId = battingOrder[state.currentBatsmanIndex] || null;
-  state.bowlingPlayerId = bowlingOrder[state.currentBowlerIndex % bowlingOrder.length] || null;
+  setDefaultTeamBatsman(state, getTeamBattingOrder(state, state.battingTeam)[state.currentBatsmanIndex]);
+  setDefaultTeamBowler(state, getTeamBowlingOrder(state, state.bowlingTeam)[state.currentBowlerIndex]);
 }
 
 function rotateTeamBowler(state) {
@@ -892,8 +1095,75 @@ function switchHandCricketTeamInnings(state) {
   [state.battingTeam, state.bowlingTeam] = [state.bowlingTeam, state.battingTeam];
   state.currentBatsmanIndex = 0;
   state.currentBowlerIndex = 0;
-  setCurrentTeamPlayers(state);
+  state.outPlayerIds = [];
+  setTeamCaptainsAsCurrentPlayers(state);
   state.innings = 2;
+}
+
+function getHandCricketTeamSelectionDuration(reason) {
+  if (reason === "switch") {
+    return HAND_CRICKET_TEAM_SELECTION_SWITCH_MS;
+  }
+
+  if (reason === "wicket") {
+    return HAND_CRICKET_TEAM_SELECTION_WICKET_MS;
+  }
+
+  return HAND_CRICKET_TEAM_SELECTION_START_MS;
+}
+
+function beginHandCricketTeamSelection(state, { countdownRequired = false, reason = "switch" } = {}) {
+  if (state.mode !== "team") {
+    return;
+  }
+
+  const now = Date.now();
+  const duration = getHandCricketTeamSelectionDuration(reason);
+
+  setCurrentTeamPlayers(state);
+  state.currentBallPicks = {};
+  state.ballReveal = null;
+  state.phase = "player-selection";
+  state.moveId += 1;
+  state.moveStartedAt = null;
+  state.moveDeadlineAt = null;
+  state.countdownStartedAt = null;
+  state.countdownDeadlineAt = null;
+  state.revealStartedAt = null;
+  state.revealDeadlineAt = null;
+  clearHandCricketTossTimer(state);
+  clearHandCricketDecisionTimer(state);
+  state.teamSelectionReady = {
+    [state.battingTeam]: false,
+    [state.bowlingTeam]: false
+  };
+  state.teamSelectionCountdownRequired = Boolean(countdownRequired);
+  state.teamSelectionStartedAt = now;
+  state.teamSelectionDeadlineAt = now + duration;
+  state.teamSelectionDurationMs = duration;
+  state.teamSelectionReason = reason;
+}
+
+function maybeStartHandCricketAfterTeamSelection(state) {
+  if (state.mode !== "team" || state.phase !== "player-selection") {
+    return false;
+  }
+
+  if (!state.battingPlayerId || !state.bowlingPlayerId) {
+    return false;
+  }
+
+  if (!state.teamSelectionReady?.[state.battingTeam] || !state.teamSelectionReady?.[state.bowlingTeam]) {
+    return false;
+  }
+
+  if (state.teamSelectionCountdownRequired) {
+    beginHandCricketCountdown(state);
+  } else {
+    beginHandCricketMove(state);
+  }
+
+  return true;
 }
 
 function createVisiblePickMap(picks, reveal) {
@@ -913,7 +1183,7 @@ function serializeHandCricket(room) {
   const playerCount = room.players.length;
   const tossPlayerCount = state.mode === "team" ? HAND_CRICKET_CLASSIC_PLAYERS : playerCount;
   const revealToss = Object.keys(state.tossPicks || {}).length === tossPlayerCount;
-  const revealBall = Object.keys(state.currentBallPicks || {}).length === 2;
+  const revealBall = Object.keys(state.currentBallPicks || {}).length === HAND_CRICKET_CLASSIC_PLAYERS;
 
   return {
     ...state,
@@ -966,7 +1236,7 @@ function publicPlayer(player, room) {
     isBot: Boolean(player.isBot),
     connected: player.connected,
     isHost: room.host === player.playerId,
-    hasBoard: Boolean(room.boards[player.playerId])
+    hasBoard: hasValidBingoBoard(room, player)
   };
 }
 
@@ -981,6 +1251,7 @@ export function serializeRoom(room) {
     roomName: room.roomName,
     host: room.host,
     maxPlayers: room.maxPlayers,
+    boardSize: room.boardSize || null,
     players: room.players.map((player) => publicPlayer(player, room)),
     calledNumbers: [...room.calledNumbers],
     currentTurn: room.currentTurn,
@@ -1054,6 +1325,7 @@ export function createRoom({
     gameStarted: false,
     gameEnded: false,
     winner: null,
+    boardSize: null,
     boards: {},
     handCricket: type === "hand-cricket" ? createHandCricketState("waiting", cricketMode) : null,
     tag: type === "tag" ? createTagState("waiting", cleanTagMap, cleanTagRound) : null,
@@ -1089,6 +1361,7 @@ export function joinRoom({ socketId, nickname, roomCode }) {
 
   const player = createPlayer(socketId, name);
   room.players.push(player);
+  syncBingoBoardsForRoster(room);
 
   if (room.gameType === "hand-cricket" && room.handCricketMode === "team") {
     assignPlayerToHandCricketTeam(room, player.playerId);
@@ -1207,7 +1480,7 @@ export function addBot({ socketId, roomCode }) {
 
   const bot = createBotPlayer(createBotName(room.players.map((entry) => entry.name)));
   room.players.push(bot);
-  room.boards[bot.playerId] = generateBotBoard();
+  syncBingoBoardsForRoster(room);
   touch(room);
 
   return {
@@ -1244,11 +1517,16 @@ export function setPlayerBoard({ socketId, roomCode, board }) {
     throw new Error("You are not in this room.");
   }
 
+  if (room.gameType !== "bingo") {
+    throw new Error("Boards are only used for Bingo.");
+  }
+
   if (room.gameStarted) {
     throw new Error("Boards are locked after the game starts.");
   }
 
-  const validation = validateBoard(board);
+  const boardSize = getSetupBingoBoardSize(room);
+  const validation = validateBoard(board, boardSize);
 
   if (!validation.valid) {
     throw new Error(validation.message);
@@ -1320,10 +1598,11 @@ export function startGame({ socketId, roomCode }) {
     return room;
   }
 
-  const missingBoard = room.players.find((entry) => !room.boards[entry.playerId]);
+  const boardSize = getSetupBingoBoardSize(room);
+  const missingBoard = room.players.find((entry) => !validateBoard(room.boards[entry.playerId], boardSize).valid);
 
   if (missingBoard) {
-    throw new Error(`${missingBoard.name} needs a board.`);
+    throw new Error(`${missingBoard.name} needs a ${boardSize}x${boardSize} board.`);
   }
 
   room.calledNumbers = [];
@@ -1331,6 +1610,7 @@ export function startGame({ socketId, roomCode }) {
   room.gameStarted = true;
   room.gameEnded = false;
   room.winner = null;
+  room.boardSize = boardSize;
   touch(room);
 
   return room;
@@ -1349,6 +1629,7 @@ export function restartGame({ socketId, roomCode }) {
   room.gameStarted = false;
   room.gameEnded = false;
   room.winner = null;
+  room.boardSize = null;
 
   if (room.gameType === "hand-cricket") {
     const previousTeams = room.handCricket?.teams || null;
@@ -1369,7 +1650,8 @@ export function restartGame({ socketId, roomCode }) {
 
   for (const entry of room.players) {
     if (entry.isBot) {
-      room.boards[entry.playerId] = generateBotBoard();
+      const boardSize = getSetupBingoBoardSize(room);
+      room.boards[entry.playerId] = generateBotBoard(boardSize);
     } else {
       delete room.boards[entry.playerId];
     }
@@ -1479,19 +1761,11 @@ export function chooseHandCricketToss({ socketId, roomCode, choice }) {
       throw new Error("Opponent captain not found.");
     }
 
-    state.tossChoice = cleanTossChoice(choice);
-    state.tossChooserId = player.playerId;
-    state.tossPicks = {
-      [player.playerId]: getRandomHandCricketNumber(),
-      [opponentCaptainId]: getRandomHandCricketNumber()
-    };
-
-    const total = state.tossPicks[player.playerId] + state.tossPicks[opponentCaptainId];
-    const parity = total % 2 === 0 ? "even" : "odd";
-    const chooserWon = parity === state.tossChoice;
-
-    state.tossWinnerId = chooserWon ? player.playerId : opponentCaptainId;
-    state.phase = "decision";
+    beginHandCricketTossThrow(state, {
+      chooserId: player.playerId,
+      opponentId: opponentCaptainId,
+      choice
+    });
     touch(room);
 
     return room;
@@ -1503,19 +1777,11 @@ export function chooseHandCricketToss({ socketId, roomCode, choice }) {
     throw new Error("Opponent not found.");
   }
 
-  state.tossChoice = cleanTossChoice(choice);
-  state.tossChooserId = player.playerId;
-  state.tossPicks = {
-    [player.playerId]: getRandomHandCricketNumber(),
-    [opponent.playerId]: getRandomHandCricketNumber()
-  };
-
-  const total = state.tossPicks[player.playerId] + state.tossPicks[opponent.playerId];
-  const parity = total % 2 === 0 ? "even" : "odd";
-  const chooserWon = parity === state.tossChoice;
-
-  state.tossWinnerId = chooserWon ? player.playerId : opponent.playerId;
-  state.phase = "decision";
+  beginHandCricketTossThrow(state, {
+    chooserId: player.playerId,
+    opponentId: opponent.playerId,
+    choice
+  });
   touch(room);
 
   return room;
@@ -1535,6 +1801,15 @@ export function chooseHandCricketDecision({ socketId, roomCode, decision }) {
   }
 
   const value = cleanTossDecision(decision);
+  applyHandCricketDecision(room, player, value);
+  touch(room);
+
+  return room;
+}
+
+function applyHandCricketDecision(room, player, decision) {
+  const state = room.handCricket;
+  const value = cleanTossDecision(decision);
 
   if (state.mode === "team") {
     const playerTeam = getHandCricketTeamKey(state, player.playerId);
@@ -1550,14 +1825,14 @@ export function chooseHandCricketDecision({ socketId, roomCode, decision }) {
     state.bowlingTeam = value === "bat" ? opponentTeam : playerTeam;
     state.currentBatsmanIndex = 0;
     state.currentBowlerIndex = 0;
-    setCurrentTeamPlayers(state);
+    state.outPlayerIds = [];
+    setTeamCaptainsAsCurrentPlayers(state);
 
     if (!state.battingPlayerId || !state.bowlingPlayerId) {
       throw new Error("Team setup is incomplete.");
     }
 
-    beginHandCricketMove(state);
-    touch(room);
+    beginHandCricketTeamSelection(state, { countdownRequired: true, reason: "start" });
 
     return room;
   }
@@ -1572,8 +1847,61 @@ export function chooseHandCricketDecision({ socketId, roomCode, decision }) {
   state.innings = 1;
   state.battingPlayerId = value === "bat" ? player.playerId : opponent.playerId;
   state.bowlingPlayerId = value === "bat" ? opponent.playerId : player.playerId;
-  state.phase = "innings";
-  beginHandCricketMove(state);
+  beginHandCricketCountdown(state);
+
+  return room;
+}
+
+export function selectHandCricketTeamPlayer({ socketId, roomCode, playerId: selectedPlayerId, ready }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.handCricket;
+
+  if (room.gameType !== "hand-cricket" || !state || state.mode !== "team") {
+    throw new Error("Team Hand Cricket is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "player-selection") {
+    throw new Error("Player selection is not active.");
+  }
+
+  const playerTeam = getHandCricketTeamKey(state, player.playerId);
+  const isBattingCaptain =
+    playerTeam === state.battingTeam && state.teams?.[playerTeam]?.captainId === player.playerId;
+  const isBowlingCaptain =
+    playerTeam === state.bowlingTeam && state.teams?.[playerTeam]?.captainId === player.playerId;
+
+  if (!isBattingCaptain && !isBowlingCaptain) {
+    throw new Error("Only the active team captains can choose players.");
+  }
+
+  const requestedPlayerId = String(selectedPlayerId || "").trim();
+
+  if (requestedPlayerId) {
+    const selectionChanged = isBattingCaptain
+      ? requestedPlayerId !== state.battingPlayerId
+      : requestedPlayerId !== state.bowlingPlayerId;
+
+    if (isBattingCaptain) {
+      setTeamBatsman(state, requestedPlayerId);
+    } else {
+      setTeamBowler(state, requestedPlayerId);
+    }
+
+    if (selectionChanged) {
+      state.teamSelectionReady[playerTeam] = false;
+    }
+  }
+
+  if (ready !== undefined) {
+    state.teamSelectionReady[playerTeam] = Boolean(ready);
+  }
+
+  maybeStartHandCricketAfterTeamSelection(state);
   touch(room);
 
   return room;
@@ -1581,17 +1909,21 @@ export function chooseHandCricketDecision({ socketId, roomCode, decision }) {
 
 function completeHandCricketToss(room) {
   const state = room.handCricket;
-  const [first, second] = room.players;
-  const firstPick = state.tossPicks[first.playerId];
-  const secondPick = state.tossPicks[second.playerId];
+  const chooserId = state.tossChooserId;
+  const opponentId = state.tossOpponentId;
+  const firstPick = state.tossPicks[chooserId];
+  const secondPick = state.tossPicks[opponentId];
+
+  if (firstPick === undefined || secondPick === undefined) {
+    return;
+  }
+
   const total = firstPick + secondPick;
   const parity = total % 2 === 0 ? "even" : "odd";
   const chooserWon = parity === state.tossChoice;
 
-  state.tossWinnerId = chooserWon
-    ? state.tossChooserId
-    : room.players.find((entry) => entry.playerId !== state.tossChooserId).playerId;
-  state.phase = "decision";
+  state.tossWinnerId = chooserWon ? chooserId : opponentId;
+  beginHandCricketDecision(state);
 }
 
 function finishHandCricketMatch(room, winnerId, resultType) {
@@ -1640,6 +1972,8 @@ function completeHandCricketBall(room) {
   }
 
   state.balls.push({
+    moveId: reveal.moveId,
+    pairId: reveal.pairId,
     innings: reveal.innings,
     battingTeam: reveal.battingTeam,
     bowlingTeam: reveal.bowlingTeam,
@@ -1658,12 +1992,23 @@ function completeHandCricketBall(room) {
   if (state.mode === "team") {
     const battingTeam = state.battingTeam;
     const bowlingTeam = state.bowlingTeam;
-    const battingOrder = getTeamBattingOrder(state, battingTeam);
     const scoreAfter = state.teamScores[battingTeam] || 0;
+    const battingOrder = getTeamBattingOrder(state, battingTeam);
 
     if (isOut) {
-      state.wickets[battingTeam] += 1;
-      state.currentBatsmanIndex += 1;
+      const outPlayerIds = getTeamOutPlayerIds(state);
+
+      if (!outPlayerIds.has(reveal.battingPlayerId)) {
+        outPlayerIds.add(reveal.battingPlayerId);
+        state.outPlayerIds = Array.from(outPlayerIds);
+        state.wickets[battingTeam] += 1;
+      }
+
+      const outIndex = battingOrder.indexOf(reveal.battingPlayerId);
+
+      if (outIndex !== -1) {
+        state.currentBatsmanIndex = Math.min(outIndex + 1, battingOrder.length - 1);
+      }
     }
 
     if (state.innings === 2 && !isOut && scoreAfter >= state.target) {
@@ -1671,11 +2016,11 @@ function completeHandCricketBall(room) {
       return;
     }
 
-    if (isOut && state.currentBatsmanIndex >= battingOrder.length) {
+    if (isOut && getAvailableTeamBatsmen(state, battingTeam).length === 0) {
       if (state.innings === 1) {
         state.target = scoreAfter + 1;
         switchHandCricketTeamInnings(state);
-        beginHandCricketMove(state);
+        beginHandCricketTeamSelection(state, { countdownRequired: true, reason: "innings" });
         return;
       }
 
@@ -1689,7 +2034,7 @@ function completeHandCricketBall(room) {
     }
 
     rotateTeamBowler(state);
-    beginHandCricketMove(state);
+    beginHandCricketTeamSelection(state, { reason: isOut ? "wicket" : "switch" });
     return;
   }
 
@@ -1754,6 +2099,113 @@ export function resolveHandCricketMoveTimeout({ roomCode, moveId }) {
   return { room, changed };
 }
 
+export function resolveHandCricketTossTimeout({ roomCode, moveId }) {
+  const room = requireRoom(roomCode);
+  const state = room.handCricket;
+
+  if (room.gameType !== "hand-cricket" || !state || state.phase !== "toss-throw") {
+    return { room, changed: false };
+  }
+
+  if (moveId !== undefined && state.moveId !== moveId) {
+    return { room, changed: false };
+  }
+
+  if (!state.tossDeadlineAt || Date.now() < state.tossDeadlineAt) {
+    return { room, changed: false };
+  }
+
+  const tossPlayerIds = [state.tossChooserId, state.tossOpponentId].filter(Boolean);
+
+  for (const playerId of tossPlayerIds) {
+    if (state.tossPicks[playerId] === undefined) {
+      state.tossPicks[playerId] = getRandomTimeoutHandCricketNumber();
+    }
+  }
+
+  completeHandCricketToss(room);
+  touch(room);
+
+  return { room, changed: true };
+}
+
+export function resolveHandCricketDecisionTimeout({ roomCode, moveId }) {
+  const room = requireRoom(roomCode);
+  const state = room.handCricket;
+
+  if (room.gameType !== "hand-cricket" || !state || state.phase !== "decision") {
+    return { room, changed: false };
+  }
+
+  if (moveId !== undefined && state.moveId !== moveId) {
+    return { room, changed: false };
+  }
+
+  if (!state.decisionDeadlineAt || Date.now() < state.decisionDeadlineAt) {
+    return { room, changed: false };
+  }
+
+  const winner = findPlayerById(room, state.tossWinnerId);
+
+  if (!winner) {
+    return { room, changed: false };
+  }
+
+  applyHandCricketDecision(room, winner, "bat");
+  touch(room);
+
+  return { room, changed: true };
+}
+
+export function resolveHandCricketTeamSelectionTimeout({ roomCode, moveId }) {
+  const room = requireRoom(roomCode);
+  const state = room.handCricket;
+
+  if (room.gameType !== "hand-cricket" || !state || state.phase !== "player-selection") {
+    return { room, changed: false };
+  }
+
+  if (moveId !== undefined && state.moveId !== moveId) {
+    return { room, changed: false };
+  }
+
+  if (!state.teamSelectionDeadlineAt || Date.now() < state.teamSelectionDeadlineAt) {
+    return { room, changed: false };
+  }
+
+  setCurrentTeamPlayers(state);
+  state.teamSelectionReady = {
+    [state.battingTeam]: true,
+    [state.bowlingTeam]: true
+  };
+  maybeStartHandCricketAfterTeamSelection(state);
+  touch(room);
+
+  return { room, changed: true };
+}
+
+export function resolveHandCricketCountdown({ roomCode, moveId }) {
+  const room = requireRoom(roomCode);
+  const state = room.handCricket;
+
+  if (room.gameType !== "hand-cricket" || !state || state.phase !== "countdown") {
+    return { room, changed: false };
+  }
+
+  if (moveId !== undefined && state.moveId !== moveId) {
+    return { room, changed: false };
+  }
+
+  if (!state.countdownDeadlineAt || Date.now() < state.countdownDeadlineAt) {
+    return { room, changed: false };
+  }
+
+  beginHandCricketMove(state);
+  touch(room);
+
+  return { room, changed: true };
+}
+
 export function resolveHandCricketReveal({ roomCode, moveId }) {
   const room = requireRoom(roomCode);
   const state = room.handCricket;
@@ -1791,13 +2243,19 @@ export function submitHandCricketNumber({ socketId, roomCode, number }) {
   }
 
   if (state.phase === "toss-throw") {
+    const tossPlayerIds = [state.tossChooserId, state.tossOpponentId].filter(Boolean);
+
+    if (!tossPlayerIds.includes(player.playerId)) {
+      throw new Error("You are not part of the toss.");
+    }
+
     if (state.tossPicks[player.playerId] !== undefined) {
       throw new Error("You already picked for the toss.");
     }
 
     state.tossPicks[player.playerId] = value;
 
-    if (Object.keys(state.tossPicks).length === HAND_CRICKET_CLASSIC_PLAYERS) {
+    if (tossPlayerIds.every((playerId) => state.tossPicks[playerId] !== undefined)) {
       completeHandCricketToss(room);
     }
 
@@ -1832,6 +2290,10 @@ export function callNumber({ socketId, roomCode, number }) {
   const value = Number(number);
   const currentPlayer = room.players[room.currentTurn];
 
+  if (room.gameType !== "bingo") {
+    throw new Error("Number calling is only active for Bingo.");
+  }
+
   if (!room.gameStarted || room.gameEnded) {
     throw new Error("Game is not active.");
   }
@@ -1844,8 +2306,11 @@ export function callNumber({ socketId, roomCode, number }) {
 }
 
 function callNumberForPlayer(room, player, value) {
-  if (!Number.isInteger(value) || value < 1 || value > 25) {
-    throw new Error("Choose a number from 1 to 25.");
+  const boardSize = getActiveBingoBoardSize(room);
+  const maxNumber = boardSize * boardSize;
+
+  if (!Number.isInteger(value) || value < 1 || value > maxNumber) {
+    throw new Error(`Choose a number from 1 to ${maxNumber}.`);
   }
 
   if (room.calledNumbers.includes(value)) {
@@ -1866,6 +2331,10 @@ function callNumberForPlayer(room, player, value) {
 export function callBotNumber({ roomCode, playerId }) {
   const room = requireRoom(roomCode);
   const currentPlayer = room.players[room.currentTurn];
+
+  if (room.gameType !== "bingo") {
+    throw new Error("Bot number calling is only active for Bingo.");
+  }
 
   if (!room.gameStarted || room.gameEnded) {
     throw new Error("Game is not active.");
@@ -1897,9 +2366,11 @@ export function claimBingo({ socketId, roomCode }) {
   }
 
   const board = room.boards[player.playerId];
-  const completedLines = countCompletedLines(board, room.calledNumbers);
+  const boardSize = getActiveBingoBoardSize(room);
+  const completedLines = countCompletedLines(board, room.calledNumbers, boardSize);
+  const requiredLines = boardSize;
 
-  if (completedLines < 5) {
+  if (completedLines < requiredLines) {
     return {
       room,
       completedLines,
@@ -1963,6 +2434,8 @@ function removePlayerAtIndex(room, leavingIndex) {
       };
     }
   }
+
+  syncBingoBoardsForRoster(room);
 
   if (room.currentTurn >= room.players.length) {
     room.currentTurn = 0;

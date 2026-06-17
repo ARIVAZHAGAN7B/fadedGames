@@ -11,7 +11,7 @@ const games = [
     defaultRoomName: "Friends Game",
     maxPlayers: 4,
     icon: Grid3X3,
-    summary: "Classic 5x5 number board with realtime room play."
+    summary: "Player-sized number board with realtime room play."
   },
   {
     id: "hand-cricket",

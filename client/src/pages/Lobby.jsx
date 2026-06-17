@@ -443,7 +443,7 @@ export default function Lobby({
           </div>
 
           {isBingo ? (
-            <BoardSetup initialBoard={board} onSave={onBoardSaved} />
+            <BoardSetup initialBoard={board} numPlayers={room.players.length} onSave={onBoardSaved} />
           ) : isTag ? (
             <TagSetup room={room} />
           ) : (

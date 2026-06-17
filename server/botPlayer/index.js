@@ -11,8 +11,8 @@ const BOT_NAMES = [
   "Ace Bot"
 ];
 
-export function generateBotBoard() {
-  return generateBoard();
+export function generateBotBoard(boardSize) {
+  return generateBoard(boardSize);
 }
 
 export function createBotName(existingNames) {
@@ -43,4 +43,3 @@ export function chooseBotNumber(board, calledNumbers) {
   const index = Math.floor(Math.random() * availableNumbers.length);
   return availableNumbers[index];
 }
-

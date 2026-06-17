@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, RotateCcw, Shuffle } from "lucide-react";
 import Board from "./Board.jsx";
-import { generateBoard, validateBoard } from "../game/board.js";
+import { generateBoard, validateBoard, getBoardSize } from "../game/board.js";
 
-function emptyDraft() {
-  return Array.from({ length: 25 }, () => "");
+function emptyDraft(boardSize) {
+  return Array.from({ length: boardSize * boardSize }, () => "");
 }
 
-function getDuplicateValues(board) {
+function getDuplicateValues(board, boardSize) {
+  const maxValue = boardSize * boardSize;
   const counts = new Map();
 
   board.forEach((entry) => {
@@ -17,7 +18,7 @@ function getDuplicateValues(board) {
 
     const value = Number(entry);
 
-    if (!Number.isInteger(value) || value < 1 || value > 25) {
+    if (!Number.isInteger(value) || value < 1 || value > maxValue) {
       return;
     }
 
@@ -29,22 +30,26 @@ function getDuplicateValues(board) {
     .map(([value]) => value);
 }
 
-export default function BoardSetup({ initialBoard, onSave }) {
+export default function BoardSetup({ initialBoard, numPlayers, onSave }) {
+  const boardSize = useMemo(() => getBoardSize(numPlayers), [numPlayers]);
+  const boardCells = boardSize * boardSize;
+  const maxValue = boardCells;
+  
   const [mode, setMode] = useState("auto");
-  const [autoDraft, setAutoDraft] = useState(() => initialBoard.length === 25 ? initialBoard : generateBoard());
-  const [manualDraft, setManualDraft] = useState(() => emptyDraft());
+  const [autoDraft, setAutoDraft] = useState(() => initialBoard.length === boardCells ? initialBoard : generateBoard(boardSize));
+  const [manualDraft, setManualDraft] = useState(() => emptyDraft(boardSize));
   const [status, setStatus] = useState("");
   const draft = mode === "auto" ? autoDraft : manualDraft;
-  const validation = useMemo(() => validateBoard(draft), [draft]);
-  const duplicateValues = useMemo(() => getDuplicateValues(manualDraft), [manualDraft]);
+  const validation = useMemo(() => validateBoard(draft, boardSize), [draft, boardSize]);
+  const duplicateValues = useMemo(() => getDuplicateValues(manualDraft, boardSize), [manualDraft, boardSize]);
   const filledCount = useMemo(
     () => manualDraft.filter((entry) => String(entry).trim() !== "").length,
     [manualDraft]
   );
   const manualMessage = duplicateValues.length
     ? `Duplicate number: ${duplicateValues.join(", ")}`
-    : filledCount < 25
-      ? `${filledCount}/25 filled`
+    : filledCount < boardCells
+      ? `${filledCount}/${boardCells} filled`
       : validation.valid
         ? "Valid board"
         : validation.message;
@@ -52,25 +57,31 @@ export default function BoardSetup({ initialBoard, onSave }) {
   const statusClass = validation.valid ? "text-mint" : mode === "manual" && filledCount === 0 ? "text-ink/50" : "text-coral";
 
   useEffect(() => {
-    if (mode === "auto" && initialBoard.length === 25) {
+    if (mode === "auto" && initialBoard.length === boardCells) {
       setAutoDraft(initialBoard);
     }
-  }, [initialBoard, mode]);
+  }, [initialBoard, mode, boardCells]);
+
+  // Reset drafts when board size changes
+  useEffect(() => {
+    setAutoDraft(generateBoard(boardSize));
+    setManualDraft(emptyDraft(boardSize));
+  }, [boardSize]);
 
   const handleShuffle = () => {
     setStatus("");
-    setAutoDraft(generateBoard());
+    setAutoDraft(generateBoard(boardSize));
   };
 
   const handleManualChange = (index, value) => {
-    const digits = value.replace(/\D/g, "").slice(0, 2);
+    const digits = value.replace(/\D/g, "").slice(0, String(maxValue).length);
     setStatus("");
     setManualDraft((current) => current.map((entry, entryIndex) => (entryIndex === index ? digits : entry)));
   };
 
   const handleManualReset = () => {
     setStatus("");
-    setManualDraft(emptyDraft());
+    setManualDraft(emptyDraft(boardSize));
   };
 
   const handleSave = async () => {
@@ -96,8 +107,8 @@ export default function BoardSetup({ initialBoard, onSave }) {
             }`}
             onClick={() => {
               setMode("auto");
-              if (!validateBoard(autoDraft).valid) {
-                setAutoDraft(generateBoard());
+              if (!validateBoard(autoDraft, boardSize).valid) {
+                setAutoDraft(generateBoard(boardSize));
               }
             }}
           >
@@ -120,7 +131,14 @@ export default function BoardSetup({ initialBoard, onSave }) {
 
       {mode === "auto" ? (
         <div className="space-y-3">
-          <Board board={draft.map(Number)} calledNumbers={[]} isMyTurn={false} gameEnded onCallNumber={() => {}} />
+          <Board
+            board={draft.map(Number)}
+            boardSize={boardSize}
+            calledNumbers={[]}
+            isMyTurn={false}
+            gameEnded
+            onCallNumber={() => {}}
+          />
           <button
             type="button"
             className="compact-button border border-ink/15 bg-paper text-ink hover:border-mint hover:text-mint"
@@ -133,12 +151,15 @@ export default function BoardSetup({ initialBoard, onSave }) {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="mx-auto grid w-full max-w-[26rem] bingo-grid gap-1.5">
+          <div
+            className="mx-auto grid w-full max-w-[26rem] gap-1.5"
+            style={{ gridTemplateColumns: `repeat(${boardSize}, minmax(0, 1fr))` }}
+          >
             {manualDraft.map((value, index) => {
               const numericValue = Number(value);
               const hasValue = String(value).trim() !== "";
               const isDuplicate = hasValue && duplicateValues.includes(numericValue);
-              const isOutOfRange = hasValue && (!Number.isInteger(numericValue) || numericValue < 1 || numericValue > 25);
+              const isOutOfRange = hasValue && (!Number.isInteger(numericValue) || numericValue < 1 || numericValue > maxValue);
 
               return (
                 <input

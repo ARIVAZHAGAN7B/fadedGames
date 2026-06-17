@@ -14,9 +14,14 @@ import {
   removePlayer,
   resumeSession,
   restartGame,
+  resolveHandCricketCountdown,
+  resolveHandCricketDecisionTimeout,
   resolveHandCricketMoveTimeout,
   resolveHandCricketReveal,
+  resolveHandCricketTeamSelectionTimeout,
+  resolveHandCricketTossTimeout,
   serializeRoom,
+  selectHandCricketTeamPlayer,
   setPlayerBoard,
   startGame,
   submitHandCricketNumber,
@@ -211,10 +216,35 @@ function scheduleHandCricketMove(io, room) {
 
   const roomCode = room.roomCode;
   const moveId = state.moveId;
+  const isToss = state.phase === "toss-throw";
+  const isDecision = state.phase === "decision";
+  const isSelection = state.phase === "player-selection";
+  const isCountdown = state.phase === "countdown";
   const isReveal = state.phase === "ball-reveal";
-  const deadlineAt = isReveal ? state.revealDeadlineAt : state.moveDeadlineAt;
+  const deadlineAt = isToss
+    ? state.tossDeadlineAt
+    : isDecision
+      ? state.decisionDeadlineAt
+      : isSelection
+        ? state.teamSelectionDeadlineAt
+        : isCountdown
+          ? state.countdownDeadlineAt
+          : isReveal
+            ? state.revealDeadlineAt
+            : state.moveDeadlineAt;
 
-  if ((state.phase !== "innings" && !isReveal) || !deadlineAt) {
+  if (
+    state.phase !== "innings" &&
+    !isReveal &&
+    !isCountdown &&
+    !isToss &&
+    !isDecision &&
+    !isSelection
+  ) {
+    return;
+  }
+
+  if (!deadlineAt) {
     return;
   }
 
@@ -223,9 +253,17 @@ function scheduleHandCricketMove(io, room) {
     handCricketMoveTimers.delete(roomCode);
 
     try {
-      const result = isReveal
-        ? resolveHandCricketReveal({ roomCode, moveId })
-        : resolveHandCricketMoveTimeout({ roomCode, moveId });
+      const result = isCountdown
+        ? resolveHandCricketCountdown({ roomCode, moveId })
+        : isReveal
+          ? resolveHandCricketReveal({ roomCode, moveId })
+          : isToss
+            ? resolveHandCricketTossTimeout({ roomCode, moveId })
+            : isDecision
+              ? resolveHandCricketDecisionTimeout({ roomCode, moveId })
+              : isSelection
+                ? resolveHandCricketTeamSelectionTimeout({ roomCode, moveId })
+                : resolveHandCricketMoveTimeout({ roomCode, moveId });
 
       if (!result.changed) {
         scheduleHandCricketMove(io, result.room);
@@ -493,6 +531,7 @@ export function registerSocketHandlers(io) {
         });
 
         emitRoomUpdate(io, room);
+        scheduleHandCricketMove(io, room);
         callbackSuccess(callback, {
           room: serializeRoom(room)
         });
@@ -548,6 +587,25 @@ export function registerSocketHandlers(io) {
           socketId: socket.id,
           roomCode: payload?.roomCode || socket.data.roomCode,
           decision: payload?.decision
+        });
+
+        emitRoomUpdate(io, room);
+        scheduleHandCricketMove(io, room);
+        callbackSuccess(callback, {
+          room: serializeRoom(room)
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("hand-cricket-select-player", (payload, callback) => {
+      try {
+        const room = selectHandCricketTeamPlayer({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          playerId: payload?.playerId,
+          ready: payload?.ready
         });
 
         emitRoomUpdate(io, room);

@@ -1,9 +1,12 @@
-const BOARD_SIZE = 5;
-const BOARD_CELLS = BOARD_SIZE * BOARD_SIZE;
 const MIN_NUMBER = 1;
-const MAX_NUMBER = 25;
 
-export function generateBoard() {
+export function getBoardSize(numPlayers) {
+  return Math.max(2, numPlayers + 2);
+}
+
+export function generateBoard(boardSize = 5) {
+  const BOARD_CELLS = boardSize * boardSize;
+  const MAX_NUMBER = BOARD_CELLS;
   const values = Array.from({ length: BOARD_CELLS }, (_value, index) => index + 1);
 
   for (let index = values.length - 1; index > 0; index -= 1) {
@@ -14,11 +17,14 @@ export function generateBoard() {
   return values;
 }
 
-export function validateBoard(board) {
+export function validateBoard(board, boardSize = 5) {
+  const BOARD_CELLS = boardSize * boardSize;
+  const MAX_NUMBER = BOARD_CELLS;
+
   if (!Array.isArray(board) || board.length !== BOARD_CELLS) {
     return {
       valid: false,
-      message: "Board must contain exactly 25 cells."
+      message: `Board must contain exactly ${BOARD_CELLS} cells.`
     };
   }
 
@@ -29,7 +35,7 @@ export function validateBoard(board) {
     if (!Number.isInteger(value) || value < MIN_NUMBER || value > MAX_NUMBER) {
       return {
         valid: false,
-        message: "Board values must be whole numbers from 1 to 25."
+        message: `Board values must be whole numbers from ${MIN_NUMBER} to ${MAX_NUMBER}.`
       };
     }
 
@@ -49,8 +55,8 @@ export function validateBoard(board) {
   };
 }
 
-export function countCompletedLines(board, calledNumbers) {
-  const validation = validateBoard(board);
+export function countCompletedLines(board, calledNumbers, boardSize = 5) {
+  const validation = validateBoard(board, boardSize);
 
   if (!validation.valid) {
     return 0;
@@ -60,10 +66,11 @@ export function countCompletedLines(board, calledNumbers) {
   const values = validation.normalized;
   let completed = 0;
 
-  for (let row = 0; row < BOARD_SIZE; row += 1) {
-    const rowStart = row * BOARD_SIZE;
+  // Count completed rows
+  for (let row = 0; row < boardSize; row += 1) {
+    const rowStart = row * boardSize;
     const isComplete = values
-      .slice(rowStart, rowStart + BOARD_SIZE)
+      .slice(rowStart, rowStart + boardSize)
       .every((value) => called.has(value));
 
     if (isComplete) {
@@ -71,11 +78,12 @@ export function countCompletedLines(board, calledNumbers) {
     }
   }
 
-  for (let column = 0; column < BOARD_SIZE; column += 1) {
+  // Count completed columns
+  for (let column = 0; column < boardSize; column += 1) {
     let isComplete = true;
 
-    for (let row = 0; row < BOARD_SIZE; row += 1) {
-      if (!called.has(values[row * BOARD_SIZE + column])) {
+    for (let row = 0; row < boardSize; row += 1) {
+      if (!called.has(values[row * boardSize + column])) {
         isComplete = false;
         break;
       }
@@ -86,20 +94,35 @@ export function countCompletedLines(board, calledNumbers) {
     }
   }
 
-  const firstDiagonal = [0, 6, 12, 18, 24].every((index) => called.has(values[index]));
-  const secondDiagonal = [4, 8, 12, 16, 20].every((index) => called.has(values[index]));
+  // Check main diagonal (top-left to bottom-right)
+  let mainDiagonalComplete = true;
+  for (let i = 0; i < boardSize; i += 1) {
+    if (!called.has(values[i * boardSize + i])) {
+      mainDiagonalComplete = false;
+      break;
+    }
+  }
 
-  if (firstDiagonal) {
+  if (mainDiagonalComplete) {
     completed += 1;
   }
 
-  if (secondDiagonal) {
+  // Check anti-diagonal (top-right to bottom-left)
+  let antiDiagonalComplete = true;
+  for (let i = 0; i < boardSize; i += 1) {
+    if (!called.has(values[i * boardSize + (boardSize - 1 - i)])) {
+      antiDiagonalComplete = false;
+      break;
+    }
+  }
+
+  if (antiDiagonalComplete) {
     completed += 1;
   }
 
   return completed;
 }
 
-export function hasWinningBingo(board, calledNumbers) {
-  return countCompletedLines(board, calledNumbers) >= BOARD_SIZE;
+export function hasWinningBingo(board, calledNumbers, boardSize = 5) {
+  return countCompletedLines(board, calledNumbers, boardSize) >= boardSize;
 }

@@ -7,6 +7,7 @@ import Result from "./pages/Result.jsx";
 import TagGame from "./pages/TagGame.jsx";
 import { socket } from "./socket/client.js";
 import { getGameTypeFromUrl, getRoomCodeFromUrl, setRoomCodeInUrl } from "./utils/roomLink.js";
+import { getBoardSize } from "./game/board.js";
 
 const STORAGE_KEY = "bingo-session-v1";
 
@@ -388,6 +389,20 @@ export default function App() {
     return response;
   };
 
+  const handleHandCricketSelectPlayer = async (payload) => {
+    const response = await emitWithAck("hand-cricket-select-player", {
+      roomCode: session.roomCode,
+      ...payload
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
   const handleRestartGame = async () => {
     const response = await emitWithAck("restart-game", {
       roomCode: session.roomCode
@@ -449,23 +464,29 @@ export default function App() {
         onChooseToss={handleHandCricketTossChoice}
         onPickNumber={handleHandCricketPickNumber}
         onChooseDecision={handleHandCricketDecision}
+        onSelectTeamPlayer={handleHandCricketSelectPlayer}
         onRestartGame={handleRestartGame}
         onLeaveRoom={handleLeaveRoom}
       />
     );
   }
 
-  if (view === "game" && room && !room.gameEnded && board.length === 25) {
-    return (
-      <Game
-        room={room}
-        session={session}
-        board={board}
-        onCallNumber={handleCallNumber}
-        onClaimBingo={handleClaimBingo}
-        onLeaveRoom={handleLeaveRoom}
-      />
-    );
+  if (view === "game" && room && !room.gameEnded) {
+    const expectedBoardSize = room.boardSize || getBoardSize(room.players.length);
+    const expectedBoardCells = expectedBoardSize * expectedBoardSize;
+    
+    if (board.length === expectedBoardCells) {
+      return (
+        <Game
+          room={room}
+          session={session}
+          board={board}
+          onCallNumber={handleCallNumber}
+          onClaimBingo={handleClaimBingo}
+          onLeaveRoom={handleLeaveRoom}
+        />
+      );
+    }
   }
 
   if (view === "tag" && room) {

@@ -36,10 +36,6 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.bingo-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
 .number-pill {
   min-width: 1.9rem;
 }
