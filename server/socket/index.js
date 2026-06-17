@@ -33,6 +33,7 @@ import {
 
 const DISCONNECT_GRACE_MS = 60_000;
 const BOT_TURN_DELAY_MS = 900;
+const TAG_LOOP_INTERVAL_MS = 1000 / 60;
 const disconnectTimers = new Map();
 const botTurnTimers = new Map();
 const handCricketMoveTimers = new Map();
@@ -181,7 +182,7 @@ function scheduleTagLoop(io, room) {
     } catch {
       cancelTagLoop(roomCode);
     }
-  }, 50);
+  }, TAG_LOOP_INTERVAL_MS);
 
   tagRoomLoops.set(roomCode, loop);
 }
