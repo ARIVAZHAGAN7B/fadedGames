@@ -11,10 +11,20 @@ dotenv.config();
 const PORT = process.env.PORT || 4000;
 const configuredOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173,http://127.0.0.1:5173,https://fadedgame.onrender.com")
   .split(",")
-  .map((origin) => origin.trim());
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+function allowOrigin(origin, callback) {
+  if (!origin || configuredOrigins.includes(origin) || process.env.NODE_ENV !== "production") {
+    callback(null, true);
+    return;
+  }
+
+  callback(new Error("Origin is not allowed by CORS."));
+}
 
 const app = express();
-app.use(cors({ origin: configuredOrigins }));
+app.use(cors({ origin: allowOrigin }));
 app.use(express.json());
 
 app.get("/health", (_request, response) => {
@@ -24,7 +34,7 @@ app.get("/health", (_request, response) => {
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: configuredOrigins,
+    origin: allowOrigin,
     methods: ["GET", "POST"]
   }
 });
@@ -34,4 +44,3 @@ registerSocketHandlers(io);
 httpServer.listen(PORT, () => {
   console.log(`Bingo server listening on port ${PORT}`);
 });
-

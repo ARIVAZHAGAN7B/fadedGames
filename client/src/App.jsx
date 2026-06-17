@@ -88,6 +88,16 @@ export default function App() {
   const [activeRooms, setActiveRooms] = useState([]);
   const [needsResume, setNeedsResume] = useState(Boolean(activeSavedState));
 
+  const requestActiveRooms = useCallback(async () => {
+    const response = await emitWithAck("list-active-rooms", {});
+
+    if (response.ok) {
+      setActiveRooms(Array.isArray(response.rooms) ? response.rooms : []);
+    }
+
+    return response;
+  }, []);
+
   const resetLocalState = () => {
     clearSavedState();
     setRoomCodeInUrl("");
@@ -103,13 +113,6 @@ export default function App() {
     const applyActiveRooms = (payload) => {
       if (!canceled) {
         setActiveRooms(Array.isArray(payload?.rooms) ? payload.rooms : []);
-      }
-    };
-    const requestActiveRooms = async () => {
-      const response = await emitWithAck("list-active-rooms", {});
-
-      if (response.ok) {
-        applyActiveRooms(response);
       }
     };
     const onConnect = () => {
@@ -167,7 +170,7 @@ export default function App() {
       socket.off("game-ended", onRoomPayload);
       socket.off("room-restarted", onRoomRestarted);
     };
-  }, []);
+  }, [requestActiveRooms]);
 
   useEffect(() => {
     if (!session.roomCode || !session.playerId || !room) {
@@ -521,6 +524,7 @@ export default function App() {
       activeRooms={activeRooms}
       onCreateRoom={handleCreateRoom}
       onJoinRoom={handleJoinRoom}
+      onRefreshActiveRooms={requestActiveRooms}
       initialRoomCode={initialRoomCode}
       initialGameType={initialGameType}
     />

@@ -36,6 +36,22 @@ function getDigitFromKeyboardEvent(event) {
     return Number(event.key);
   }
 
+  const codeMatch = String(event.code || "").match(/^(?:Digit|Numpad)([0-9])$/);
+
+  if (codeMatch) {
+    return Number(codeMatch[1]);
+  }
+
+  const legacyCode = event.which || event.keyCode;
+
+  if (legacyCode >= 48 && legacyCode <= 57) {
+    return legacyCode - 48;
+  }
+
+  if (legacyCode >= 96 && legacyCode <= 105) {
+    return legacyCode - 96;
+  }
+
   return null;
 }
 
@@ -155,6 +171,8 @@ function NumberPad({ disabled, onPick, role, secondsLeft, timerProgress, selecte
       <div className="grid grid-cols-3 gap-2">
         {calculatorNumbers.map((number) => {
           const isSelected = selectedNumber === number;
+          const showPickFeedback = animatePick && isSelected;
+          const quietAfterPick = !animatePick && selectedNumber !== null;
 
           return (
             <button
@@ -165,10 +183,12 @@ function NumberPad({ disabled, onPick, role, secondsLeft, timerProgress, selecte
               } ${
                 number === 10 ? "col-span-2" : ""
               } ${
-                isSelected
-                  ? `${animatePick ? "pick-pop " : ""}border-coral bg-coral text-white shadow-md`
+                showPickFeedback
+                  ? "pick-pop border-coral bg-coral text-white shadow-md"
                   : "border-ink/15 bg-white text-ink hover:border-coral hover:text-coral disabled:bg-ink/10 disabled:text-ink/35"
-              } ${selectedNumber !== null && !isSelected ? "opacity-45" : ""}`}
+              } ${animatePick && selectedNumber !== null && !isSelected ? "opacity-45" : ""} ${
+                quietAfterPick ? "disabled:border-ink/15 disabled:bg-white disabled:text-ink" : ""
+              }`}
               disabled={disabled}
               onClick={() => onPick(number)}
             >
@@ -205,6 +225,8 @@ function TossNumberPad({ disabled, onPick, selectedNumber, secondsLeft, timerPro
       <div className="grid grid-cols-3 gap-2">
         {calculatorNumbers.map((number) => {
           const isSelected = selectedNumber === number;
+          const showPickFeedback = animatePick && isSelected;
+          const quietAfterPick = !animatePick && selectedNumber !== null;
 
           return (
             <button
@@ -215,10 +237,12 @@ function TossNumberPad({ disabled, onPick, selectedNumber, secondsLeft, timerPro
               } ${
                 number === 10 ? "col-span-2" : ""
               } ${
-                isSelected
-                  ? `${animatePick ? "pick-pop " : ""}border-coral bg-coral text-white shadow-md`
+                showPickFeedback
+                  ? "pick-pop border-coral bg-coral text-white shadow-md"
                   : "border-ink/15 bg-white text-ink hover:border-coral hover:text-coral disabled:bg-ink/10 disabled:text-ink/35"
-              } ${selectedNumber !== null && !isSelected ? "opacity-45" : ""}`}
+              } ${animatePick && selectedNumber !== null && !isSelected ? "opacity-45" : ""} ${
+                quietAfterPick ? "disabled:border-ink/15 disabled:bg-white disabled:text-ink" : ""
+              }`}
               disabled={disabled}
               onClick={() => onPick(number)}
             >

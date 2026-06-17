@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, LogIn, Plus, Wifi, WifiOff } from "lucide-react";
 import bingoLogo from "../images/bingo.png";
 import handCricketLogo from "../images/handCricket.png";
@@ -89,6 +89,7 @@ export default function Home({
   activeRooms = [],
   onCreateRoom,
   onJoinRoom,
+  onRefreshActiveRooms,
   initialRoomCode = "",
   initialGameType = ""
 }) {
@@ -107,6 +108,8 @@ export default function Home({
   const [roomCode, setRoomCode] = useState(normalizeRoomCode(initialRoomCode));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [pickingGameId, setPickingGameId] = useState("");
+  const pickingGameTimerRef = useRef(null);
   const selectedGame = getGameById(selectedGameId);
   const isHandCricket = selectedGame?.id === "hand-cricket";
   const isTag = selectedGame?.id === "tag";
@@ -140,6 +143,34 @@ export default function Home({
       setRoomCode("");
     }
   };
+
+  const handleGamePick = (gameId) => {
+    const game = getGameById(gameId);
+
+    if (!game?.available || pickingGameId) {
+      return;
+    }
+
+    setPickingGameId(game.id);
+    pickingGameTimerRef.current = window.setTimeout(() => {
+      setPickingGameId("");
+      selectGame(game.id);
+    }, 220);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pickingGameTimerRef.current) {
+        window.clearTimeout(pickingGameTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (connected && selectedGameId && typeof onRefreshActiveRooms === "function") {
+      onRefreshActiveRooms();
+    }
+  }, [connected, onRefreshActiveRooms, selectedGameId]);
 
   useEffect(() => {
     const code = normalizeRoomCode(initialRoomCode);
@@ -213,7 +244,7 @@ export default function Home({
   if (!selectedGame) {
     return (
       <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
-        <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-6xl flex-col gap-5">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
           <header className="flex items-center justify-between gap-3 py-1">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-sm font-extrabold text-white">
@@ -231,27 +262,39 @@ export default function Home({
             </div>
           </header>
 
-          <section className="grid flex-1 content-center gap-3 sm:grid-cols-4 xl:grid-cols-8">
-            {games.map((game) => (
-              <button
-                key={game.id}
-                type="button"
-                className="group overflow-hidden rounded-md border border-ink/10 bg-white text-left shadow-soft transition hover:-translate-y-0.5 hover:border-coral disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={() => selectGame(game.id)}
-                disabled={!game.available}
-              >
-                <span className="block aspect-square w-full overflow-hidden bg-ink/5">
-                  <img
-                    src={game.logo}
-                    alt=""
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                  />
-                </span>
-                <span className="flex min-h-16 items-center justify-center px-3 py-3 text-center text-xl font-extrabold text-ink">
-                  {game.name}
-                </span>
-              </button>
-            ))}
+          <section className="grid auto-rows-fr gap-3 sm:grid-cols-4 xl:grid-cols-8">
+            {games.map((game) => {
+              const isPicking = pickingGameId === game.id;
+
+              return (
+                <button
+                  key={game.id}
+                  type="button"
+                  className={`group relative grid h-full grid-rows-[1fr_4rem] overflow-hidden rounded-md border bg-white text-left shadow-soft transition hover:-translate-y-0.5 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isPicking ? "game-select-pop border-coral" : "border-ink/10"
+                  }`}
+                  onClick={() => handleGamePick(game.id)}
+                  disabled={!game.available || Boolean(pickingGameId)}
+                >
+                  <span className="block aspect-square h-full w-full overflow-hidden bg-ink/5">
+                    <img
+                      src={game.logo}
+                      alt=""
+                      className={`h-full w-full object-cover transition duration-300 ${
+                        isPicking ? "scale-[1.06]" : "group-hover:scale-[1.03]"
+                      }`}
+                    />
+                  </span>
+                  <span
+                    className={`flex h-16 items-center justify-center overflow-hidden px-2 text-center text-lg font-extrabold leading-tight transition ${
+                      isPicking ? "bg-coral text-white" : "text-ink"
+                    }`}
+                  >
+                    {game.name}
+                  </span>
+                </button>
+              );
+            })}
           </section>
         </div>
       </main>

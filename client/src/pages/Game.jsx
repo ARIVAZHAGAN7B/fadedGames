@@ -34,6 +34,22 @@ function getDigitFromKeyboardEvent(event) {
     return Number(event.key);
   }
 
+  const codeMatch = String(event.code || "").match(/^(?:Digit|Numpad)([0-9])$/);
+
+  if (codeMatch) {
+    return Number(codeMatch[1]);
+  }
+
+  const legacyCode = event.which || event.keyCode;
+
+  if (legacyCode >= 48 && legacyCode <= 57) {
+    return legacyCode - 48;
+  }
+
+  if (legacyCode >= 96 && legacyCode <= 105) {
+    return legacyCode - 96;
+  }
+
   return null;
 }
 
