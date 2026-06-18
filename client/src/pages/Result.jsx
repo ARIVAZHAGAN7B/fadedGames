@@ -1,4 +1,9 @@
-import { Home, RotateCcw, Trophy, Users, Hash } from "lucide-react";
+import { Trophy, Users, Hash } from "lucide-react";
+import {
+  GamePage,
+  ResultActions,
+  RoomHeader
+} from "../components/game/GameLayout.jsx";
 
 const confetti = [
   ["8%", "0ms", "#e05d44"],
@@ -17,19 +22,14 @@ export default function Result({ room, session, onRestartGame, onLeaveRoom }) {
   const completedLines = room.winner?.completedLines || 5;
 
   return (
-    <main className="min-h-screen overflow-hidden bg-paper px-4 py-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-        <header className="surface flex items-center justify-between gap-3 p-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-              BI
-            </div>
-            <div>
-              <p className="text-xs font-extrabold uppercase text-mint">Bingo Result</p>
-              <h1 className="text-2xl font-extrabold text-ink">{room.roomName}</h1>
-            </div>
-          </div>
-        </header>
+    <GamePage overflowHidden>
+        <RoomHeader
+          room={room}
+          codeLabel="BI"
+          eyebrow="Bingo Result"
+          showCopy={false}
+          showLeave={false}
+        />
 
         <div className="grid gap-3 lg:grid-cols-[1fr_21rem]">
           <section className="surface result-card relative overflow-hidden border-honey p-5 text-center">
@@ -74,32 +74,18 @@ export default function Result({ room, session, onRestartGame, onLeaveRoom }) {
 
           <section className="surface h-fit p-3">
             <h2 className="mb-3 text-base font-extrabold">Match Actions</h2>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                className="compact-button w-full border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-                onClick={onLeaveRoom}
-              >
-                <Home className="h-4 w-4" aria-hidden="true" />
-                Home
-              </button>
-              <button
-                type="button"
-                className="compact-button w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-                onClick={onRestartGame}
-                disabled={!isHost}
-              >
-                <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                Restart
-              </button>
-            </div>
+            <ResultActions
+              onLeaveRoom={onLeaveRoom}
+              onRestart={onRestartGame}
+              restartDisabled={!isHost}
+              layoutClassName="flex flex-col gap-2"
+            />
 
             {!isHost ? (
               <p className="mt-2 text-center text-xs font-bold text-ink/55">Waiting for host</p>
             ) : null}
           </section>
         </div>
-      </div>
-    </main>
+    </GamePage>
   );
 }

@@ -1,22 +1,28 @@
-import { useCallback, useEffect, useState } from "react";
-import Boost from "./pages/Boost.jsx";
-import Game from "./pages/Game.jsx";
-import GuessNumber from "./pages/GuessNumber.jsx";
-import HandCricket from "./pages/HandCricket.jsx";
-import Home from "./pages/Home.jsx";
-import Lobby from "./pages/Lobby.jsx";
-import RajaRani from "./pages/RajaRani.jsx";
-import RajaRaniTurns from "./pages/RajaRaniTurns.jsx";
-import Result from "./pages/Result.jsx";
-import SpyWord from "./pages/SpyWord.jsx";
-import TagGame from "./pages/TagGame.jsx";
-import TreasureHunt from "./pages/TreasureHunt.jsx";
-import WordGuess from "./pages/WordGuess.jsx";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { socket } from "./socket/client.js";
-import { getGameTypeFromUrl, getRoomCodeFromUrl, setRoomCodeInUrl } from "./utils/roomLink.js";
+import {
+  readRoomRouteFromUrl,
+  ROOM_ROUTE_CHANGE_EVENT,
+  setRoomCodeInUrl
+} from "./utils/roomLink.js";
 import { getBoardSize } from "./game/board.js";
 
+const Boost = lazy(() => import("./pages/Boost.jsx"));
+const Game = lazy(() => import("./pages/Game.jsx"));
+const GuessNumber = lazy(() => import("./pages/GuessNumber.jsx"));
+const HandCricket = lazy(() => import("./pages/HandCricket.jsx"));
+const Home = lazy(() => import("./pages/Home.jsx"));
+const Lobby = lazy(() => import("./pages/Lobby.jsx"));
+const RajaRani = lazy(() => import("./pages/RajaRani.jsx"));
+const RajaRaniTurns = lazy(() => import("./pages/RajaRaniTurns.jsx"));
+const Result = lazy(() => import("./pages/Result.jsx"));
+const SpyWord = lazy(() => import("./pages/SpyWord.jsx"));
+const TagGame = lazy(() => import("./pages/TagGame.jsx"));
+const TreasureHunt = lazy(() => import("./pages/TreasureHunt.jsx"));
+const WordGuess = lazy(() => import("./pages/WordGuess.jsx"));
+
 const STORAGE_KEY = "bingo-session-v1";
+const SAVED_STATE_WRITE_DELAY_MS = 500;
 
 const emptySession = {
   nickname: "",
@@ -39,6 +45,31 @@ function writeSavedState(state) {
   } catch {
     // Local storage can fail in private browsing; the game still works for the current tab.
   }
+}
+
+function getPersistableRoom(room) {
+  if (!room) {
+    return null;
+  }
+
+  return {
+    roomCode: room.roomCode,
+    gameType: room.gameType,
+    roomName: room.roomName,
+    host: room.host,
+    maxPlayers: room.maxPlayers,
+    boardSize: room.boardSize || null,
+    players: room.players,
+    calledNumbers: room.calledNumbers,
+    currentTurn: room.currentTurn,
+    currentPlayerId: room.currentPlayerId,
+    currentPlayerName: room.currentPlayerName,
+    gameStarted: room.gameStarted,
+    gameEnded: room.gameEnded,
+    winner: room.winner,
+    handCricketMode: room.handCricketMode,
+    handCricketTeamSize: room.handCricketTeamSize
+  };
 }
 
 function clearSavedState() {
@@ -105,10 +136,25 @@ function viewForRoom(room, fallback = "lobby") {
   return fallback;
 }
 
+function LoadingView() {
+  return (
+    <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
+      <div className="mx-auto flex min-h-[60vh] w-full max-w-7xl items-center justify-center">
+        <div className="surface px-5 py-4 text-sm font-extrabold text-ink/60">Loading...</div>
+      </div>
+    </main>
+  );
+}
+
+function screen(node) {
+  return <Suspense fallback={<LoadingView />}>{node}</Suspense>;
+}
+
 export default function App() {
+  const [route, setRoute] = useState(() => readRoomRouteFromUrl());
   const savedState = readSavedState();
-  const initialRoomCode = getRoomCodeFromUrl();
-  const initialGameType = getGameTypeFromUrl();
+  const initialRoomCode = route.roomCode;
+  const initialGameType = route.gameType;
   const canResumeSavedState =
     savedState?.session?.playerId &&
     savedState?.session?.roomCode &&
@@ -122,6 +168,7 @@ export default function App() {
   const [board, setBoard] = useState(activeSavedState?.board || []);
   const [activeRooms, setActiveRooms] = useState([]);
   const [needsResume, setNeedsResume] = useState(Boolean(activeSavedState));
+  const saveTimerRef = useRef(null);
 
   const requestActiveRooms = useCallback(async () => {
     const response = await emitWithAck("list-active-rooms", {});
@@ -131,6 +178,18 @@ export default function App() {
     }
 
     return response;
+  }, []);
+
+  useEffect(() => {
+    const syncRoute = () => setRoute(readRoomRouteFromUrl());
+
+    window.addEventListener("popstate", syncRoute);
+    window.addEventListener(ROOM_ROUTE_CHANGE_EVENT, syncRoute);
+
+    return () => {
+      window.removeEventListener("popstate", syncRoute);
+      window.removeEventListener(ROOM_ROUTE_CHANGE_EVENT, syncRoute);
+    };
   }, []);
 
   const resetLocalState = () => {
@@ -182,7 +241,6 @@ export default function App() {
     socket.on("player-joined", onRoomPayload);
     socket.on("player-left", onRoomPayload);
     socket.on("number-called", onRoomPayload);
-    socket.on("next-turn", onRoomPayload);
     socket.on("start-game", onStartGame);
     socket.on("game-ended", onRoomPayload);
     socket.on("room-restarted", onRoomRestarted);
@@ -200,7 +258,6 @@ export default function App() {
       socket.off("player-joined", onRoomPayload);
       socket.off("player-left", onRoomPayload);
       socket.off("number-called", onRoomPayload);
-      socket.off("next-turn", onRoomPayload);
       socket.off("start-game", onStartGame);
       socket.off("game-ended", onRoomPayload);
       socket.off("room-restarted", onRoomRestarted);
@@ -213,12 +270,34 @@ export default function App() {
     }
 
     setRoomCodeInUrl(session.roomCode, room.gameType);
-    writeSavedState({
+
+    const savedState = {
       session,
-      room,
+      room: room.gameType === "tag" ? getPersistableRoom(room) : room,
       board,
       view: viewForRoom(room, view)
-    });
+    };
+
+    if (room.gameType !== "tag") {
+      writeSavedState(savedState);
+      return undefined;
+    }
+
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = window.setTimeout(() => {
+      writeSavedState(savedState);
+      saveTimerRef.current = null;
+    }, SAVED_STATE_WRITE_DELAY_MS);
+
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
   }, [board, room, session, view]);
 
   useEffect(() => {
@@ -632,7 +711,7 @@ export default function App() {
   }, [session.roomCode]);
 
   if (view === "lobby" && room) {
-    return (
+    return screen(
       <Lobby
         room={room}
         session={session}
@@ -648,7 +727,7 @@ export default function App() {
   }
 
   if (view === "result" && room) {
-    return (
+    return screen(
       <Result
         room={room}
         session={session}
@@ -659,7 +738,7 @@ export default function App() {
   }
 
   if (view === "hand-cricket" && room) {
-    return (
+    return screen(
       <HandCricket
         room={room}
         session={session}
@@ -675,7 +754,7 @@ export default function App() {
   }
 
   if (view === "guess-number" && room) {
-    return (
+    return screen(
       <GuessNumber
         room={room}
         session={session}
@@ -688,7 +767,7 @@ export default function App() {
   }
 
   if (view === "word-guess" && room) {
-    return (
+    return screen(
       <WordGuess
         room={room}
         session={session}
@@ -701,7 +780,7 @@ export default function App() {
   }
 
   if (view === "spy-word" && room) {
-    return (
+    return screen(
       <SpyWord
         room={room}
         session={session}
@@ -715,7 +794,7 @@ export default function App() {
   }
 
   if (view === "boost" && room) {
-    return (
+    return screen(
       <Boost
         room={room}
         session={session}
@@ -728,7 +807,7 @@ export default function App() {
   }
 
   if (view === "raja-rani" && room) {
-    return (
+    return screen(
       <RajaRani
         room={room}
         session={session}
@@ -740,7 +819,7 @@ export default function App() {
   }
 
   if (view === "raja-rani-turns" && room) {
-    return (
+    return screen(
       <RajaRaniTurns
         room={room}
         session={session}
@@ -756,7 +835,7 @@ export default function App() {
     const expectedBoardCells = expectedBoardSize * expectedBoardSize;
 
     if (board.length === expectedBoardCells) {
-      return (
+      return screen(
         <Game
           room={room}
           session={session}
@@ -770,7 +849,7 @@ export default function App() {
   }
 
   if (view === "tag" && room) {
-    return (
+    return screen(
       <TagGame
         room={room}
         session={session}
@@ -782,7 +861,7 @@ export default function App() {
   }
 
   if (view === "treasure-hunt" && room) {
-    return (
+    return screen(
       <TreasureHunt
         socket={socket}
         room={room}
@@ -793,7 +872,7 @@ export default function App() {
     );
   }
 
-  return (
+  return screen(
     <Home
       connected={connected}
       activeRooms={activeRooms}

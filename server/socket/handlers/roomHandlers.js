@@ -2,7 +2,6 @@ import {
   addBot,
   createRoom,
   joinRoom,
-  listActiveRooms,
   restartGame,
   resumeSession,
   setPlayerBoard,
@@ -13,7 +12,7 @@ import {
 export function registerRoomHandlers(socket, context, timers, lifecycle) {
   socket.on("list-active-rooms", (_payload, callback) => {
     context.callbackSuccess(callback, {
-      rooms: listActiveRooms()
+      rooms: context.getActiveRooms()
     });
   });
 

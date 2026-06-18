@@ -1,11 +1,14 @@
 import {
-  Copy,
-  DoorOpen,
-  RotateCcw,
   Timer
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { buildRoomLink } from "../utils/roomLink.js";
+import {
+  GamePage,
+  RestartButton,
+  RoomHeader,
+  StatusMessage
+} from "../components/game/GameLayout.jsx";
+import { formatClock } from "../utils/time.js";
 
 const WORLD_WIDTH = 2400;
 const WORLD_HEIGHT = 1200;
@@ -543,6 +546,14 @@ function createTagScene(Phaser, mapId, onReady) {
       });
     }
 
+    positionPlayerEntry(entry, x, y) {
+      entry.shadow.setPosition(x, y + 24);
+      entry.glow.setPosition(x, y);
+      entry.shield.setPosition(x, y);
+      entry.sprite.setPosition(x, y);
+      entry.badge.setPosition(x, y - 54);
+    }
+
     updateFromRoom(room) {
       this.roomState = room;
       const players = room.tag?.players || [];
@@ -573,26 +584,42 @@ function createTagScene(Phaser, mapId, onReady) {
             .setOrigin(0.5)
             .setDepth(25);
 
-          entry = { shadow, glow, shield, sprite, badge };
+          entry = {
+            shadow,
+            glow,
+            shield,
+            sprite,
+            badge,
+            x: player.x,
+            y: player.y,
+            targetX: player.x,
+            targetY: player.y,
+            vx: player.vx,
+            isIt: player.isIt,
+            grounded: player.grounded,
+            invulMs: player.invulMs
+          };
+          this.positionPlayerEntry(entry, player.x, player.y);
           this.playerObjects.set(player.playerId, entry);
         }
 
-        entry.shadow.setPosition(player.x, player.y + 24);
-        entry.glow.setPosition(player.x, player.y);
-        entry.shield.setPosition(player.x, player.y);
-        entry.sprite.setPosition(player.x, player.y);
-        entry.sprite.setFlipX(player.vx < -5);
-        entry.sprite.setScale(player.isIt ? 1.1 : player.grounded ? 1 : 1.04);
+        entry.targetX = player.x;
+        entry.targetY = player.y;
+        entry.vx = player.vx;
+        entry.isIt = player.isIt;
+        entry.grounded = player.grounded;
+        entry.invulMs = player.invulMs;
+        entry.sprite.setFlipX(entry.vx < -5);
+        entry.sprite.setScale(entry.isIt ? 1.1 : entry.grounded ? 1 : 1.04);
         entry.sprite.clearTint();
 
         if (player.flash) {
           entry.sprite.setTint(0xffffff);
         }
 
-        entry.badge.setPosition(player.x, player.y - 54);
-        entry.badge.setVisible(player.isIt);
-        entry.glow.setVisible(player.isIt);
-        entry.shield.setVisible(!player.isIt && player.invulMs > 0);
+        entry.badge.setVisible(entry.isIt);
+        entry.glow.setVisible(entry.isIt);
+        entry.shield.setVisible(!entry.isIt && entry.invulMs > 0);
       });
 
       const activeIds = new Set(players.map((player) => player.playerId));
@@ -642,7 +669,7 @@ function createTagScene(Phaser, mapId, onReady) {
       camera.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
     }
 
-    update(time) {
+    update(time, delta) {
       for (const entry of this.movingPlatformObjects) {
         const position = movingPlatformPosition(entry.platform, time);
 
@@ -652,6 +679,19 @@ function createTagScene(Phaser, mapId, onReady) {
       }
 
       for (const entry of this.playerObjects.values()) {
+        const distance = Math.hypot(entry.targetX - entry.x, entry.targetY - entry.y);
+
+        if (distance > 220) {
+          entry.x = entry.targetX;
+          entry.y = entry.targetY;
+        } else {
+          const blend = Math.min(1, Math.max(0.16, (delta || 16.7) / 50));
+          entry.x += (entry.targetX - entry.x) * blend;
+          entry.y += (entry.targetY - entry.y) * blend;
+        }
+
+        this.positionPlayerEntry(entry, entry.x, entry.y);
+
         if (entry.glow.visible) {
           const pulse = 1 + Math.sin(time / 140) * 0.08;
           entry.glow.setScale(pulse);
@@ -800,14 +840,6 @@ function sameInput(first, second) {
   );
 }
 
-function formatClock(ms) {
-  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
 function getCountdownLabel(tag) {
   if (tag?.phase !== "countdown") {
     return "";
@@ -948,15 +980,6 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
     }
   }, [result]);
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(buildRoomLink(room.roomCode, room.gameType));
-      setStatus("Link copied");
-    } catch {
-      setStatus("Copy failed");
-    }
-  };
-
   const handleRestart = async () => {
     const response = await onRestartGame();
 
@@ -966,20 +989,15 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
   };
 
   return (
-    <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-        <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-              TG
-            </div>
-            <div>
-              <p className="text-xs font-extrabold uppercase text-mint">{mapName}</p>
-              <h1 className="text-2xl font-extrabold text-ink">{room.roomName}</h1>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+    <GamePage>
+      <RoomHeader
+        room={room}
+        codeLabel="TG"
+        eyebrow={mapName}
+        onStatus={setStatus}
+        onLeaveRoom={onLeaveRoom}
+        actions={
+          <>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-extrabold ${
                 tension ? "tag-timer-pulse bg-coral text-white" : "bg-honey text-ink"
@@ -988,38 +1006,12 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
               <Timer className="h-4 w-4" aria-hidden="true" />
               {tag.phase === "countdown" ? countdownLabel || "3" : formatClock(timeLeftMs)}
             </span>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-paper font-extrabold"
-              onClick={handleCopy}
-              title="Copy room link"
-            >
-              <Copy className="h-4 w-4" aria-hidden="true" />
-              {room.roomCode}
-            </button>
-            <button
-              type="button"
-              className="compact-button bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-              onClick={handleRestart}
-              disabled={!isHost}
-              title="Restart"
-            >
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Restart
-            </button>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-              onClick={onLeaveRoom}
-              title="Leave room"
-            >
-              <DoorOpen className="h-4 w-4" aria-hidden="true" />
-              Leave
-            </button>
-          </div>
-        </header>
+            <RestartButton onRestart={handleRestart} disabled={!isHost} />
+          </>
+        }
+      />
 
-        {status ? <p className="text-xs font-bold text-coral">{status}</p> : null}
+        <StatusMessage status={status} />
 
         <section className="surface overflow-hidden bg-ink p-2">
           <div className={`relative overflow-hidden rounded-md bg-ink ${tension ? "tag-tension-frame" : ""}`}>
@@ -1045,7 +1037,6 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
             ) : null}
           </div>
         </section>
-      </div>
-    </main>
+    </GamePage>
   );
 }

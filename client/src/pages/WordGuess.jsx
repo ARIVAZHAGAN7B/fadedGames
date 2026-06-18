@@ -1,19 +1,23 @@
 import {
   Check,
   Clock,
-  Copy,
   CornerDownLeft,
   Delete,
-  DoorOpen,
   Eye,
-  Home,
   KeyRound,
   Lock,
-  RotateCcw,
   Trophy
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { buildRoomLink } from "../utils/roomLink.js";
+import {
+  GamePage,
+  ResultActions,
+  RestartButton,
+  RoomHeader,
+  StatusMessage
+} from "../components/game/GameLayout.jsx";
+import { useNow } from "../hooks/useNow.js";
+import { formatSeconds, getTimeLeft } from "../utils/time.js";
 
 const keyboardRows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
 const feedbackRank = {
@@ -27,18 +31,6 @@ function cleanWord(value, length = 5) {
     .toUpperCase()
     .replace(/[^A-Z]/g, "")
     .slice(0, length);
-}
-
-function formatSeconds(milliseconds) {
-  return Math.max(0, Math.ceil(milliseconds / 1000));
-}
-
-function getTimeLeft(deadlineAt, now) {
-  if (!deadlineAt) {
-    return 0;
-  }
-
-  return Math.max(0, deadlineAt - now);
 }
 
 function getPlayerEntries(state, playerId) {
@@ -376,9 +368,9 @@ export default function WordGuess({
   const [guessWord, setGuessWord] = useState("");
   const [status, setStatus] = useState("");
   const [highContrast, setHighContrast] = useState(false);
-  const [now, setNow] = useState(Date.now());
   const isHost = room.host === session.playerId;
   const state = room.wordGuess || {};
+  const now = useNow({ enabled: !room.gameEnded && ["locked", "guessing"].includes(state.phase) });
   const wordLength = state.wordLength || 5;
   const maxAttempts = state.maxAttempts || 6;
   const readyPlayerIds = useMemo(() => new Set(state.readyPlayerIds || []), [state.readyPlayerIds]);
@@ -390,11 +382,6 @@ export default function WordGuess({
   const canGuess = state.phase === "guessing" && !room.gameEnded && !myRoundEntry;
   const lockTimeLeft = getTimeLeft(state.lockDeadlineAt, now);
   const guessTimeLeft = getTimeLeft(state.roundDeadlineAt, now);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     setGuessWord("");
@@ -428,15 +415,6 @@ export default function WordGuess({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [canGuess, guessWord, wordLength]);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(buildRoomLink(room.roomCode, room.gameType));
-      setStatus("Link copied");
-    } catch {
-      setStatus("Copy failed");
-    }
-  };
 
   const lockWord = async () => {
     if (!confirmWord) {
@@ -500,29 +478,15 @@ export default function WordGuess({
   };
 
   return (
-    <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-        <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-              WD
-            </div>
-            <div>
-              <p className="text-xs font-extrabold uppercase text-mint">Word Guess Room</p>
-              <h1 className="text-2xl font-extrabold text-ink">{room.roomName}</h1>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-paper font-extrabold"
-              onClick={handleCopy}
-              title="Copy room link"
-            >
-              <Copy className="h-4 w-4" aria-hidden="true" />
-              {room.roomCode}
-            </button>
+    <GamePage>
+      <RoomHeader
+        room={room}
+        codeLabel="WD"
+        eyebrow="Word Guess Room"
+        onStatus={setStatus}
+        onLeaveRoom={onLeaveRoom}
+        actions={
+          <>
             <button
               type="button"
               className={`compact-button border ${
@@ -534,29 +498,12 @@ export default function WordGuess({
               <Eye className="h-4 w-4" aria-hidden="true" />
               Contrast
             </button>
-            <button
-              type="button"
-              className="compact-button bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-              onClick={handleRestart}
-              disabled={!isHost}
-              title="Restart"
-            >
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Restart
-            </button>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-              onClick={onLeaveRoom}
-              title="Leave room"
-            >
-              <DoorOpen className="h-4 w-4" aria-hidden="true" />
-              Leave
-            </button>
-          </div>
-        </header>
+            <RestartButton onRestart={handleRestart} disabled={!isHost} />
+          </>
+        }
+      />
 
-        {status ? <p className="text-xs font-bold text-coral">{status}</p> : null}
+        <StatusMessage status={status} />
 
         <section className="grid gap-3 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-3">
@@ -684,25 +631,12 @@ export default function WordGuess({
             {room.gameEnded || state.phase === "result" ? (
               <section className="space-y-3">
                 <RevealPanel room={room} state={state} highContrast={highContrast} />
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    className="compact-button flex-1 border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-                    onClick={onLeaveRoom}
-                  >
-                    <Home className="h-4 w-4" aria-hidden="true" />
-                    Home
-                  </button>
-                  <button
-                    type="button"
-                    className="compact-button flex-1 bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-                    onClick={handleRestart}
-                    disabled={!isHost}
-                  >
-                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                    Restart
-                  </button>
-                </div>
+                <ResultActions
+                  onLeaveRoom={onLeaveRoom}
+                  onRestart={handleRestart}
+                  restartDisabled={!isHost}
+                  layoutClassName="flex flex-col gap-2 sm:flex-row"
+                />
                 {!isHost ? <p className="text-center text-xs font-bold text-ink/55">Waiting for host</p> : null}
               </section>
             ) : null}
@@ -713,8 +647,6 @@ export default function WordGuess({
             <PlayerProgress room={room} state={state} session={session} />
           </aside>
         </section>
-      </div>
-
       {confirmWord ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-ink/45 px-4">
           <section className="result-card w-full max-w-sm rounded-md border border-ink/10 bg-white p-5 text-center shadow-soft">
@@ -735,6 +667,6 @@ export default function WordGuess({
           </section>
         </div>
       ) : null}
-    </main>
+    </GamePage>
   );
 }

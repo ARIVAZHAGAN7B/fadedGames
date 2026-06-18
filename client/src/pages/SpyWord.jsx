@@ -1,11 +1,7 @@
 import {
   CheckCircle2,
-  Copy,
-  DoorOpen,
-  Home,
   KeyRound,
   MessageSquare,
-  RotateCcw,
   Send,
   Shield,
   Trophy,
@@ -13,7 +9,13 @@ import {
   XCircle
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { buildRoomLink } from "../utils/roomLink.js";
+import {
+  GamePage,
+  ResultActions,
+  RestartButton,
+  RoomHeader,
+  StatusMessage
+} from "../components/game/GameLayout.jsx";
 
 function cleanClue(value) {
   return String(value || "")
@@ -218,7 +220,7 @@ function VotePanel({ room, state }) {
   );
 }
 
-function ResultPanel({ room, state, onLeaveRoom, onRestartGame, onRestartDisabled }) {
+function ResultPanel({ room, state, onLeaveRoom, onRestartGame, restartDisabled }) {
   const winnerSide = state.result?.winnerSide || room.winner?.side;
   const spyWon = winnerSide === "spy";
   const spyGuess = state.spyGuess || state.result?.spyGuess || null;
@@ -258,25 +260,11 @@ function ResultPanel({ room, state, onLeaveRoom, onRestartGame, onRestartDisable
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button
-          type="button"
-          className="compact-button flex-1 border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-          onClick={onLeaveRoom}
-        >
-          <Home className="h-4 w-4" aria-hidden="true" />
-          Home
-        </button>
-        <button
-          type="button"
-          className="compact-button flex-1 bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-          onClick={onRestartGame}
-          disabled={onRestartDisabled}
-        >
-          <RotateCcw className="h-4 w-4" aria-hidden="true" />
-          Restart
-        </button>
-      </div>
+      <ResultActions
+        onLeaveRoom={onLeaveRoom}
+        onRestart={onRestartGame}
+        restartDisabled={restartDisabled}
+      />
     </section>
   );
 }
@@ -311,15 +299,6 @@ export default function SpyWord({
     setSelectedSuspectId("");
     setStatus("");
   }, [state.moveId]);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(buildRoomLink(room.roomCode, room.gameType));
-      setStatus("Link copied");
-    } catch {
-      setStatus("Copy failed");
-    }
-  };
 
   const handleClueSubmit = async (event) => {
     event.preventDefault();
@@ -382,52 +361,17 @@ export default function SpyWord({
   };
 
   return (
-    <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-        <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-              SW
-            </div>
-            <div>
-              <p className="text-xs font-extrabold uppercase text-mint">Spy Word Room</p>
-              <h1 className="text-2xl font-extrabold text-ink">{room.roomName}</h1>
-            </div>
-          </div>
+    <GamePage>
+      <RoomHeader
+        room={room}
+        codeLabel="SW"
+        eyebrow="Spy Word Room"
+        onStatus={setStatus}
+        onLeaveRoom={onLeaveRoom}
+        actions={<RestartButton onRestart={handleRestart} disabled={!isHost} />}
+      />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-paper font-extrabold"
-              onClick={handleCopy}
-              title="Copy room link"
-            >
-              <Copy className="h-4 w-4" aria-hidden="true" />
-              {room.roomCode}
-            </button>
-            <button
-              type="button"
-              className="compact-button bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-              onClick={handleRestart}
-              disabled={!isHost}
-              title="Restart"
-            >
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Restart
-            </button>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-              onClick={onLeaveRoom}
-              title="Leave room"
-            >
-              <DoorOpen className="h-4 w-4" aria-hidden="true" />
-              Leave
-            </button>
-          </div>
-        </header>
-
-        {status ? <p className="text-xs font-bold text-coral">{status}</p> : null}
+        <StatusMessage status={status} />
 
         <section className="grid gap-3 lg:grid-cols-[1fr_21rem]">
           <div className="space-y-3">
@@ -595,7 +539,7 @@ export default function SpyWord({
                 state={state}
                 onLeaveRoom={onLeaveRoom}
                 onRestartGame={handleRestart}
-                onRestartDisabled={!isHost}
+                restartDisabled={!isHost}
               />
             )}
 
@@ -615,7 +559,6 @@ export default function SpyWord({
             ) : null}
           </aside>
         </section>
-      </div>
-    </main>
+    </GamePage>
   );
 }

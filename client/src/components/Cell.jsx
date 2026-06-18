@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { X as XIcon } from "lucide-react";
 
-export default function Cell({ number, called, latest, clickable, onClick, animateCall = true }) {
+function Cell({ number, called, latest, clickable, onClick, animateCall = true }) {
   const baseClasses =
     "relative aspect-square w-full overflow-hidden rounded-md border text-center text-base font-extrabold transition sm:text-xl";
   const stateClasses = called
@@ -37,3 +38,5 @@ export default function Cell({ number, called, latest, clickable, onClick, anima
     </button>
   );
 }
+
+export default memo(Cell);

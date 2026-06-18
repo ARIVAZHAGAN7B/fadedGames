@@ -1,6 +1,7 @@
-import { Check, Clock3, Copy, DoorOpen, Home, RefreshCw, RotateCcw, Sparkles, Trophy } from "lucide-react";
+import { Check, Clock3, Home, RefreshCw, RotateCcw, Sparkles, Trophy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { buildRoomLink } from "../utils/roomLink.js";
+import { GamePage, RoomHeader } from "../components/game/GameLayout.jsx";
+import { useNow } from "../hooks/useNow.js";
 
 const calculatorNumbers = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, 10];
 const PICK_ANIMATION_STORAGE_KEY = "hand-cricket-pick-animations";
@@ -574,7 +575,6 @@ export default function HandCricket({
   onLeaveRoom
 }) {
   const [status, setStatus] = useState("");
-  const [now, setNow] = useState(Date.now());
   const [selectedPick, setSelectedPick] = useState(null);
   const [selectedTossPick, setSelectedTossPick] = useState(null);
   const [pickAnimationsEnabled, setPickAnimationsEnabled] = useState(readPickAnimationPreference);
@@ -627,6 +627,13 @@ export default function HandCricket({
         : !bowlerPicked
           ? "Waiting for bowler"
           : "Waiting for reveal";
+  const hasActiveTimer =
+    (state.phase === "innings" && Boolean(state.moveDeadlineAt)) ||
+    (state.phase === "countdown" && Boolean(state.countdownDeadlineAt)) ||
+    (state.phase === "toss-throw" && Boolean(state.tossDeadlineAt)) ||
+    (state.phase === "decision" && Boolean(state.decisionDeadlineAt)) ||
+    (state.phase === "player-selection" && Boolean(state.teamSelectionDeadlineAt));
+  const now = useNow({ enabled: hasActiveTimer, intervalMs: 200 });
   const moveDurationMs = state.moveDurationMs || 7000;
   const moveTimeLeftMs =
     state.phase === "innings" && state.moveDeadlineAt
@@ -689,31 +696,6 @@ export default function HandCricket({
   }
 
   useEffect(() => {
-    const hasInningsTimer = state.phase === "innings" && state.moveDeadlineAt;
-    const hasCountdownTimer = state.phase === "countdown" && state.countdownDeadlineAt;
-    const hasTossTimer = state.phase === "toss-throw" && state.tossDeadlineAt;
-    const hasDecisionTimer = state.phase === "decision" && state.decisionDeadlineAt;
-    const hasSelectionTimer = state.phase === "player-selection" && state.teamSelectionDeadlineAt;
-
-    if (!hasInningsTimer && !hasCountdownTimer && !hasTossTimer && !hasDecisionTimer && !hasSelectionTimer) {
-      return undefined;
-    }
-
-    setNow(Date.now());
-    const interval = window.setInterval(() => setNow(Date.now()), 200);
-
-    return () => window.clearInterval(interval);
-  }, [
-    state.phase,
-    state.moveDeadlineAt,
-    state.countdownDeadlineAt,
-    state.tossDeadlineAt,
-    state.decisionDeadlineAt,
-    state.teamSelectionDeadlineAt,
-    state.moveId
-  ]);
-
-  useEffect(() => {
     if (state.phase !== "innings") {
       setSelectedPick(null);
       return undefined;
@@ -746,15 +728,6 @@ export default function HandCricket({
 
     return () => window.clearTimeout(timeout);
   }, [state.phase, selectedTossPick]);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(buildRoomLink(room.roomCode, room.gameType));
-      setStatus("Link copied");
-    } catch {
-      setStatus("Copy failed");
-    }
-  };
 
   const togglePickAnimations = () => {
     setPickAnimationsEnabled((current) => {
@@ -892,51 +865,31 @@ export default function HandCricket({
     return result;
   };
 
+  const animationToggle = (
+    <button
+      type="button"
+      className={`compact-button border border-ink/15 ${
+        pickAnimationsEnabled ? "bg-honey text-ink" : "bg-white text-ink/55"
+      }`}
+      onClick={togglePickAnimations}
+      title={pickAnimationsEnabled ? "Disable click animation" : "Enable click animation"}
+      aria-label={pickAnimationsEnabled ? "Disable click animation" : "Enable click animation"}
+      aria-pressed={pickAnimationsEnabled}
+    >
+      <Sparkles className="h-4 w-4" aria-hidden="true" />
+    </button>
+  );
+
   return (
-    <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-        <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-              HC
-            </div>
-            <div>
-              <p className="text-xs font-extrabold uppercase text-mint">Hand Cricket Room</p>
-              <h1 className="text-2xl font-extrabold text-ink">{room.roomName}</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className={`compact-button border border-ink/15 ${
-                pickAnimationsEnabled ? "bg-honey text-ink" : "bg-white text-ink/55"
-              }`}
-              onClick={togglePickAnimations}
-              title={pickAnimationsEnabled ? "Disable click animation" : "Enable click animation"}
-              aria-label={pickAnimationsEnabled ? "Disable click animation" : "Enable click animation"}
-              aria-pressed={pickAnimationsEnabled}
-            >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-paper font-extrabold"
-              onClick={handleCopy}
-              title="Copy room link"
-            >
-              <Copy className="h-4 w-4" aria-hidden="true" />
-              {room.roomCode}
-            </button>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-              onClick={onLeaveRoom}
-            >
-              <DoorOpen className="h-4 w-4" aria-hidden="true" />
-              Leave
-            </button>
-          </div>
-        </header>
+    <GamePage>
+        <RoomHeader
+          room={room}
+          codeLabel="HC"
+          eyebrow="Hand Cricket Room"
+          actions={animationToggle}
+          onStatus={setStatus}
+          onLeaveRoom={onLeaveRoom}
+        />
 
         <section className="grid gap-3 lg:grid-cols-[1fr_19rem] xl:grid-cols-[1fr_21rem]">
           <div className="space-y-3">
@@ -1283,7 +1236,6 @@ export default function HandCricket({
             </section>
           </aside>
         </section>
-      </div>
-    </main>
+    </GamePage>
   );
 }

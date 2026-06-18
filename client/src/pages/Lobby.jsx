@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bomb, Bot, Clock, Copy, Crown, DoorOpen, Gem, KeyRound, Keyboard, MessageSquare, Play, Settings, Shield, Square, Users, Zap } from "lucide-react";
+import { Bomb, Clock, Crown, Gem, KeyRound, Keyboard, MessageSquare, Settings, Shield, Square, Users, Zap } from "lucide-react";
 import BoardSetup from "../components/BoardSetup.jsx";
+import { GamePage, RoomHeader, StatusMessage } from "../components/game/GameLayout.jsx";
 import PlayerList from "../components/PlayerList.jsx";
-import { buildRoomLink } from "../utils/roomLink.js";
+import RoomSettingsStrip from "../components/lobby/RoomSettingsStrip.jsx";
+import { resizeBoostNames, spyWordDifficulties, tagMaps, tagRoundOptions } from "../game/options.js";
 
 const teamMeta = {
   red: {
@@ -17,32 +19,8 @@ const teamMeta = {
   }
 };
 
-const tagMaps = {
-  classic: "The Classic",
-  tower: "The Tower",
-  maze: "The Maze",
-  arena: "The Arena"
-};
-
-const tagRoundOptions = [60, 90, 120];
-const spyWordDifficulties = [
-  { id: "easy", label: "Easy" },
-  { id: "medium", label: "Medium" },
-  { id: "hard", label: "Hard" }
-];
 const rajaRaniRoles = ["Raja", "Rani", "Police", "Thirudan", "Manthiri"];
 const rajaRaniTurnRoles = ["Raja", "Rani", "Manthiri", "Police", "Thirudan"];
-const boostDefaultNames = [
-  "Perambalur",
-  "Ariyalur",
-  "Trichy",
-  "Kovai",
-  "Madurai"
-];
-
-function resizeBoostNames(names, count) {
-  return Array.from({ length: count }, (_entry, index) => names[index] || boostDefaultNames[index] || `Card ${index + 1}`);
-}
 
 function TeamSetup({ room, session, onJoinTeam }) {
   const [status, setStatus] = useState("");
@@ -498,136 +476,6 @@ function TreasureHuntSetup({ room }) {
   );
 }
 
-function RoomSettingsStrip({ room, canStart, isHost, onAddBot, onStartGame }) {
-  const isBingo = room.gameType === "bingo";
-  const isBoost = room.gameType === "boost";
-  const isTag = room.gameType === "tag";
-  const isGuessNumber = room.gameType === "guess-number";
-  const isWordGuess = room.gameType === "word-guess";
-  const isSpyWord = room.gameType === "spy-word";
-  const isRajaRani = room.gameType === "raja-rani";
-  const isRajaRaniTurns = room.gameType === "raja-rani-turns";
-  const isTreasureHunt = room.gameType === "treasure-hunt";
-  const isHandCricket = room.gameType === "hand-cricket";
-  const isTeamHandCricket = room.handCricketMode === "team";
-  const categories = room.boost?.categories || [];
-  const showAddBot = isHost && (isBingo || isBoost || isTreasureHunt);
-  const neededPlayers = Math.max(
-    0,
-    (isSpyWord
-      ? 4
-      : isTag || isGuessNumber || isWordGuess || isTreasureHunt
-        ? 2
-        : isRajaRani || isRajaRaniTurns
-          ? 5
-          : room.maxPlayers) - room.players.length
-  );
-  const readyLabel = canStart
-    ? "Ready"
-    : neededPlayers > 0
-      ? `Need ${neededPlayers}`
-      : isBingo
-        ? "Boards pending"
-        : "Waiting";
-  const settingBadges = [
-    isBoost ? `${room.maxPlayers} players` : null,
-    isBoost ? `${room.maxPlayers} card set` : null,
-    isTag ? `${tagMaps[room.tag?.mapId] || "The Classic"}` : null,
-    isTag ? `${room.tag?.roundSeconds || 60}s round` : null,
-    isGuessNumber ? "1-100" : null,
-    isWordGuess ? "5 letters" : null,
-    isSpyWord ? `${room.spyWord?.difficulty || "easy"} difficulty` : null,
-    isSpyWord ? "5 clue rounds" : null,
-    isRajaRani ? "5 hidden roles" : null,
-    isRajaRani ? "10 rounds" : null,
-    isRajaRaniTurns ? "Clockwise turns" : null,
-    isRajaRaniTurns ? "10s timer" : null,
-    isTreasureHunt ? "10x10 grid" : null,
-    isTreasureHunt ? "10s turns" : null,
-    isHandCricket ? (isTeamHandCricket ? `Teams of ${room.handCricketTeamSize || 2}` : "Classic") : null
-  ].filter(Boolean);
-
-  return (
-    <section className="surface p-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-2">
-            <Settings className="h-4 w-4 text-mint" aria-hidden="true" />
-            <h2 className="text-base font-extrabold">Room Settings</h2>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${
-                canStart ? "bg-mint text-white" : "bg-paper text-ink/60"
-              }`}
-            >
-              {readyLabel}
-            </span>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1 rounded-md bg-ink px-2.5 py-1 text-xs font-extrabold text-white">
-              <Users className="h-3.5 w-3.5" aria-hidden="true" />
-              {room.players.length}/{room.maxPlayers}
-            </span>
-            {settingBadges.map((badge) => (
-              <span
-                key={badge}
-                className="rounded-md border border-ink/10 bg-paper px-2.5 py-1 text-xs font-extrabold text-ink/70"
-              >
-                {badge}
-              </span>
-            ))}
-          </div>
-
-          {isBoost && categories.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {categories.map((category) => (
-                <span
-                  key={category.id}
-                  className="rounded-full bg-honey/20 px-2 py-0.5 text-[11px] font-extrabold text-ink"
-                >
-                  {category.label}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className={`grid gap-2 ${showAddBot ? "sm:grid-cols-2 lg:w-72" : "lg:w-40"}`}>
-          {showAddBot ? (
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-mint hover:text-mint disabled:bg-ink/10 disabled:text-ink/35"
-              onClick={onAddBot}
-              disabled={room.players.length >= room.maxPlayers}
-              title="Add bot"
-            >
-              <Bot className="h-4 w-4" aria-hidden="true" />
-              Add Bot
-            </button>
-          ) : null}
-
-          {isHost ? (
-            <button
-              type="button"
-              className="compact-button bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-              onClick={onStartGame}
-              disabled={!canStart}
-              title="Start game"
-            >
-              <Play className="h-5 w-5" aria-hidden="true" />
-              Start Game
-            </button>
-          ) : (
-            <div className="rounded-md border border-ink/10 bg-paper p-3 text-center text-sm font-bold text-ink/70">
-              Waiting...
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export default function Lobby({
   room,
   session,
@@ -704,15 +552,6 @@ export default function Lobby({
     );
   }, [room.boost?.categories, room.handCricketTeamSize, room.maxPlayers, room.roomName, room.spyWord?.difficulty, room.tag?.mapId, room.tag?.roundSeconds]);
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(buildRoomLink(room.roomCode, room.gameType));
-      setStatus("Link copied");
-    } catch {
-      setStatus("Copy failed");
-    }
-  };
-
   const handleStart = async () => {
     const result = await onStartGame();
 
@@ -744,63 +583,56 @@ export default function Lobby({
     setStatus(result.ok ? `${result.player.name} added` : result.error);
   };
 
+  const codeLabel = isWordGuess
+    ? "WG"
+    : isSpyWord
+      ? "SW"
+      : isGuessNumber
+        ? "GN"
+        : isBoost
+          ? "BO"
+          : isRajaRani
+            ? "RR"
+            : isRajaRaniTurns
+              ? "RT"
+              : isTreasureHunt
+                ? "TH"
+                : isTag
+                  ? "TG"
+                  : isHandCricket
+                    ? "HC"
+                    : "BI";
+  const lobbyEyebrow = isGuessNumber
+    ? "Guess Number Lobby"
+    : isWordGuess
+      ? "Word Guess Lobby"
+      : isSpyWord
+        ? "Spy Word Lobby"
+        : isBoost
+          ? "BOOST Lobby"
+          : isRajaRani
+            ? "Raja Rani Lobby"
+            : isRajaRaniTurns
+              ? "Raja Rani Turns Lobby"
+              : isTreasureHunt
+                ? "Treasure Hunt Lobby"
+                : isTag
+                  ? "TAG Lobby"
+                  : isHandCricket
+                    ? "Hand Cricket Lobby"
+                    : "Bingo Lobby";
+
   return (
-    <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-        <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-              {isWordGuess ? "WG" : isSpyWord ? "SW" : isGuessNumber ? "GN" : isBoost ? "BO" : isRajaRani ? "RR" : isRajaRaniTurns ? "RT" : isTreasureHunt ? "TH" : isTag ? "TG" : isHandCricket ? "HC" : "BI"}
-            </div>
-            <div>
-              <p className="text-xs font-extrabold uppercase text-mint">
-                {isGuessNumber
-                  ? "Guess Number Lobby"
-                  : isWordGuess
-                    ? "Word Guess Lobby"
-                    : isSpyWord
-                      ? "Spy Word Lobby"
-                      : isBoost
-                        ? "BOOST Lobby"
-                        : isRajaRani
-                          ? "Raja Rani Lobby"
-                          : isRajaRaniTurns
-                            ? "Raja Rani Turns Lobby"
-                            : isTreasureHunt
-                              ? "Treasure Hunt Lobby"
-                              : isTag
-                              ? "TAG Lobby"
-                              : isHandCricket
-                                ? "Hand Cricket Lobby"
-                                : "Bingo Lobby"}
-              </p>
-              <h1 className="text-2xl font-extrabold text-ink">{room.roomName}</h1>
-            </div>
-          </div>
+    <GamePage>
+        <RoomHeader
+          room={room}
+          codeLabel={codeLabel}
+          eyebrow={lobbyEyebrow}
+          onStatus={setStatus}
+          onLeaveRoom={onLeaveRoom}
+        />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-paper font-extrabold"
-              onClick={handleCopy}
-              title="Copy room link"
-            >
-              <Copy className="h-4 w-4" aria-hidden="true" />
-              {room.roomCode}
-            </button>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-              onClick={onLeaveRoom}
-              title="Leave room"
-            >
-              <DoorOpen className="h-4 w-4" aria-hidden="true" />
-              Leave
-            </button>
-          </div>
-        </header>
-
-        {status ? <p className="text-xs font-bold text-coral">{status}</p> : null}
+        <StatusMessage status={status} />
 
         <RoomSettingsStrip
           room={room}
@@ -1038,7 +870,6 @@ export default function Lobby({
             />
           )}
         </section>
-      </div>
-    </main>
+    </GamePage>
   );
 }

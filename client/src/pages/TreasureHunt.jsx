@@ -1,18 +1,20 @@
 import {
   Bomb,
-  Copy,
   Crown,
-  DoorOpen,
   Gem,
-  Home,
-  RotateCcw,
   Square,
   Timer,
   Trophy,
   Users
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { buildRoomLink } from "../utils/roomLink.js";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  GamePage,
+  ResultActions,
+  RoomHeader
+} from "../components/game/GameLayout.jsx";
+import { useNow } from "../hooks/useNow.js";
+import { formatSeconds, getTimeLeft } from "../utils/time.js";
 
 const GRID_SIZE = 10;
 const BOMB_LIMIT = 3;
@@ -29,18 +31,6 @@ function createEmptyBoard() {
       type: null
     }))
   );
-}
-
-function getTimeLeft(deadlineAt, now) {
-  if (!deadlineAt) {
-    return 0;
-  }
-
-  return Math.max(0, deadlineAt - now);
-}
-
-function formatSeconds(milliseconds) {
-  return Math.max(0, Math.ceil(milliseconds / 1000));
 }
 
 function getCellClass(cell) {
@@ -96,7 +86,7 @@ function StatTile({ icon: Icon, label, value, tone = "ink" }) {
   );
 }
 
-function GameGrid({ board, canSelect, onSelectCell }) {
+const GameGrid = memo(function GameGrid({ board, canSelect, onSelectCell }) {
   return (
     <section className="surface p-3 sm:p-4">
       <div
@@ -132,9 +122,9 @@ function GameGrid({ board, canSelect, onSelectCell }) {
       </div>
     </section>
   );
-}
+});
 
-function PlayerCard({ player, isCurrent, isMe }) {
+const PlayerCard = memo(function PlayerCard({ player, isCurrent, isMe }) {
   const bombs = player.bombs || 0;
 
   return (
@@ -189,9 +179,9 @@ function PlayerCard({ player, isCurrent, isMe }) {
       </div>
     </div>
   );
-}
+});
 
-function PlayerPanel({ players, currentPlayerIndex, sessionPlayerId }) {
+const PlayerPanel = memo(function PlayerPanel({ players, currentPlayerIndex, sessionPlayerId }) {
   return (
     <section className="surface p-3 sm:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -215,9 +205,9 @@ function PlayerPanel({ players, currentPlayerIndex, sessionPlayerId }) {
       </div>
     </section>
   );
-}
+});
 
-function StatusPanel({ currentPlayer, isMyTurn, timeLeftMs, turnTimeMs, roomEnded }) {
+const StatusPanel = memo(function StatusPanel({ currentPlayer, isMyTurn, timeLeftMs, turnTimeMs, roomEnded }) {
   const seconds = formatSeconds(timeLeftMs);
   const progress = turnTimeMs ? Math.max(0, Math.min(100, (timeLeftMs / turnTimeMs) * 100)) : 0;
   const danger = seconds <= 3 && !roomEnded;
@@ -259,7 +249,7 @@ function StatusPanel({ currentPlayer, isMyTurn, timeLeftMs, turnTimeMs, roomEnde
       </div>
     </section>
   );
-}
+});
 
 function ResultPanel({ winner, finalStats }) {
   if (!winner) {
@@ -339,7 +329,7 @@ export default function TreasureHunt({
   onRestartGame,
   onLeaveRoom
 }) {
-  const [now, setNow] = useState(Date.now());
+  const now = useNow({ enabled: !room.gameEnded && Boolean(room.treasureHunt?.turnDeadlineAt) });
   const [status, setStatus] = useState("");
   const [reveal, setReveal] = useState(null);
   const revealTimerRef = useRef(null);
@@ -355,7 +345,6 @@ export default function TreasureHunt({
   const timeLeftMs = getTimeLeft(state.turnDeadlineAt, now);
   const totalTreasures = state.totalTreasures || 15;
   const totalBombs = state.totalBombs || 20;
-  const roomLink = buildRoomLink(room.roomCode, room.gameType);
   const winner = room.winner || state.winner || null;
   const finalStats = state.finalStats || [];
   const cellsRevealed = state.cellsRevealed || 0;
@@ -363,11 +352,6 @@ export default function TreasureHunt({
     () => players.filter((player) => !player.eliminated),
     [players]
   );
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     setStatus("");
@@ -429,16 +413,7 @@ export default function TreasureHunt({
     };
   }, [socket]);
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(roomLink);
-      setStatus("Link copied");
-    } catch {
-      setStatus("Copy failed");
-    }
-  };
-
-  const handleSelectCell = (row, col) => {
+  const handleSelectCell = useCallback((row, col) => {
     if (!canSelect) {
       return;
     }
@@ -457,7 +432,7 @@ export default function TreasureHunt({
         }
       }
     );
-  };
+  }, [canSelect, room.roomCode, socket]);
 
   const handleRestart = async () => {
     if (!isHost) {
@@ -473,34 +448,15 @@ export default function TreasureHunt({
   };
 
   return (
-    <main className="min-h-screen bg-paper px-3 py-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-        <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-extrabold uppercase text-mint">{room.roomCode}</p>
-            <h1 className="truncate text-3xl font-extrabold text-ink">Treasure Hunt</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-mint hover:text-mint"
-              onClick={handleCopy}
-              title="Copy room link"
-              aria-label="Copy room link"
-            >
-              <Copy className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-              onClick={onLeaveRoom}
-              title="Leave room"
-              aria-label="Leave room"
-            >
-              <DoorOpen className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-        </header>
+    <GamePage className="px-3 sm:px-6">
+        <RoomHeader
+          room={room}
+          codeLabel="TH"
+          eyebrow={room.roomCode}
+          title="Treasure Hunt"
+          onStatus={setStatus}
+          onLeaveRoom={onLeaveRoom}
+        />
 
         {status ? (
           <div className="rounded-md border border-coral/30 bg-coral/10 px-3 py-2 text-sm font-extrabold text-coral">
@@ -546,29 +502,18 @@ export default function TreasureHunt({
 
         {room.gameEnded ? (
           <div className="flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              className="compact-button bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-              onClick={handleRestart}
-              disabled={!isHost}
-              title={isHost ? "Play again" : "Only the host can restart"}
-            >
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Play Again
-            </button>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-mint hover:text-mint"
-              onClick={onLeaveRoom}
-            >
-              <Home className="h-4 w-4" aria-hidden="true" />
-              Back Home
-            </button>
+            <ResultActions
+              onLeaveRoom={onLeaveRoom}
+              onRestart={handleRestart}
+              restartDisabled={!isHost}
+              restartLabel="Play Again"
+              homeLabel="Back Home"
+              layoutClassName="flex flex-wrap justify-center gap-2"
+            />
           </div>
         ) : null}
-      </div>
 
       <RevealToast reveal={reveal} />
-    </main>
+    </GamePage>
   );
 }

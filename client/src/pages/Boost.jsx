@@ -2,16 +2,19 @@ import {
   ArrowRight,
   Check,
   Clock,
-  Copy,
-  DoorOpen,
-  Home,
-  RotateCcw,
   Send,
   Users,
   Zap
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { buildRoomLink } from "../utils/roomLink.js";
+import {
+  GamePage,
+  ResultActions,
+  RoomHeader,
+  StatusMessage
+} from "../components/game/GameLayout.jsx";
+import { useNow } from "../hooks/useNow.js";
+import { formatSeconds, getTimeLeft } from "../utils/time.js";
 
 const toneClasses = {
   coral: {
@@ -35,18 +38,6 @@ const toneClasses = {
     soft: "bg-ink/10 text-ink"
   }
 };
-
-function formatSeconds(milliseconds) {
-  return Math.max(0, Math.ceil(milliseconds / 1000));
-}
-
-function getTimeLeft(deadlineAt, now) {
-  if (!deadlineAt) {
-    return 0;
-  }
-
-  return Math.max(0, deadlineAt - now);
-}
 
 function getCategoryMeta(categories = [], categoryId = "") {
   return categories.find((category) => category.id === categoryId) || {
@@ -176,9 +167,11 @@ export default function Boost({
 }) {
   const [selectedCardId, setSelectedCardId] = useState("");
   const [status, setStatus] = useState("");
-  const [now, setNow] = useState(Date.now());
   const isHost = room.host === session.playerId;
   const state = room.boost || {};
+  const now = useNow({
+    enabled: !room.gameEnded && (state.phase === "selecting" || Boolean(state.falseBoostCooldownUntil))
+  });
   const categories = state.categories || [];
   const hand = state.hand || [];
   const myCounts = state.viewerCounts || {};
@@ -199,22 +192,8 @@ export default function Boost({
   const falseBoosts = [...(state.falseBoosts || [])].reverse();
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     setSelectedCardId("");
   }, [state.moveId, state.phase]);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(buildRoomLink(room.roomCode, room.gameType));
-      setStatus("Link copied");
-    } catch {
-      setStatus("Copy failed");
-    }
-  };
 
   const handleDrop = async () => {
     if (!canDrop) {
@@ -257,19 +236,14 @@ export default function Boost({
 
   if (room.gameEnded) {
     return (
-      <main className="min-h-screen overflow-hidden bg-paper px-4 py-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-          <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-                BO
-              </div>
-              <div>
-                <p className="text-xs font-extrabold uppercase text-mint">BOOST Result</p>
-                <h1 className="text-2xl font-extrabold text-ink">{room.roomName}</h1>
-              </div>
-            </div>
-          </header>
+      <GamePage overflowHidden>
+          <RoomHeader
+            room={room}
+            codeLabel="BO"
+            eyebrow="BOOST Result"
+            showCopy={false}
+            showLeave={false}
+          />
 
           <section className="grid gap-3 lg:grid-cols-[1fr_21rem]">
             <div className="surface result-card relative overflow-hidden border-honey p-5 text-center">
@@ -304,72 +278,32 @@ export default function Boost({
 
             <aside className="surface h-fit p-3">
               <h2 className="mb-3 text-base font-extrabold">Match Actions</h2>
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  className="compact-button w-full border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-                  onClick={onLeaveRoom}
-                >
-                  <Home className="h-4 w-4" aria-hidden="true" />
-                  Home
-                </button>
-                <button
-                  type="button"
-                  className="compact-button w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-                  onClick={handleRestart}
-                  disabled={!isHost}
-                >
-                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                  Restart
-                </button>
-              </div>
+              <ResultActions
+                onLeaveRoom={onLeaveRoom}
+                onRestart={handleRestart}
+                restartDisabled={!isHost}
+                layoutClassName="flex flex-col gap-2"
+              />
               {!isHost ? (
                 <p className="mt-2 text-center text-xs font-bold text-ink/55">Waiting for host</p>
               ) : null}
             </aside>
           </section>
-        </div>
-      </main>
+      </GamePage>
     );
   }
 
   return (
-    <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-        <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-              BO
-            </div>
-            <div>
-              <p className="text-xs font-extrabold uppercase text-mint">BOOST Room</p>
-              <h1 className="text-2xl font-extrabold text-ink">{room.roomName}</h1>
-            </div>
-          </div>
+    <GamePage>
+      <RoomHeader
+        room={room}
+        codeLabel="BO"
+        eyebrow="BOOST Room"
+        onStatus={setStatus}
+        onLeaveRoom={onLeaveRoom}
+      />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-paper font-extrabold"
-              onClick={handleCopy}
-              title="Copy room link"
-            >
-              <Copy className="h-4 w-4" aria-hidden="true" />
-              {room.roomCode}
-            </button>
-            <button
-              type="button"
-              className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
-              onClick={onLeaveRoom}
-              title="Leave room"
-            >
-              <DoorOpen className="h-4 w-4" aria-hidden="true" />
-              Leave
-            </button>
-          </div>
-        </header>
-
-        {status ? <p className="text-xs font-bold text-coral">{status}</p> : null}
+        <StatusMessage status={status} />
 
         <section className="grid gap-3 lg:grid-cols-[1fr_21rem]">
           <div className="space-y-3">
@@ -513,7 +447,6 @@ export default function Boost({
             ) : null}
           </aside>
         </section>
-      </div>
-    </main>
+    </GamePage>
   );
 }

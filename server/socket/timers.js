@@ -23,7 +23,7 @@ import { resolveWordGuessTimeout } from "../services/games/wordGuessService.js";
 const DISCONNECT_GRACE_MS = 60_000;
 const BOT_TURN_DELAY_MS = 900;
 const BOOST_BOT_DELAY_MS = 900;
-const TAG_LOOP_INTERVAL_MS = 1000 / 60;
+const TAG_LOOP_INTERVAL_MS = 1000 / 30;
 
 function timerKey(roomCode, playerId) {
   return `${roomCode}:${playerId}`;
@@ -451,7 +451,7 @@ export function createSocketTimers(context) {
         const result = tickTagRoom({ roomCode });
         const roomState = context.serializeRoom(result.room);
 
-        context.io.to(roomCode).emit("room-updated", {
+        context.io.to(roomCode).volatile.emit("room-updated", {
           room: roomState
         });
 

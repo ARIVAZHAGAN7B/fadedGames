@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, LogIn, Plus, Wifi, WifiOff } from "lucide-react";
-import bingoLogo from "../images/bingo.png";
-import boostLogo from "../images/boost.png";
-import guessNumberLogo from "../images/guessNumber.png";
-import handCricketLogo from "../images/handCricket.png";
-import rajaRaniLogo from "../images/raja_rani.png";
-import tagLogo from "../images/tag.png";
-import thirudanPoliceLogo from "../images/thirudan police.png";
-import spyWordLogo from "../images/spy word.png";
-import treasureHuntLogo from "../images/treasure hunt.png";
+import bingoLogo from "../images/optimized/bingo.webp";
+import boostLogo from "../images/optimized/boost.webp";
+import fadedGamesLogo from "../images/optimized/FGlogo.webp";
+import guessNumberLogo from "../images/optimized/guessNumber.webp";
+import handCricketLogo from "../images/optimized/handCricket.webp";
+import rajaRaniLogo from "../images/optimized/raja_rani.webp";
+import tagLogo from "../images/optimized/tag.webp";
+import thirudanPoliceLogo from "../images/optimized/thirudan police.webp";
+import spyWordLogo from "../images/optimized/spy word.webp";
+import treasureHuntLogo from "../images/optimized/treasure hunt.webp";
 import wordGuessLogo from "../images/wordGuess.svg";
-import { normalizeGameType, normalizeRoomCode } from "../utils/roomLink.js";
+import { warmImageCache } from "../utils/imageCache.js";
+import { normalizeGameType, normalizeRoomCode, setGameRouteInUrl } from "../utils/roomLink.js";
 
 const games = [
   {
@@ -289,8 +291,13 @@ export default function Home({
     pickingGameTimerRef.current = window.setTimeout(() => {
       setPickingGameId("");
       selectGame(game.id);
+      setGameRouteInUrl(game.id);
     }, 220);
   };
+
+  useEffect(() => {
+    warmImageCache([fadedGamesLogo, ...games.map((game) => game.logo)]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -395,9 +402,13 @@ export default function Home({
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
           <header className="flex items-center justify-between gap-3 py-1">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-sm font-extrabold text-white">
-                FG
-              </div>
+              <img
+                src={fadedGamesLogo}
+                alt=""
+                decoding="async"
+                loading="eager"
+                className="h-10 w-10 shrink-0 rounded-md object-cover"
+              />
               <h1 className="text-2xl font-extrabold text-ink sm:text-3xl">Faded Games</h1>
             </div>
             <div
@@ -411,7 +422,7 @@ export default function Home({
           </header>
 
           <section className="grid auto-rows-fr gap-3 sm:grid-cols-4 xl:grid-cols-8">
-            {games.map((game) => {
+            {games.map((game, index) => {
               const isPicking = pickingGameId === game.id;
 
               return (
@@ -428,6 +439,8 @@ export default function Home({
                     <img
                       src={game.logo}
                       alt=""
+                      decoding="async"
+                      loading={index < 4 ? "eager" : "lazy"}
                       className={`h-full w-full object-cover transition duration-300 ${
                         isPicking ? "scale-[1.06]" : "group-hover:scale-[1.03]"
                       }`}
@@ -458,6 +471,7 @@ export default function Home({
               type="button"
               className="compact-button shrink-0 border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
               onClick={() => {
+                setGameRouteInUrl("", "", { replace: true });
                 setSelectedGameId("");
                 setError("");
                 setSubmitting(false);
@@ -470,6 +484,8 @@ export default function Home({
             <img
               src={selectedGame.logo}
               alt=""
+              decoding="async"
+              loading="eager"
               className="h-12 w-12 shrink-0 rounded-md object-cover"
             />
             <div className="min-w-0">
@@ -494,6 +510,8 @@ export default function Home({
                 <img
                   src={selectedGame.logo}
                   alt=""
+                  decoding="async"
+                  loading="eager"
                   className="aspect-square w-full max-w-36 rounded-md object-cover"
                 />
                 <div className="min-w-0">
@@ -563,6 +581,7 @@ export default function Home({
                             onClick={() => {
                               setMode("join");
                               setRoomCode(activeRoom.roomCode);
+                              setGameRouteInUrl(selectedGame.id, activeRoom.roomCode);
                             }}
                           >
                             Use Code
@@ -587,7 +606,11 @@ export default function Home({
                 className={`flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-extrabold ${
                   mode === "create" ? "bg-ink text-white" : "text-ink/70"
                 }`}
-                onClick={() => setMode("create")}
+                onClick={() => {
+                  setMode("create");
+                  setRoomCode("");
+                  setGameRouteInUrl(selectedGame.id, "", { replace: true });
+                }}
               >
                 <Plus className="h-4 w-4" />
                 Create
@@ -597,7 +620,10 @@ export default function Home({
                 className={`flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-extrabold ${
                   mode === "join" ? "bg-ink text-white" : "text-ink/70"
                 }`}
-                onClick={() => setMode("join")}
+                onClick={() => {
+                  setMode("join");
+                  setGameRouteInUrl(selectedGame.id, roomCode, { replace: true });
+                }}
               >
                 <LogIn className="h-4 w-4" />
                 Join
