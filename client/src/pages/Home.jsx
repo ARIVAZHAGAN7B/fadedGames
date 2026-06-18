@@ -7,12 +7,10 @@ import handCricketLogo from "../images/handCricket.png";
 import rajaRaniLogo from "../images/raja_rani.png";
 import tagLogo from "../images/tag.png";
 import thirudanPoliceLogo from "../images/thirudan police.png";
-import spyWordLogo from "../images/spyWord.svg";
+import spyWordLogo from "../images/spy word.png";
+import treasureHuntLogo from "../images/treasure hunt.png";
 import wordGuessLogo from "../images/wordGuess.svg";
 import { normalizeGameType, normalizeRoomCode } from "../utils/roomLink.js";
-
-// Placeholder for Treasure Hunt - TODO: Add treasure-hunt.png
-const treasureHuntLogo = boostLogo;
 
 const games = [
   {
