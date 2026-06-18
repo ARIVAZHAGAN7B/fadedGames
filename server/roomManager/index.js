@@ -1448,6 +1448,8 @@ function createTreasureHuntState() {
   return {
     phase: "playing",
     board: createTreasureHuntGrid(),
+    totalBombs: TREASURE_HUNT_BOMB_COUNT,
+    totalTreasures: TREASURE_HUNT_TREASURE_COUNT,
     currentPlayerIndex: 0,
     currentTurnCount: 0,
     cellsRevealed: 0,
@@ -1461,6 +1463,51 @@ function createTreasureHuntState() {
     startedAt: null,
     endedAt: null
   };
+}
+
+function getActiveTreasureHuntPlayers(room) {
+  return room.players.filter((player) => !player.eliminated);
+}
+
+function getNextTreasureHuntPlayerIndex(room, fromIndex) {
+  if (room.players.length === 0) {
+    return -1;
+  }
+
+  for (let offset = 1; offset <= room.players.length; offset += 1) {
+    const index = (fromIndex + offset) % room.players.length;
+
+    if (!room.players[index]?.eliminated) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function advanceTreasureHuntTurn(room, now = Date.now()) {
+  const state = room.treasureHunt;
+  const nextIndex = getNextTreasureHuntPlayerIndex(room, state.currentPlayerIndex);
+
+  if (nextIndex === -1) {
+    endTreasureHuntGame(room);
+    return false;
+  }
+
+  state.currentPlayerIndex = nextIndex;
+  state.currentTurnCount = (state.currentTurnCount || 0) + 1;
+  state.turnStartedAt = now;
+  state.turnDeadlineAt = now + TREASURE_HUNT_TURN_MS;
+  room.currentTurn = nextIndex;
+
+  return true;
+}
+
+function shouldEndTreasureHunt(room) {
+  const state = room.treasureHunt;
+  const activePlayers = getActiveTreasureHuntPlayers(room);
+
+  return activePlayers.length <= 1 || state.treasuresRevealed >= TREASURE_HUNT_TREASURE_COUNT;
 }
 
 function shuffleRajaRaniRoles() {
@@ -3534,7 +3581,46 @@ function publicPlayer(player, room) {
     isBot: Boolean(player.isBot),
     connected: player.connected,
     isHost: room.host === player.playerId,
-    hasBoard: hasValidBingoBoard(room, player)
+    hasBoard: hasValidBingoBoard(room, player),
+    ...(room.gameType === "treasure-hunt"
+      ? {
+          treasures: player.treasures || 0,
+          bombs: player.bombs || 0,
+          eliminated: Boolean(player.eliminated)
+        }
+      : {})
+  };
+}
+
+function serializeTreasureHunt(room) {
+  const state = room.treasureHunt;
+
+  if (room.gameType !== "treasure-hunt" || !state) {
+    return null;
+  }
+
+  return {
+    phase: state.phase,
+    board: state.board.map((row) =>
+      row.map((cell) => ({
+        revealed: Boolean(cell.revealed),
+        type: cell.revealed ? cell.type : null
+      }))
+    ),
+    totalBombs: state.totalBombs || TREASURE_HUNT_BOMB_COUNT,
+    totalTreasures: state.totalTreasures || TREASURE_HUNT_TREASURE_COUNT,
+    currentPlayerIndex: state.currentPlayerIndex || 0,
+    currentTurnCount: state.currentTurnCount || 0,
+    cellsRevealed: state.cellsRevealed || 0,
+    treasuresRevealed: state.treasuresRevealed || 0,
+    bombsRevealed: state.bombsRevealed || 0,
+    turnStartedAt: state.turnStartedAt || null,
+    turnDeadlineAt: state.turnDeadlineAt || null,
+    turnTimeMs: state.turnTimeMs || TREASURE_HUNT_TURN_MS,
+    winner: state.winner || null,
+    finalStats: state.finalStats || [],
+    startedAt: state.startedAt || null,
+    endedAt: state.endedAt || null
   };
 }
 
@@ -3567,6 +3653,7 @@ export function serializeRoom(room, viewerPlayerId = null) {
     wordGuess: serializeWordGuess(room),
     spyWord: serializeSpyWord(room, viewerPlayerId),
     boost: serializeBoost(room, viewerPlayerId),
+    treasureHunt: serializeTreasureHunt(room),
     rajaRani: serializeRajaRani(room, viewerPlayerId),
     rajaRaniTurns: serializeRajaRaniTurns(room, viewerPlayerId)
   };
@@ -3817,8 +3904,8 @@ export function addBot({ socketId, roomCode }) {
   const room = requireRoom(roomCode);
   const player = findPlayerBySocket(room, socketId);
 
-  if (room.gameType !== "bingo" && room.gameType !== "boost") {
-    throw new Error("Bots are only available for Bingo and BOOST right now.");
+  if (room.gameType !== "bingo" && room.gameType !== "boost" && room.gameType !== "treasure-hunt") {
+    throw new Error("Bots are only available for Bingo, BOOST, and Treasure Hunt right now.");
   }
 
   if (!player || room.host !== player.playerId) {
@@ -4093,11 +4180,14 @@ export function startGame({ socketId, roomCode }) {
       player.eliminated = false;
     });
 
+    const now = Date.now();
+
     room.treasureHunt = {
       ...createTreasureHuntState(),
-      startedAt: Date.now(),
-      turnStartedAt: Date.now(),
-      turnDeadlineAt: Date.now() + TREASURE_HUNT_TURN_MS
+      currentTurnCount: 1,
+      startedAt: now,
+      turnStartedAt: now,
+      turnDeadlineAt: now + TREASURE_HUNT_TURN_MS
     };
 
     touch(room);
@@ -4178,6 +4268,18 @@ export function restartGame({ socketId, roomCode }) {
 
   if (room.gameType === "boost") {
     room.boost = createBoostState("waiting", createBoostCategories(getBoostCategoryLabels(room), room.maxPlayers));
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "treasure-hunt") {
+    room.players.forEach((entry) => {
+      entry.treasures = 0;
+      entry.bombs = 0;
+      entry.eliminated = false;
+    });
+    room.treasureHunt = createTreasureHuntState();
     touch(room);
 
     return room;
@@ -5954,6 +6056,38 @@ function removePlayerAtIndex(room, leavingIndex) {
     }
   }
 
+  if (room.gameType === "treasure-hunt") {
+    room.treasureHunt = room.treasureHunt || createTreasureHuntState();
+
+    if (room.gameStarted && !room.gameEnded) {
+      if (shouldEndTreasureHunt(room)) {
+        endTreasureHuntGame(room);
+      } else {
+        const state = room.treasureHunt;
+
+        if (leavingIndex < state.currentPlayerIndex) {
+          state.currentPlayerIndex -= 1;
+        }
+
+        if (state.currentPlayerIndex >= room.players.length) {
+          state.currentPlayerIndex = 0;
+        }
+
+        if (room.players[state.currentPlayerIndex]?.eliminated) {
+          const nextIndex = getNextTreasureHuntPlayerIndex(room, state.currentPlayerIndex - 1);
+
+          if (nextIndex !== -1) {
+            state.currentPlayerIndex = nextIndex;
+          }
+        }
+
+        room.currentTurn = state.currentPlayerIndex;
+        state.turnStartedAt = Date.now();
+        state.turnDeadlineAt = state.turnStartedAt + TREASURE_HUNT_TURN_MS;
+      }
+    }
+  }
+
   if (room.gameType === "raja-rani") {
     room.rajaRani = room.rajaRani || createRajaRaniState("complete");
     delete room.rajaRani.rolesByPlayerId?.[player.playerId];
@@ -6080,11 +6214,15 @@ export function selectTreasureHuntCell({ socketId, roomCode, row, col }) {
     throw new Error("You are not in this room.");
   }
 
-  if (room.gameEnded) {
+  if (!room.gameStarted || room.gameEnded) {
     throw new Error("Game has ended.");
   }
 
   const currentPlayer = room.players[state.currentPlayerIndex];
+  if (!currentPlayer) {
+    throw new Error("No active turn was found.");
+  }
+
   if (currentPlayer.playerId !== player.playerId) {
     throw new Error("It is not your turn.");
   }
@@ -6128,33 +6266,16 @@ export function selectTreasureHuntCell({ socketId, roomCode, row, col }) {
 
     if (currentPlayer.bombs >= TREASURE_HUNT_BOMB_LIMIT) {
       currentPlayer.eliminated = true;
-      message = `Eliminated! 💣 ${currentPlayer.bombs} bombs`;
+      message = `Eliminated! ${currentPlayer.bombs} bombs`;
     }
   } else {
     message = "Empty cell";
   }
 
-  // Check if game should end
-  const activePlayers = room.players.filter((p) => !p.eliminated);
-  const totalNonBombCells =
-    TREASURE_HUNT_GRID_SIZE * TREASURE_HUNT_GRID_SIZE -
-    TREASURE_HUNT_BOMB_COUNT;
-  const allNonBombCellsRevealed =
-    state.cellsRevealed >= totalNonBombCells;
-
-  if (activePlayers.length === 1 || allNonBombCellsRevealed) {
+  if (shouldEndTreasureHunt(room)) {
     endTreasureHuntGame(room);
   } else {
-    // Move to next player
-    state.currentPlayerIndex = (state.currentPlayerIndex + 1) % room.players.length;
-    while (
-      room.players[state.currentPlayerIndex].eliminated &&
-      state.currentPlayerIndex !== room.players.findIndex((p) => !p.eliminated)
-    ) {
-      state.currentPlayerIndex = (state.currentPlayerIndex + 1) % room.players.length;
-    }
-    state.turnStartedAt = Date.now();
-    state.turnDeadlineAt = Date.now() + TREASURE_HUNT_TURN_MS;
+    advanceTreasureHuntTurn(room);
   }
 
   touch(room);
@@ -6162,12 +6283,68 @@ export function selectTreasureHuntCell({ socketId, roomCode, row, col }) {
   return {
     room,
     cellType: resultType,
-    message
+    message,
+    player: {
+      playerId: currentPlayer.playerId,
+      name: currentPlayer.name
+    }
+  };
+}
+
+export function resolveTreasureHuntTimeout({ roomCode, turnNumber }) {
+  const room = requireRoom(roomCode);
+  const state = room.treasureHunt;
+
+  if (
+    room.gameType !== "treasure-hunt" ||
+    !state ||
+    !room.gameStarted ||
+    room.gameEnded
+  ) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if (turnNumber !== undefined && state.currentTurnCount !== turnNumber) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if (!state.turnDeadlineAt || Date.now() < state.turnDeadlineAt) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  const skippedPlayer = room.players[state.currentPlayerIndex] || null;
+
+  if (shouldEndTreasureHunt(room)) {
+    endTreasureHuntGame(room);
+  } else {
+    advanceTreasureHuntTurn(room);
+  }
+
+  touch(room);
+
+  return {
+    room,
+    changed: true,
+    skippedPlayer: skippedPlayer
+      ? {
+          playerId: skippedPlayer.playerId,
+          name: skippedPlayer.name
+        }
+      : null
   };
 }
 
 function endTreasureHuntGame(room) {
-  const activePlayers = room.players.filter((p) => !p.eliminated);
+  const activePlayers = getActiveTreasureHuntPlayers(room);
 
   let winner = null;
   if (activePlayers.length > 0) {
@@ -6180,16 +6357,28 @@ function endTreasureHuntGame(room) {
 
   const finalStats = room.players
     .map((player) => ({
+      playerId: player.playerId,
       name: player.name,
-      treasures: player.treasures,
-      bombs: player.bombs,
-      eliminated: player.eliminated
+      treasures: player.treasures || 0,
+      bombs: player.bombs || 0,
+      eliminated: Boolean(player.eliminated)
     }))
     .sort((a, b) => b.treasures - a.treasures || a.bombs - b.bombs);
 
-  room.treasureHunt.winner = winner;
+  const publicWinner = winner
+    ? {
+        playerId: winner.playerId,
+        name: winner.name,
+        treasures: winner.treasures || 0,
+        bombs: winner.bombs || 0
+      }
+    : null;
+
+  room.treasureHunt.phase = "complete";
+  room.treasureHunt.turnDeadlineAt = null;
+  room.treasureHunt.winner = publicWinner;
   room.treasureHunt.finalStats = finalStats;
   room.treasureHunt.endedAt = Date.now();
-  room.winner = winner;
+  room.winner = publicWinner;
   room.gameEnded = true;
 }

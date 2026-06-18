@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Clock, Copy, Crown, DoorOpen, KeyRound, Keyboard, MessageSquare, Play, Settings, Shield, Users, Zap } from "lucide-react";
+import { Bomb, Bot, Clock, Copy, Crown, DoorOpen, Gem, KeyRound, Keyboard, MessageSquare, Play, Settings, Shield, Square, Users, Zap } from "lucide-react";
 import BoardSetup from "../components/BoardSetup.jsx";
 import PlayerList from "../components/PlayerList.jsx";
 import { buildRoomLink } from "../utils/roomLink.js";
@@ -454,6 +454,50 @@ function BoostSetup({ room }) {
   );
 }
 
+function TreasureHuntSetup({ room }) {
+  const neededPlayers = Math.max(0, 2 - room.players.length);
+
+  return (
+    <section className="surface p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-extrabold uppercase text-mint">Grid Race</p>
+          <h2 className="flex items-center gap-1.5 text-lg font-extrabold">
+            <Gem className="h-4 w-4 text-honey" aria-hidden="true" />
+            Treasure Hunt
+          </h2>
+        </div>
+        <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-extrabold text-ink/65">
+          {room.players.length}/{room.maxPlayers}
+        </span>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-4">
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <Square className="mb-2 h-5 w-5 text-mint" aria-hidden="true" />
+          <p className="text-xs font-extrabold uppercase text-ink/45">Grid</p>
+          <p className="text-xl font-extrabold">10x10</p>
+        </div>
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <Gem className="mb-2 h-5 w-5 text-honey" aria-hidden="true" />
+          <p className="text-xs font-extrabold uppercase text-ink/45">Treasures</p>
+          <p className="text-xl font-extrabold">15</p>
+        </div>
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <Bomb className="mb-2 h-5 w-5 text-coral" aria-hidden="true" />
+          <p className="text-xs font-extrabold uppercase text-ink/45">Bomb Limit</p>
+          <p className="text-xl font-extrabold">3</p>
+        </div>
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <Users className="mb-2 h-5 w-5 text-ink" aria-hidden="true" />
+          <p className="text-xs font-extrabold uppercase text-ink/45">Needed</p>
+          <p className="text-xl font-extrabold">{neededPlayers}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function RoomSettingsStrip({ room, canStart, isHost, onAddBot, onStartGame }) {
   const isBingo = room.gameType === "bingo";
   const isBoost = room.gameType === "boost";
@@ -463,15 +507,16 @@ function RoomSettingsStrip({ room, canStart, isHost, onAddBot, onStartGame }) {
   const isSpyWord = room.gameType === "spy-word";
   const isRajaRani = room.gameType === "raja-rani";
   const isRajaRaniTurns = room.gameType === "raja-rani-turns";
+  const isTreasureHunt = room.gameType === "treasure-hunt";
   const isHandCricket = room.gameType === "hand-cricket";
   const isTeamHandCricket = room.handCricketMode === "team";
   const categories = room.boost?.categories || [];
-  const showAddBot = isHost && (isBingo || isBoost);
+  const showAddBot = isHost && (isBingo || isBoost || isTreasureHunt);
   const neededPlayers = Math.max(
     0,
     (isSpyWord
       ? 4
-      : isTag || isGuessNumber || isWordGuess
+      : isTag || isGuessNumber || isWordGuess || isTreasureHunt
         ? 2
         : isRajaRani || isRajaRaniTurns
           ? 5
@@ -497,6 +542,8 @@ function RoomSettingsStrip({ room, canStart, isHost, onAddBot, onStartGame }) {
     isRajaRani ? "10 rounds" : null,
     isRajaRaniTurns ? "Clockwise turns" : null,
     isRajaRaniTurns ? "10s timer" : null,
+    isTreasureHunt ? "10x10 grid" : null,
+    isTreasureHunt ? "10s turns" : null,
     isHandCricket ? (isTeamHandCricket ? `Teams of ${room.handCricketTeamSize || 2}` : "Classic") : null
   ].filter(Boolean);
 
@@ -612,6 +659,7 @@ export default function Lobby({
   const isBoost = room.gameType === "boost";
   const isRajaRani = room.gameType === "raja-rani";
   const isRajaRaniTurns = room.gameType === "raja-rani-turns";
+  const isTreasureHunt = room.gameType === "treasure-hunt";
   const isTeamHandCricket = room.handCricketMode === "team";
   const teamSize = room.handCricketTeamSize || 2;
   const teams = room.handCricket?.teams || {};
@@ -634,7 +682,9 @@ export default function Lobby({
             ? room.players.length === 5
             : isRajaRaniTurns
               ? room.players.length === 5
-              : isTag
+              : isTreasureHunt
+                ? room.players.length >= 2 && room.players.length <= room.maxPlayers
+                : isTag
                 ? room.players.length >= 2
                 : isHandCricket
                   ? isTeamHandCricket
@@ -700,7 +750,7 @@ export default function Lobby({
         <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-ink text-xs font-extrabold text-white">
-              {isWordGuess ? "WG" : isSpyWord ? "SW" : isGuessNumber ? "GN" : isBoost ? "BO" : isRajaRani ? "RR" : isRajaRaniTurns ? "RT" : isTag ? "TG" : isHandCricket ? "HC" : "BI"}
+              {isWordGuess ? "WG" : isSpyWord ? "SW" : isGuessNumber ? "GN" : isBoost ? "BO" : isRajaRani ? "RR" : isRajaRaniTurns ? "RT" : isTreasureHunt ? "TH" : isTag ? "TG" : isHandCricket ? "HC" : "BI"}
             </div>
             <div>
               <p className="text-xs font-extrabold uppercase text-mint">
@@ -716,7 +766,9 @@ export default function Lobby({
                           ? "Raja Rani Lobby"
                           : isRajaRaniTurns
                             ? "Raja Rani Turns Lobby"
-                            : isTag
+                            : isTreasureHunt
+                              ? "Treasure Hunt Lobby"
+                              : isTag
                               ? "TAG Lobby"
                               : isHandCricket
                                 ? "Hand Cricket Lobby"
@@ -791,7 +843,7 @@ export default function Lobby({
                       onChange={(event) => setMaxPlayers(event.target.value)}
                     />
                   </label>
-                ) : isTag ? (
+                ) : isTag || isTreasureHunt ? (
                   <div className="mb-3 space-y-3">
                     <label className="block">
                       <span className="compact-label">Players</span>
@@ -799,51 +851,55 @@ export default function Lobby({
                         className="compact-input"
                         type="number"
                         min={Math.max(2, room.players.length)}
-                        max="4"
+                        max={isTreasureHunt ? "10" : "4"}
                         value={maxPlayers}
                         onChange={(event) => setMaxPlayers(event.target.value)}
                       />
                     </label>
 
-                    <div>
-                      <span className="compact-label">Map</span>
-                      <div className="grid gap-2">
-                        {Object.entries(tagMaps).map(([mapId, label]) => (
-                          <button
-                            key={mapId}
-                            type="button"
-                            className={`rounded-md border px-3 py-2 text-left text-sm font-extrabold transition ${
-                              tagMapId === mapId
-                                ? "border-coral bg-coral text-white"
-                                : "border-ink/10 bg-paper text-ink hover:border-mint"
-                            }`}
-                            onClick={() => setTagMapId(mapId)}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    {isTag ? (
+                      <>
+                        <div>
+                          <span className="compact-label">Map</span>
+                          <div className="grid gap-2">
+                            {Object.entries(tagMaps).map(([mapId, label]) => (
+                              <button
+                                key={mapId}
+                                type="button"
+                                className={`rounded-md border px-3 py-2 text-left text-sm font-extrabold transition ${
+                                  tagMapId === mapId
+                                    ? "border-coral bg-coral text-white"
+                                    : "border-ink/10 bg-paper text-ink hover:border-mint"
+                                }`}
+                                onClick={() => setTagMapId(mapId)}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
 
-                    <div>
-                      <span className="compact-label">Round</span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {tagRoundOptions.map((seconds) => (
-                          <button
-                            key={seconds}
-                            type="button"
-                            className={`rounded-md border px-2 py-2 text-sm font-extrabold transition ${
-                              tagRoundSeconds === seconds
-                                ? "border-coral bg-coral text-white"
-                                : "border-ink/10 bg-paper text-ink hover:border-mint"
-                            }`}
-                            onClick={() => setTagRoundSeconds(seconds)}
-                          >
-                            {seconds}s
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                        <div>
+                          <span className="compact-label">Round</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {tagRoundOptions.map((seconds) => (
+                              <button
+                                key={seconds}
+                                type="button"
+                                className={`rounded-md border px-2 py-2 text-sm font-extrabold transition ${
+                                  tagRoundSeconds === seconds
+                                    ? "border-coral bg-coral text-white"
+                                    : "border-ink/10 bg-paper text-ink hover:border-mint"
+                                }`}
+                                onClick={() => setTagRoundSeconds(seconds)}
+                              >
+                                {seconds}s
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
                   </div>
                 ) : isSpyWord ? (
                   <div className="mb-3 space-y-3">
@@ -972,6 +1028,8 @@ export default function Lobby({
             <RajaRaniSetup room={room} />
           ) : isRajaRaniTurns ? (
             <RajaRaniTurnsSetup room={room} />
+          ) : isTreasureHunt ? (
+            <TreasureHuntSetup room={room} />
           ) : (
             <TeamSetup
               room={room}

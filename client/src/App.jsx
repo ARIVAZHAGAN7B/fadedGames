@@ -787,6 +787,8 @@ export default function App() {
         socket={socket}
         room={room}
         session={session}
+        onRestartGame={handleRestartGame}
+        onLeaveRoom={handleLeaveRoom}
       />
     );
   }

@@ -1,412 +1,574 @@
-import { Copy, DoorOpen, RotateCcw, Trophy } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  Bomb,
+  Copy,
+  Crown,
+  DoorOpen,
+  Gem,
+  Home,
+  RotateCcw,
+  Square,
+  Timer,
+  Trophy,
+  Users
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { buildRoomLink } from "../utils/roomLink.js";
 
 const GRID_SIZE = 10;
+const BOMB_LIMIT = 3;
 const CELL_TYPES = {
-  UNREVEALED: "unrevealed",
   BOMB: "bomb",
   TREASURE: "treasure",
   EMPTY: "empty"
 };
 
-function getCellContent(cellType) {
-  switch (cellType) {
-    case CELL_TYPES.BOMB:
-      return "💣";
-    case CELL_TYPES.TREASURE:
-      return "💰";
-    case CELL_TYPES.EMPTY:
-      return "⬜";
-    default:
-      return "?";
-  }
+function createEmptyBoard() {
+  return Array.from({ length: GRID_SIZE }, () =>
+    Array.from({ length: GRID_SIZE }, () => ({
+      revealed: false,
+      type: null
+    }))
+  );
 }
 
-function getCellClass(cellType, isRevealed) {
-  const base = "w-12 h-12 flex items-center justify-center text-2xl rounded-md transition-all cursor-pointer border-2 font-bold";
-  
-  if (!isRevealed) {
-    return `${base} bg-slate-300 border-slate-400 hover:bg-slate-400`;
+function getTimeLeft(deadlineAt, now) {
+  if (!deadlineAt) {
+    return 0;
   }
 
-  switch (cellType) {
-    case CELL_TYPES.BOMB:
-      return `${base} bg-red-100 border-red-400`;
-    case CELL_TYPES.TREASURE:
-      return `${base} bg-yellow-100 border-yellow-400`;
-    case CELL_TYPES.EMPTY:
-      return `${base} bg-gray-100 border-gray-300`;
-    default:
-      return base;
-  }
+  return Math.max(0, deadlineAt - now);
 }
 
-function GameGrid({ board, onCellClick, isCurrentPlayer, gameEnded }) {
+function formatSeconds(milliseconds) {
+  return Math.max(0, Math.ceil(milliseconds / 1000));
+}
+
+function getCellClass(cell) {
+  if (!cell?.revealed) {
+    return "border-ink/15 bg-[#d9c8a6] text-ink shadow-[inset_0_-4px_0_rgba(23,33,43,0.12)] hover:border-mint hover:bg-[#e8d7b5]";
+  }
+
+  if (cell.type === CELL_TYPES.BOMB) {
+    return "border-coral bg-coral/10 text-coral";
+  }
+
+  if (cell.type === CELL_TYPES.TREASURE) {
+    return "border-honey bg-honey/25 text-ink";
+  }
+
+  return "border-ink/10 bg-white text-ink/35";
+}
+
+function CellIcon({ type, revealed }) {
+  if (!revealed) {
+    return null;
+  }
+
+  if (type === CELL_TYPES.BOMB) {
+    return <Bomb className="h-[58%] w-[58%]" aria-hidden="true" />;
+  }
+
+  if (type === CELL_TYPES.TREASURE) {
+    return <Gem className="h-[58%] w-[58%]" aria-hidden="true" />;
+  }
+
+  return <Square className="h-[42%] w-[42%]" aria-hidden="true" />;
+}
+
+function StatTile({ icon: Icon, label, value, tone = "ink" }) {
+  const toneClass =
+    tone === "coral"
+      ? "bg-coral/10 text-coral"
+      : tone === "mint"
+        ? "bg-mint/10 text-mint"
+        : tone === "honey"
+          ? "bg-honey/25 text-ink"
+          : "bg-ink/10 text-ink";
+
   return (
-    <div className="flex justify-center my-6">
-      <div 
-        className="inline-grid gap-1 p-4 bg-slate-100 rounded-lg"
-        style={{
-          gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))`
-        }}
+    <div className="rounded-md border border-ink/10 bg-white p-3">
+      <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-md ${toneClass}`}>
+        <Icon className="h-5 w-5" aria-hidden="true" />
+      </div>
+      <p className="text-xl font-extrabold leading-tight text-ink">{value}</p>
+      <p className="mt-1 text-xs font-extrabold uppercase text-ink/50">{label}</p>
+    </div>
+  );
+}
+
+function GameGrid({ board, canSelect, onSelectCell }) {
+  return (
+    <section className="surface p-3 sm:p-4">
+      <div
+        className="grid w-full gap-1"
+        style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))` }}
       >
-        {Array.from({ length: GRID_SIZE * GRID_SIZE }, (_, index) => {
-          const row = Math.floor(index / GRID_SIZE);
-          const col = index % GRID_SIZE;
-          const cell = board?.[row]?.[col];
-          const isRevealed = cell?.revealed || false;
-          
-          return (
-            <button
-              key={index}
-              className={getCellClass(cell?.type || CELL_TYPES.UNREVEALED, isRevealed)}
-              onClick={() => {
-                if (isCurrentPlayer && !gameEnded && !isRevealed) {
-                  onCellClick(row, col);
-                }
-              }}
-              disabled={!isCurrentPlayer || gameEnded || isRevealed}
-              title={`Cell (${row}, ${col})`}
-            >
-              {isRevealed && getCellContent(cell.type)}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+        {board.map((row, rowIndex) =>
+          row.map((cell, colIndex) => {
+            const revealed = Boolean(cell?.revealed);
+            const disabled = !canSelect || revealed;
 
-function PlayerStats({ players, currentPlayerIndex, gameEnded }) {
-  return (
-    <section className="surface p-4 mb-6">
-      <h2 className="text-lg font-extrabold mb-4 flex items-center gap-2">
-        <Trophy className="h-5 w-5" aria-hidden="true" />
-        Players
-      </h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {players.map((player, index) => {
-          const isActive = !player.eliminated;
-          const isCurrent = index === currentPlayerIndex && !gameEnded;
-          
-          return (
-            <div
-              key={player.playerId}
-              className={`p-3 rounded-lg border-2 transition-all ${
-                player.eliminated
-                  ? "bg-gray-100 border-gray-300 opacity-50"
-                  : isCurrent
-                  ? "bg-blue-100 border-blue-400 font-bold"
-                  : "bg-white border-gray-300"
-              }`}
-            >
-              <p className="text-sm font-bold truncate">{player.name}</p>
-              <div className="mt-2 space-y-1 text-xs">
-                <p className="text-yellow-600">💰 {player.treasures || 0}</p>
-                <p className="text-red-600">💣 {(player.bombs || 0)}/3</p>
-              </div>
-              {player.eliminated && (
-                <p className="mt-2 text-xs font-bold text-red-600">Eliminated</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function Timer({ timeLeft, totalTime = 10 }) {
-  const percentage = (timeLeft / totalTime) * 100;
-  const isWarning = timeLeft <= 3;
-  
-  return (
-    <div className="flex justify-center my-4">
-      <div className="w-32 h-32 rounded-full flex items-center justify-center relative">
-        <div className={`absolute inset-0 rounded-full border-8 flex items-center justify-center text-4xl font-bold ${
-          isWarning ? "border-red-500 text-red-600" : "border-blue-500 text-blue-600"
-        }`}>
-          {timeLeft}
-        </div>
-        <div className={`absolute inset-0 rounded-full border-8 opacity-30`}
-          style={{
-            borderColor: isWarning ? '#ef4444' : '#3b82f6',
-            clipPath: `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.cos((percentage / 100) * Math.PI * 2 - Math.PI / 2)}% ${50 + 50 * Math.sin((percentage / 100) * Math.PI * 2 - Math.PI / 2)}%)`
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function GameStatus({ state, room, isCurrentPlayer }) {
-  const currentPlayer = room?.players?.[state?.currentPlayerIndex];
-  
-  if (room?.gameEnded) {
-    return (
-      <section className="surface p-4 mb-6 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-400">
-        <h2 className="text-2xl font-extrabold mb-3">Game Over!</h2>
-        <div className="space-y-2">
-          {state?.winner && (
-            <p className="text-lg">
-              <span className="font-bold text-green-600">🏆 Winner:</span> {state.winner.name}
-            </p>
-          )}
-          {state?.finalStats && (
-            <div className="mt-4 space-y-1">
-              <p className="text-sm font-bold">Final Standings:</p>
-              {state.finalStats.map((stat, idx) => (
-                <div key={idx} className="text-sm">
-                  {idx + 1}. {stat.name} - 💰 {stat.treasures} | 💣 {stat.bombs}/3
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="surface p-4 mb-4">
-      {currentPlayer && (
-        <div className={`text-center ${isCurrentPlayer ? "text-blue-600 font-bold" : ""}`}>
-          <p className="text-sm opacity-70 uppercase">Current Turn</p>
-          <p className="text-xl font-bold">{currentPlayer.name}</p>
-          {isCurrentPlayer && (
-            <p className="text-sm text-blue-600 mt-2">Your turn - Select a cell!</p>
-          )}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function RevealAnimation({ revealResult, onAnimationEnd }) {
-  if (!revealResult) return null;
-
-  const getResultColor = () => {
-    switch (revealResult.type) {
-      case CELL_TYPES.BOMB:
-        return "bg-red-100 border-red-400";
-      case CELL_TYPES.TREASURE:
-        return "bg-yellow-100 border-yellow-400";
-      default:
-        return "bg-gray-100 border-gray-300";
-    }
-  };
-
-  const getResultMessage = () => {
-    switch (revealResult.type) {
-      case CELL_TYPES.BOMB:
-        return "💣 BOMB!";
-      case CELL_TYPES.TREASURE:
-        return "💰 TREASURE!";
-      default:
-        return "⬜ Empty";
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-      <div className={`p-8 rounded-lg border-4 text-center ${getResultColor()} animate-pulse`}>
-        <p className="text-6xl mb-4">{getCellContent(revealResult.type)}</p>
-        <p className="text-2xl font-bold mb-2">{getResultMessage()}</p>
-        {revealResult.message && (
-          <p className="text-lg mt-4">{revealResult.message}</p>
+            return (
+              <button
+                key={`${rowIndex}-${colIndex}`}
+                type="button"
+                className={`relative aspect-square rounded-md border-2 transition active:scale-95 disabled:cursor-not-allowed ${getCellClass(
+                  cell
+                )} ${canSelect && !revealed ? "hover:-translate-y-0.5" : ""}`}
+                disabled={disabled}
+                onClick={() => onSelectCell(rowIndex, colIndex)}
+                title={`Row ${rowIndex + 1}, column ${colIndex + 1}`}
+                aria-label={`Row ${rowIndex + 1}, column ${colIndex + 1}${
+                  revealed ? ` ${cell.type || "empty"}` : ""
+                }`}
+              >
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <CellIcon type={cell?.type} revealed={revealed} />
+                </span>
+              </button>
+            );
+          })
         )}
       </div>
+    </section>
+  );
+}
+
+function PlayerCard({ player, isCurrent, isMe }) {
+  const bombs = player.bombs || 0;
+
+  return (
+    <div
+      className={`rounded-md border p-3 transition ${
+        player.eliminated
+          ? "border-ink/10 bg-ink/5 text-ink/45"
+          : isCurrent
+            ? "border-honey bg-honey/20 text-ink"
+            : isMe
+              ? "border-mint bg-mint/5 text-ink"
+              : "border-ink/10 bg-white text-ink"
+      }`}
+    >
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-extrabold">
+            {player.name}
+            {isMe ? " (You)" : ""}
+          </h3>
+          <p className="text-xs font-extrabold uppercase text-ink/45">
+            {player.eliminated ? "Eliminated" : isCurrent ? "Turn" : "Active"}
+          </p>
+        </div>
+        {isCurrent && !player.eliminated ? (
+          <Crown className="h-4 w-4 shrink-0 text-honey" aria-hidden="true" />
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-sm font-extrabold">
+        <div className="rounded bg-honey/20 px-2 py-1.5 text-ink">
+          <span className="mr-1 inline-block align-[-2px]">
+            <Gem className="h-4 w-4" aria-hidden="true" />
+          </span>
+          {player.treasures || 0}
+        </div>
+        <div className="rounded bg-coral/10 px-2 py-1.5 text-coral">
+          <span className="mr-1 inline-block align-[-2px]">
+            <Bomb className="h-4 w-4" aria-hidden="true" />
+          </span>
+          {bombs}/{BOMB_LIMIT}
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-1">
+        {Array.from({ length: BOMB_LIMIT }).map((_, index) => (
+          <span
+            key={index}
+            className={`h-1.5 rounded-full ${index < bombs ? "bg-coral" : "bg-ink/10"}`}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
-export default function TreasureHunt({ socket, room, session }) {
-  const [state, setState] = useState(room?.state || {});
-  const [timeLeft, setTimeLeft] = useState(10);
-  const [revealResult, setRevealResult] = useState(null);
-  const timerRef = useRef(null);
-  const animationRef = useRef(null);
+function PlayerPanel({ players, currentPlayerIndex, sessionPlayerId }) {
+  return (
+    <section className="surface p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-base font-extrabold text-ink">
+          <Users className="h-5 w-5" aria-hidden="true" />
+          Players
+        </h2>
+        <span className="rounded-full bg-mint px-2.5 py-1 text-xs font-extrabold text-white">
+          {players.filter((player) => !player.eliminated).length} active
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+        {players.map((player, index) => (
+          <PlayerCard
+            key={player.playerId}
+            player={player}
+            isCurrent={index === currentPlayerIndex}
+            isMe={player.playerId === sessionPlayerId}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
 
+function StatusPanel({ currentPlayer, isMyTurn, timeLeftMs, turnTimeMs, roomEnded }) {
+  const seconds = formatSeconds(timeLeftMs);
+  const progress = turnTimeMs ? Math.max(0, Math.min(100, (timeLeftMs / turnTimeMs) * 100)) : 0;
+  const danger = seconds <= 3 && !roomEnded;
+
+  return (
+    <section className="surface p-3 sm:p-4">
+      <div className="grid gap-3 sm:grid-cols-[1fr_12rem] sm:items-center">
+        <div className="min-w-0">
+          <p className="text-xs font-extrabold uppercase text-ink/50">Current Turn</p>
+          <h2 className="truncate text-2xl font-extrabold text-ink">
+            {roomEnded ? "Game Over" : currentPlayer?.name || "Waiting"}
+          </h2>
+          <p
+            className={`mt-1 text-sm font-extrabold ${
+              isMyTurn ? "text-mint" : roomEnded ? "text-ink/45" : "text-ink/55"
+            }`}
+          >
+            {roomEnded ? "Final result" : isMyTurn ? "Your turn" : "Waiting"}
+          </p>
+        </div>
+
+        <div className="rounded-md border border-ink/10 bg-paper p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-xs font-extrabold uppercase text-ink/55">
+              <Timer className="h-4 w-4" aria-hidden="true" />
+              Timer
+            </span>
+            <span className={`text-xl font-extrabold ${danger ? "text-coral" : "text-ink"}`}>
+              {roomEnded ? "--" : `${seconds}s`}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-ink/10">
+            <div
+              className={`h-full rounded-full transition-all ${danger ? "bg-coral" : "bg-mint"}`}
+              style={{ width: `${roomEnded ? 0 : progress}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ResultPanel({ winner, finalStats }) {
+  if (!winner) {
+    return null;
+  }
+
+  return (
+    <section className="surface border-honey bg-honey/15 p-4">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-md bg-honey text-ink">
+          <Trophy className="h-6 w-6" aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-extrabold uppercase text-ink/55">Winner</p>
+          <h2 className="truncate text-2xl font-extrabold text-ink">{winner.name}</h2>
+        </div>
+      </div>
+
+      {finalStats?.length ? (
+        <div className="grid gap-2">
+          {finalStats.map((stat, index) => (
+            <div
+              key={stat.playerId || stat.name}
+              className="grid grid-cols-[2rem_1fr_auto_auto] items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-extrabold"
+            >
+              <span className="text-ink/45">{index + 1}</span>
+              <span className="truncate">{stat.name}</span>
+              <span className="flex items-center gap-1 text-ink">
+                <Gem className="h-4 w-4 text-honey" aria-hidden="true" />
+                {stat.treasures || 0}
+              </span>
+              <span className="flex items-center gap-1 text-coral">
+                <Bomb className="h-4 w-4" aria-hidden="true" />
+                {stat.bombs || 0}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function RevealToast({ reveal }) {
+  if (!reveal) {
+    return null;
+  }
+
+  const isBomb = reveal.type === CELL_TYPES.BOMB;
+  const isTreasure = reveal.type === CELL_TYPES.TREASURE;
+  const Icon = isBomb ? Bomb : isTreasure ? Gem : reveal.type === "timeout" ? Timer : Square;
+  const tone = isBomb
+    ? "border-coral bg-coral text-white"
+    : isTreasure
+      ? "border-honey bg-honey text-ink"
+      : reveal.type === "timeout"
+        ? "border-ink bg-ink text-white"
+        : "border-mint bg-mint text-white";
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+      <div className={`flex max-w-md items-center gap-3 rounded-md border-2 px-4 py-3 shadow-soft ${tone}`}>
+        <Icon className="h-7 w-7 shrink-0" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="truncate text-base font-extrabold">{reveal.title}</p>
+          {reveal.message ? <p className="text-sm font-bold opacity-85">{reveal.message}</p> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function TreasureHunt({
+  socket,
+  room,
+  session,
+  onRestartGame,
+  onLeaveRoom
+}) {
+  const [now, setNow] = useState(Date.now());
+  const [status, setStatus] = useState("");
+  const [reveal, setReveal] = useState(null);
+  const revealTimerRef = useRef(null);
+  const state = room.treasureHunt || {};
+  const board = state.board?.length ? state.board : createEmptyBoard();
+  const players = room.players || [];
   const currentPlayerIndex = state.currentPlayerIndex || 0;
-  const currentPlayer = room?.players?.[currentPlayerIndex];
-  const isCurrentPlayer = currentPlayer?.playerId === session?.playerId;
-  const board = state.board || Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
+  const currentPlayer = players[currentPlayerIndex] || null;
+  const me = players.find((player) => player.playerId === session.playerId) || null;
+  const isHost = room.host === session.playerId;
+  const isMyTurn = currentPlayer?.playerId === session.playerId && !room.gameEnded;
+  const canSelect = isMyTurn && !me?.eliminated && !room.gameEnded;
+  const timeLeftMs = getTimeLeft(state.turnDeadlineAt, now);
+  const totalTreasures = state.totalTreasures || 15;
+  const totalBombs = state.totalBombs || 20;
+  const roomLink = buildRoomLink(room.roomCode, room.gameType);
+  const winner = room.winner || state.winner || null;
+  const finalStats = state.finalStats || [];
+  const cellsRevealed = state.cellsRevealed || 0;
+  const activePlayers = useMemo(
+    () => players.filter((player) => !player.eliminated),
+    [players]
+  );
 
   useEffect(() => {
-    if (!socket) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, []);
 
-    const handleStateUpdate = (newState) => {
-      setState(newState);
-      setTimeLeft(10);
-      setRevealResult(null);
+  useEffect(() => {
+    setStatus("");
+  }, [state.currentTurnCount]);
+
+  useEffect(() => {
+    if (!socket) {
+      return undefined;
+    }
+
+    const showReveal = (nextReveal) => {
+      setReveal(nextReveal);
+
+      if (revealTimerRef.current) {
+        window.clearTimeout(revealTimerRef.current);
+      }
+
+      revealTimerRef.current = window.setTimeout(() => {
+        setReveal(null);
+      }, 1700);
     };
 
-    const handleCellRevealed = (data) => {
-      setRevealResult({
-        type: data.cellType,
-        message: data.message
+    const handleCellRevealed = (payload = {}) => {
+      const type = payload.cellType || CELL_TYPES.EMPTY;
+      const title =
+        type === CELL_TYPES.BOMB
+          ? "Bomb"
+          : type === CELL_TYPES.TREASURE
+            ? "Treasure"
+            : "Empty";
+
+      showReveal({
+        type,
+        title: payload.player?.name ? `${payload.player.name}: ${title}` : title,
+        message: payload.message || ""
       });
-      
-      animationRef.current = setTimeout(() => {
-        setRevealResult(null);
-      }, 2000);
     };
 
-    const handleTurnTimeout = () => {
-      setRevealResult({
-        type: null,
-        message: "⏰ Time's up! Next player..."
+    const handleTurnTimeout = (payload = {}) => {
+      showReveal({
+        type: "timeout",
+        title: "Time up",
+        message: payload.skippedPlayer?.name
+          ? `${payload.skippedPlayer.name} lost the turn`
+          : "Turn skipped"
       });
-      
-      animationRef.current = setTimeout(() => {
-        setRevealResult(null);
-      }, 1500);
     };
 
-    socket.on("treasure-hunt:state-update", handleStateUpdate);
     socket.on("treasure-hunt:cell-revealed", handleCellRevealed);
     socket.on("treasure-hunt:turn-timeout", handleTurnTimeout);
 
     return () => {
-      socket.off("treasure-hunt:state-update", handleStateUpdate);
       socket.off("treasure-hunt:cell-revealed", handleCellRevealed);
       socket.off("treasure-hunt:turn-timeout", handleTurnTimeout);
-      if (animationRef.current) clearTimeout(animationRef.current);
-    };
-  }, [socket, session?.clientId]);
 
-  useEffect(() => {
-    if (room?.gameEnded) {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (revealTimerRef.current) {
+        window.clearTimeout(revealTimerRef.current);
+      }
+    };
+  }, [socket]);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(roomLink);
+      setStatus("Link copied");
+    } catch {
+      setStatus("Copy failed");
+    }
+  };
+
+  const handleSelectCell = (row, col) => {
+    if (!canSelect) {
       return;
     }
 
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          return 10;
+    setStatus("");
+    socket?.emit(
+      "treasure-hunt:select-cell",
+      {
+        roomCode: room.roomCode,
+        row,
+        col
+      },
+      (response) => {
+        if (!response?.ok) {
+          setStatus(response?.error || "Move failed");
         }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [room?.gameEnded]);
-
-  const handleCellClick = (row, col) => {
-    if (!isCurrentPlayer || room?.gameEnded) return;
-    
-    socket?.emit("treasure-hunt:select-cell", {
-      roomCode: room.code,
-      row,
-      col
-    });
+      }
+    );
   };
 
-  const handleRestart = () => {
-    socket?.emit("restart-game", {
-      roomCode: room.code
-    });
-  };
+  const handleRestart = async () => {
+    if (!isHost) {
+      setStatus("Only the host can restart.");
+      return;
+    }
 
-  const handleLeave = () => {
-    window.location.href = "/";
-  };
+    const result = await onRestartGame?.();
 
-  const roomLink = room?.code ? buildRoomLink(room.code, "treasure-hunt") : "";
-  const livePlayers = room?.players?.filter((p) => !p.eliminated) || [];
-  const stats = {
-    treasuresFound: state.treasuresRevealed || 0,
-    bombsRevealed: state.bombsRevealed || 0,
-    cellsRevealed: state.cellsRevealed || 0
+    if (result && !result.ok) {
+      setStatus(result.error);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-extrabold text-slate-800">Treasure Hunt</h1>
-          <div className="flex gap-2">
+    <main className="min-h-screen bg-paper px-3 py-4 sm:px-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
+        <header className="surface flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-extrabold uppercase text-mint">{room.roomCode}</p>
+            <h1 className="truncate text-3xl font-extrabold text-ink">Treasure Hunt</h1>
+          </div>
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => navigator.clipboard.writeText(roomLink)}
-              className="p-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+              type="button"
+              className="compact-button border border-ink/15 bg-white text-ink hover:border-mint hover:text-mint"
+              onClick={handleCopy}
               title="Copy room link"
+              aria-label="Copy room link"
             >
-              <Copy className="h-5 w-5" aria-hidden="true" />
+              <Copy className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
-              onClick={handleLeave}
-              className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+              type="button"
+              className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
+              onClick={onLeaveRoom}
               title="Leave room"
+              aria-label="Leave room"
             >
-              <DoorOpen className="h-5 w-5" aria-hidden="true" />
+              <DoorOpen className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Game Status */}
-        <GameStatus state={state} room={room} isCurrentPlayer={isCurrentPlayer} />
-
-        {/* Timer */}
-        {!room?.gameEnded && isCurrentPlayer && <Timer timeLeft={timeLeft} />}
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="surface p-4 text-center">
-            <p className="text-2xl font-bold">💰 {stats.treasuresFound}</p>
-            <p className="text-xs text-ink/60">Treasures Found</p>
+        {status ? (
+          <div className="rounded-md border border-coral/30 bg-coral/10 px-3 py-2 text-sm font-extrabold text-coral">
+            {status}
           </div>
-          <div className="surface p-4 text-center">
-            <p className="text-2xl font-bold">💣 {stats.bombsRevealed}</p>
-            <p className="text-xs text-ink/60">Bombs Revealed</p>
-          </div>
-          <div className="surface p-4 text-center">
-            <p className="text-2xl font-bold">⬜ {stats.cellsRevealed}</p>
-            <p className="text-xs text-ink/60">Cells Revealed</p>
-          </div>
-        </div>
+        ) : null}
 
-        {/* Game Grid */}
-        <GameGrid
-          board={board}
-          onCellClick={handleCellClick}
-          isCurrentPlayer={isCurrentPlayer}
-          gameEnded={room?.gameEnded}
+        <StatusPanel
+          currentPlayer={currentPlayer}
+          isMyTurn={canSelect}
+          timeLeftMs={timeLeftMs}
+          turnTimeMs={state.turnTimeMs || 10000}
+          roomEnded={room.gameEnded}
         />
 
-        {/* Player Stats */}
-        <PlayerStats
-          players={room?.players || []}
-          currentPlayerIndex={currentPlayerIndex}
-          gameEnded={room?.gameEnded}
-        />
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile
+            icon={Gem}
+            label="Treasures"
+            value={`${state.treasuresRevealed || 0}/${totalTreasures}`}
+            tone="honey"
+          />
+          <StatTile
+            icon={Bomb}
+            label="Bombs"
+            value={`${state.bombsRevealed || 0}/${totalBombs}`}
+            tone="coral"
+          />
+          <StatTile icon={Square} label="Revealed" value={`${cellsRevealed}/100`} tone="mint" />
+          <StatTile icon={Users} label="Active" value={`${activePlayers.length}/${players.length}`} />
+        </section>
 
-        {/* Game Ended */}
-        {room?.gameEnded && (
-          <div className="flex justify-center gap-4 mt-6">
+        {room.gameEnded ? <ResultPanel winner={winner} finalStats={finalStats} /> : null}
+
+        <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <GameGrid board={board} canSelect={canSelect} onSelectCell={handleSelectCell} />
+          <PlayerPanel
+            players={players}
+            currentPlayerIndex={currentPlayerIndex}
+            sessionPlayerId={session.playerId}
+          />
+        </section>
+
+        {room.gameEnded ? (
+          <div className="flex flex-wrap justify-center gap-2">
             <button
+              type="button"
+              className="compact-button bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
               onClick={handleRestart}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 transition-colors flex items-center gap-2"
+              disabled={!isHost}
+              title={isHost ? "Play again" : "Only the host can restart"}
             >
               <RotateCcw className="h-4 w-4" aria-hidden="true" />
               Play Again
             </button>
             <button
-              onClick={handleLeave}
-              className="px-6 py-3 bg-gray-500 text-white rounded-lg font-bold hover:bg-gray-600 transition-colors"
+              type="button"
+              className="compact-button border border-ink/15 bg-white text-ink hover:border-mint hover:text-mint"
+              onClick={onLeaveRoom}
             >
-              Back to Home
+              <Home className="h-4 w-4" aria-hidden="true" />
+              Back Home
             </button>
           </div>
-        )}
-
-        {/* Reveal Animation */}
-        <RevealAnimation revealResult={revealResult} onAnimationEnd={() => setRevealResult(null)} />
+        ) : null}
       </div>
-    </div>
+
+      <RevealToast reveal={reveal} />
+    </main>
   );
 }
