@@ -17,12 +17,16 @@ import {
   resolveRajaRaniTurnsTimer
 } from "../services/games/rajaRaniService.js";
 import { tickTagRoom } from "../services/games/tagService.js";
-import { resolveTreasureHuntTimeout } from "../services/games/treasureHuntService.js";
+import {
+  resolveTreasureHuntTimeout,
+  selectTreasureHuntBotCell
+} from "../services/games/treasureHuntService.js";
 import { resolveWordGuessTimeout } from "../services/games/wordGuessService.js";
 
 const DISCONNECT_GRACE_MS = 60_000;
 const BOT_TURN_DELAY_MS = 900;
 const BOOST_BOT_DELAY_MS = 900;
+const TREASURE_HUNT_BOT_DELAY_MS = 900;
 const TAG_LOOP_INTERVAL_MS = 1000 / 30;
 
 function timerKey(roomCode, playerId) {
@@ -40,6 +44,7 @@ export function createSocketTimers(context) {
   const rajaRaniRevealTimers = new Map();
   const rajaRaniTurnsTimers = new Map();
   const treasureHuntTimers = new Map();
+  const treasureHuntBotTimers = new Map();
 
   function cancelDisconnectCleanup(roomCode, playerId) {
     const key = timerKey(roomCode, playerId);
@@ -132,6 +137,15 @@ export function createSocketTimers(context) {
     }
   }
 
+  function cancelTreasureHuntBotTurn(roomCode) {
+    const timer = treasureHuntBotTimers.get(roomCode);
+
+    if (timer) {
+      clearTimeout(timer);
+      treasureHuntBotTimers.delete(roomCode);
+    }
+  }
+
   function cancelGameTimers(roomCode) {
     cancelBotTurn(roomCode);
     cancelHandCricketMove(roomCode);
@@ -142,6 +156,7 @@ export function createSocketTimers(context) {
     cancelRajaRaniReveal(roomCode);
     cancelRajaRaniTurnsTimer(roomCode);
     cancelTreasureHuntTimer(roomCode);
+    cancelTreasureHuntBotTurn(roomCode);
   }
 
   function scheduleWordGuessTimer(room) {
@@ -415,6 +430,7 @@ export function createSocketTimers(context) {
 
         if (!result.changed) {
           scheduleTreasureHuntTimer(result.room);
+          scheduleTreasureHuntBotTurn(result.room);
           return;
         }
 
@@ -425,15 +441,70 @@ export function createSocketTimers(context) {
             message: result.message
           });
           scheduleTreasureHuntTimer(result.room);
+          scheduleTreasureHuntBotTurn(result.room);
         } else {
           cancelTreasureHuntTimer(roomCode);
+          cancelTreasureHuntBotTurn(roomCode);
         }
       } catch {
         cancelTreasureHuntTimer(roomCode);
+        cancelTreasureHuntBotTurn(roomCode);
       }
     }, delay);
 
     treasureHuntTimers.set(roomCode, timer);
+  }
+
+  function scheduleTreasureHuntBotTurn(room) {
+    cancelTreasureHuntBotTurn(room.roomCode);
+
+    const state = room.treasureHunt;
+
+    if (
+      room.gameType !== "treasure-hunt" ||
+      !room.gameStarted ||
+      room.gameEnded ||
+      !state
+    ) {
+      return;
+    }
+
+    const currentPlayer = room.players[state.currentPlayerIndex] || null;
+
+    if (!currentPlayer?.isBot) {
+      return;
+    }
+
+    const roomCode = room.roomCode;
+    const playerId = currentPlayer.playerId;
+    const turnNumber = state.currentTurnCount;
+    const timer = setTimeout(() => {
+      treasureHuntBotTimers.delete(roomCode);
+
+      try {
+        const result = selectTreasureHuntBotCell({ roomCode, playerId, turnNumber });
+        const ended = context.emitGameEndedIfNeeded(result.room);
+
+        context.emitRoomEvent(result.room, "treasure-hunt:cell-revealed", {
+          cellType: result.cellType,
+          message: result.message,
+          player: result.player
+        });
+
+        if (!ended) {
+          context.emitRoomUpdate(result.room);
+          scheduleTreasureHuntTimer(result.room);
+          scheduleTreasureHuntBotTurn(result.room);
+        } else {
+          cancelTreasureHuntTimer(roomCode);
+          cancelTreasureHuntBotTurn(roomCode);
+        }
+      } catch {
+        cancelTreasureHuntBotTurn(roomCode);
+      }
+    }, TREASURE_HUNT_BOT_DELAY_MS);
+
+    treasureHuntBotTimers.set(roomCode, timer);
   }
 
   function scheduleTagLoop(room) {
@@ -620,6 +691,7 @@ export function createSocketTimers(context) {
     scheduleRajaRaniReveal(room);
     scheduleRajaRaniTurnsTimer(room);
     scheduleTreasureHuntTimer(room);
+    scheduleTreasureHuntBotTurn(room);
   }
 
   function scheduleGameStart(room) {
@@ -639,6 +711,7 @@ export function createSocketTimers(context) {
     cancelRajaRaniReveal,
     cancelRajaRaniTurnsTimer,
     cancelTagLoop,
+    cancelTreasureHuntBotTurn,
     cancelTreasureHuntTimer,
     cancelWordGuessTimer,
     scheduleBoostBotTurn,
@@ -650,6 +723,7 @@ export function createSocketTimers(context) {
     scheduleRajaRaniReveal,
     scheduleRajaRaniTurnsTimer,
     scheduleTagLoop,
+    scheduleTreasureHuntBotTurn,
     scheduleTimeoutDrivenGames,
     scheduleTreasureHuntTimer,
     scheduleWordGuessTimer

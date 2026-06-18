@@ -1506,6 +1506,30 @@ function changeTreasureHuntLives(player, delta) {
   return nextLives;
 }
 
+function getAvailableTreasureHuntCells(state) {
+  const cells = [];
+
+  for (let row = 0; row < TREASURE_HUNT_GRID_SIZE; row += 1) {
+    for (let col = 0; col < TREASURE_HUNT_GRID_SIZE; col += 1) {
+      if (!state.board[row][col].revealed) {
+        cells.push({ row, col });
+      }
+    }
+  }
+
+  return cells;
+}
+
+function chooseTreasureHuntBotCell(state) {
+  const cells = getAvailableTreasureHuntCells(state);
+
+  if (cells.length === 0) {
+    return null;
+  }
+
+  return cells[Math.floor(Math.random() * cells.length)];
+}
+
 function getActiveTreasureHuntPlayers(room) {
   return room.players.filter((player) => !player.eliminated && getTreasureHuntLives(player) > 0);
 }
@@ -1524,6 +1548,74 @@ function getNextTreasureHuntPlayerIndex(room, fromIndex) {
   }
 
   return -1;
+}
+
+function validateTreasureHuntCell(row, col) {
+  if (
+    !Number.isInteger(row) ||
+    !Number.isInteger(col) ||
+    row < 0 ||
+    row >= TREASURE_HUNT_GRID_SIZE ||
+    col < 0 ||
+    col >= TREASURE_HUNT_GRID_SIZE
+  ) {
+    throw new Error("Invalid cell coordinates.");
+  }
+}
+
+function revealTreasureHuntCell(room, currentPlayer, row, col) {
+  const state = room.treasureHunt;
+
+  currentPlayer.lives = getTreasureHuntLives(currentPlayer);
+  validateTreasureHuntCell(row, col);
+
+  const cell = state.board[row][col];
+  if (cell.revealed) {
+    throw new Error("Cell already revealed.");
+  }
+
+  cell.revealed = true;
+  state.cellsRevealed += 1;
+
+  const resultType = cell.type;
+  let message = "";
+
+  if (cell.type === TREASURE_HUNT_CELL_TYPES.TREASURE) {
+    currentPlayer.treasures = (currentPlayer.treasures || 0) + 1;
+    const livesLeft = changeTreasureHuntLives(currentPlayer, 1);
+    state.treasuresRevealed += 1;
+    message = `Found a diamond! +1 life (${livesLeft} lives)`;
+  } else if (cell.type === TREASURE_HUNT_CELL_TYPES.BOMB) {
+    currentPlayer.bombs = (currentPlayer.bombs || 0) + 1;
+    state.bombsRevealed += 1;
+    const livesLeft = changeTreasureHuntLives(currentPlayer, -1);
+    message = `Hit a bomb! -1 life (${livesLeft} left)`;
+
+    if (currentPlayer.eliminated) {
+      message = "Eliminated! No lives left";
+    }
+  } else {
+    message = "Empty cell";
+  }
+
+  if (shouldEndTreasureHunt(room)) {
+    endTreasureHuntGame(room);
+  } else {
+    advanceTreasureHuntTurn(room);
+  }
+
+  touch(room);
+
+  return {
+    room,
+    cellType: resultType,
+    message,
+    selection: { row, col },
+    player: {
+      playerId: currentPlayer.playerId,
+      name: currentPlayer.name
+    }
+  };
 }
 
 function advanceTreasureHuntTurn(room, now = Date.now()) {
@@ -1622,6 +1714,15 @@ function getRajaRaniActivePicker(room, state) {
   return room.players.find((player) => player.playerId === state.activePickerId) || null;
 }
 
+function hasCompleteRajaRaniCardDistribution(room, state) {
+  const rolesByPlayerId = state.rolesByPlayerId || {};
+
+  return (
+    room.players.length > 0 &&
+    room.players.every((player) => Boolean(rolesByPlayerId[player.playerId]))
+  );
+}
+
 function setRajaRaniActivePicker(room, state, playerId) {
   const activePlayer = room.players.find((player) => player.playerId === playerId) || null;
 
@@ -1701,7 +1802,7 @@ function processRajaRaniCardPick(room, state, player, cardId, onComplete) {
     }
   ];
 
-  if ((state.cardDeck || []).length === 0 || Object.keys(state.rolesByPlayerId || {}).length >= room.players.length) {
+  if (hasCompleteRajaRaniCardDistribution(room, state)) {
     completeRajaRaniCardPick(room, state, onComplete);
     return {
       completed: true,
@@ -3659,6 +3760,8 @@ function serializeRajaRani(room, viewerPlayerId = null) {
   const now = Date.now();
   const viewerRoleId = viewerPlayerId ? state.rolesByPlayerId?.[viewerPlayerId] || null : null;
   const revealed = state.phase === "reveal" || state.phase === "complete" || room.gameEnded;
+  const cardsDistributed = hasCompleteRajaRaniCardDistribution(room, state);
+  const canPoliceAct = cardsDistributed && viewerRoleId === "police" && state.phase === "police-turn";
   const police = getRajaRaniPlayerByRole(room, "police");
   const thief = getRajaRaniPlayerByRole(room, "thirudan");
   const leaderboard = getRajaRaniLeaderboard(room);
@@ -3672,7 +3775,8 @@ function serializeRajaRani(room, viewerPlayerId = null) {
     viewerRole: viewerRoleId ? getRajaRaniRole(viewerRoleId) : null,
     revealed,
     cardPick: serializeRajaRaniCardPick(room, state, viewerPlayerId),
-    policePlayerId: revealed || viewerRoleId === "police" ? police?.playerId || null : null,
+    cardsDistributed,
+    policePlayerId: revealed || canPoliceAct ? police?.playerId || null : null,
     thiefPlayerId: revealed ? thief?.playerId || null : null,
     scores: createRajaRaniScores(room.players, state.scores),
     roundScores: { ...(state.roundScores || {}) },
@@ -3690,7 +3794,7 @@ function serializeRajaRani(room, viewerPlayerId = null) {
       };
     }),
     suspects:
-      viewerRoleId === "police" && state.phase === "police-turn"
+      cardsDistributed && viewerRoleId === "police" && state.phase === "police-turn"
         ? room.players
             .filter((player) => player.playerId !== viewerPlayerId)
             .map((player) => ({
@@ -3721,8 +3825,10 @@ function serializeRajaRaniTurns(room, viewerPlayerId = null) {
   const state = room.rajaRaniTurns || createRajaRaniTurnsState();
   const now = Date.now();
   const viewerRoleId = viewerPlayerId ? state.rolesByPlayerId?.[viewerPlayerId] || null : null;
-  const targetRoleId = viewerRoleId ? RAJA_RANI_TURNS_TARGETS[viewerRoleId] || null : null;
   const revealed = state.phase === "reveal" || state.phase === "complete" || room.gameEnded;
+  const cardsDistributed = hasCompleteRajaRaniCardDistribution(room, state);
+  const targetRoleId =
+    viewerRoleId && cardsDistributed ? RAJA_RANI_TURNS_TARGETS[viewerRoleId] || null : null;
   const leaderboard = getRajaRaniTurnsLeaderboard(room);
 
   return {
@@ -3736,6 +3842,7 @@ function serializeRajaRaniTurns(room, viewerPlayerId = null) {
     viewerTargetRole: targetRoleId ? getRajaRaniRole(targetRoleId) : null,
     revealed,
     cardPick: serializeRajaRaniCardPick(room, state, viewerPlayerId),
+    cardsDistributed,
     scores: createRajaRaniScores(room.players, state.scores),
     roundScores: { ...(state.roundScores || {}) },
     leaderboard,
@@ -3753,7 +3860,7 @@ function serializeRajaRaniTurns(room, viewerPlayerId = null) {
       };
     }),
     suspects:
-      viewerPlayerId === state.activePlayerId && state.phase === "turn"
+      cardsDistributed && viewerPlayerId === state.activePlayerId && state.phase === "turn"
         ? room.players
             .filter((player) => player.playerId !== viewerPlayerId)
             .map((player) => ({
@@ -6526,67 +6633,56 @@ export function selectTreasureHuntCell({ socketId, roomCode, row, col }) {
     throw new Error("You have been eliminated.");
   }
 
-  currentPlayer.lives = getTreasureHuntLives(currentPlayer);
+  return revealTreasureHuntCell(room, currentPlayer, row, col);
+}
 
-  // Validate cell coordinates
-  if (
-    !Number.isInteger(row) ||
-    !Number.isInteger(col) ||
-    row < 0 ||
-    row >= TREASURE_HUNT_GRID_SIZE ||
-    col < 0 ||
-    col >= TREASURE_HUNT_GRID_SIZE
-  ) {
-    throw new Error("Invalid cell coordinates.");
+export function selectTreasureHuntBotCell({ roomCode, playerId, turnNumber }) {
+  const room = requireRoom(roomCode);
+  const state = room.treasureHunt;
+
+  if (room.gameType !== "treasure-hunt" || !state) {
+    throw new Error("Treasure Hunt is not active.");
   }
 
-  const cell = state.board[row][col];
-  if (cell.revealed) {
-    throw new Error("Cell already revealed.");
+  if (!room.gameStarted || room.gameEnded) {
+    throw new Error("Game has ended.");
   }
 
-  // Reveal the cell
-  cell.revealed = true;
-  state.cellsRevealed += 1;
-
-  let resultType = cell.type;
-  let message = "";
-
-  if (cell.type === TREASURE_HUNT_CELL_TYPES.TREASURE) {
-    currentPlayer.treasures = (currentPlayer.treasures || 0) + 1;
-    const livesLeft = changeTreasureHuntLives(currentPlayer, 1);
-    state.treasuresRevealed += 1;
-    message = `Found a diamond! +1 life (${livesLeft} lives)`;
-  } else if (cell.type === TREASURE_HUNT_CELL_TYPES.BOMB) {
-    currentPlayer.bombs = (currentPlayer.bombs || 0) + 1;
-    state.bombsRevealed += 1;
-    const livesLeft = changeTreasureHuntLives(currentPlayer, -1);
-    message = `Hit a bomb! -1 life (${livesLeft} left)`;
-
-    if (currentPlayer.eliminated) {
-      message = "Eliminated! No lives left";
-    }
-  } else {
-    message = "Empty cell";
+  if (turnNumber !== undefined && state.currentTurnCount !== turnNumber) {
+    throw new Error("This bot turn has already passed.");
   }
 
-  if (shouldEndTreasureHunt(room)) {
+  const currentPlayer = room.players[state.currentPlayerIndex];
+  if (!currentPlayer) {
+    throw new Error("No active turn was found.");
+  }
+
+  if (!currentPlayer.isBot || currentPlayer.playerId !== playerId) {
+    throw new Error("It is not this bot's turn.");
+  }
+
+  if (currentPlayer.eliminated) {
+    throw new Error("The bot has been eliminated.");
+  }
+
+  const selection = chooseTreasureHuntBotCell(state);
+  if (!selection) {
     endTreasureHuntGame(room);
-  } else {
-    advanceTreasureHuntTurn(room);
+    touch(room);
+
+    return {
+      room,
+      cellType: TREASURE_HUNT_CELL_TYPES.EMPTY,
+      message: "No cells left",
+      selection: null,
+      player: {
+        playerId: currentPlayer.playerId,
+        name: currentPlayer.name
+      }
+    };
   }
 
-  touch(room);
-
-  return {
-    room,
-    cellType: resultType,
-    message,
-    player: {
-      playerId: currentPlayer.playerId,
-      name: currentPlayer.name
-    }
-  };
+  return revealTreasureHuntCell(room, currentPlayer, selection.row, selection.col);
 }
 
 export function resolveTreasureHuntTimeout({ roomCode, turnNumber }) {

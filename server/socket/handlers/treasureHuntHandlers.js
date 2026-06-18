@@ -21,8 +21,10 @@ export function registerTreasureHuntHandlers(socket, context, timers) {
       if (!ended) {
         context.emitRoomUpdate(result.room);
         timers.scheduleTreasureHuntTimer(result.room);
+        timers.scheduleTreasureHuntBotTurn(result.room);
       } else {
         timers.cancelTreasureHuntTimer(result.room.roomCode);
+        timers.cancelTreasureHuntBotTurn(result.room.roomCode);
         context.emitActiveRooms();
       }
 

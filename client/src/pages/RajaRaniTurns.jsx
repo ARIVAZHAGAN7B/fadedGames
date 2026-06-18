@@ -191,6 +191,7 @@ export default function RajaRaniTurns({
   const now = useNow({ enabled: !room.gameEnded && ["turn", "reveal"].includes(state.phase) });
   const myRole = state.viewerRole || null;
   const myTargetRole = state.viewerTargetRole || null;
+  const showTarget = state.phase !== "card-pick" && Boolean(myTargetRole);
   const isMyTurn = state.phase === "turn" && state.activePlayerId === session.playerId && !room.gameEnded;
   const turnLeftMs = getTimeLeft(state.turnDeadlineAt, now);
   const revealLeftMs = getTimeLeft(state.revealDeadlineAt, now);
@@ -305,7 +306,7 @@ export default function RajaRaniTurns({
                 <div className="grid gap-3 lg:grid-cols-[18rem_1fr]">
                   <div className="space-y-3">
                     <RoleCard player={myPlayer} title="Your Role" />
-                    {myTargetRole ? (
+                    {showTarget ? (
                       <div className="rounded-md border border-ink/10 bg-paper p-3">
                         <div className="mb-2 flex items-center gap-2">
                           <Repeat2 className="h-4 w-4 text-mint" aria-hidden="true" />
@@ -368,7 +369,7 @@ export default function RajaRaniTurns({
                 <div className="grid gap-3 lg:grid-cols-[18rem_1fr]">
                   <div className="space-y-3">
                     <RoleCard player={myPlayer} title="Your Role" />
-                    {myTargetRole ? (
+                    {showTarget ? (
                       <div className="rounded-md border border-ink/10 bg-paper p-3">
                         <div className="mb-2 flex items-center gap-2">
                           <Repeat2 className="h-4 w-4 text-mint" aria-hidden="true" />
