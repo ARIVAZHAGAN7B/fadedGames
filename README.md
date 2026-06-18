@@ -2,11 +2,16 @@
 
 A no-login multiplayer game app built with React, Vite, Tailwind CSS, Node, Express, and Socket.IO.
 
-The app currently includes three realtime games:
+The app currently includes six realtime games:
 
 - Bingo
 - Hand Cricket
 - TAG
+- BOOST
+- Guess Number
+- Word Guess
+- Raja Rani
+- Raja Rani Turns
 
 ## Shared Features
 
@@ -90,6 +95,57 @@ Realtime same-keyboard platform chase game for 2 to 4 players.
 - Move left: `A` or `ArrowLeft`
 - Move right: `D` or `ArrowRight`
 - Jump: `W`, `ArrowUp`, or `Space`
+
+## BOOST
+
+Realtime configurable card passing game for 3 to 5 players.
+
+### BOOST Features
+
+- Adjustable 3 to 5 player rooms
+- Editable card category names before the game starts
+- Player-sized deck with one matching category per player
+- Private player hands
+- Clockwise turn order
+- Each player has 10 seconds to drop one card
+- Timed turns with auto-drop on timeout
+- Server-verified BOOST claims
+- False BOOST cooldown
+- Host can add bot players
+- Winner screen with restart support
+
+### BOOST Controls
+
+- Click a card in your hand.
+- Use Drop In to pass the selected card clockwise.
+- Use BOOST when your hand has a full matching set.
+
+## Raja Rani
+
+Simple hidden-role game for exactly 5 players.
+
+### Raja Rani Features
+
+- Roles: Raja, Rani, Police, Thirudan, Manthiri
+- 10 fixed rounds
+- Roles are private until the Police guess
+- Police gets one Catch Thief guess each round
+- Automatic reveal and reshuffle between rounds
+- Balanced digital scoring across the match
+
+## Raja Rani Turns
+
+Clockwise hidden-role variant for exactly 5 players.
+
+### Raja Rani Turns Features
+
+- Roles reshuffle every round
+- 10 rounds with 5 turns per round
+- Each player gets 10 seconds on their turn
+- Every role has a target role
+- Correct target guess gives 100 points
+- Wrong guess swaps the two selected roles immediately
+- Final roles reveal after all 5 turns
 
 ## Local Development
 

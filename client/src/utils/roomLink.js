@@ -9,7 +9,12 @@ export function normalizeGameType(gameType) {
     value === "hand-cricket" ||
     value === "tag" ||
     value === "guess-number" ||
-    value === "word-guess"
+    value === "word-guess" ||
+    value === "spy-word" ||
+    value === "boost" ||
+    value === "treasure-hunt" ||
+    value === "raja-rani" ||
+    value === "raja-rani-turns"
   )
     ? value
     : "";

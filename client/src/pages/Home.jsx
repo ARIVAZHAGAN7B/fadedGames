@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, LogIn, Plus, Wifi, WifiOff } from "lucide-react";
 import bingoLogo from "../images/bingo.png";
-import guessNumberLogo from "../images/guessNumber.svg";
+import boostLogo from "../images/boost.png";
+import guessNumberLogo from "../images/guessNumber.png";
 import handCricketLogo from "../images/handCricket.png";
+import rajaRaniLogo from "../images/raja_rani.png";
 import tagLogo from "../images/tag.png";
+import thirudanPoliceLogo from "../images/thirudan police.png";
+import spyWordLogo from "../images/spyWord.svg";
 import wordGuessLogo from "../images/wordGuess.svg";
 import { normalizeGameType, normalizeRoomCode } from "../utils/roomLink.js";
+
+// Placeholder for Treasure Hunt - TODO: Add treasure-hunt.png
+const treasureHuntLogo = boostLogo;
 
 const games = [
   {
@@ -30,10 +37,10 @@ const games = [
   },
   {
     id: "tag",
-    name: "TAG",
+    name: "Tag",
     status: "Ready",
     available: true,
-    defaultRoomName: "TAG Match",
+    defaultRoomName: "Tag Match",
     maxPlayers: 4,
     logo: tagLogo,
     summary: "Same-keyboard platform chase where the player marked It must pass it on."
@@ -57,6 +64,56 @@ const games = [
     maxPlayers: 2,
     logo: wordGuessLogo,
     summary: "Two players lock hidden words, then race through Wordle-style guesses."
+  },
+  {
+    id: "spy-word",
+    name: "Spy Word",
+    status: "Ready",
+    available: true,
+    defaultRoomName: "Spy Word Table",
+    maxPlayers: 6,
+    logo: spyWordLogo,
+    summary: "One spy gets a related word while detectives trade careful clues."
+  },
+  {
+    id: "raja-rani",
+    name: "Thirudan Police",
+    status: "Ready",
+    available: true,
+    defaultRoomName: "Thirudan Police Table",
+    maxPlayers: 5,
+    logo: thirudanPoliceLogo,
+    summary: "Five hidden roles, one Police guess, ten suspense rounds."
+  },
+  {
+    id: "raja-rani-turns",
+    name: "Raja Rani",
+    status: "Ready",
+    available: true,
+    defaultRoomName: "Raja Rani Turns",
+    maxPlayers: 5,
+    logo: rajaRaniLogo,
+    summary: "Clockwise hidden-role turns with instant swaps on wrong guesses."
+  },
+  {
+    id: "boost",
+    name: "Boost",
+    status: "Ready",
+    available: true,
+    defaultRoomName: "Boost Table",
+    maxPlayers: 4,
+    logo: boostLogo,
+    summary: "Adjustable card passing race to collect a matching set."
+  },
+  {
+    id: "treasure-hunt",
+    name: "Treasure Hunt",
+    status: "Ready",
+    available: true,
+    defaultRoomName: "Treasure Hunt",
+    maxPlayers: 10,
+    logo: treasureHuntLogo,
+    summary: "Explore a 10x10 grid to find treasures and avoid bombs. Last survivor wins!"
   }
 ];
 
@@ -68,6 +125,24 @@ const tagMaps = [
 ];
 
 const tagRoundOptions = [60, 90, 120];
+const boostPlayerOptions = [3, 4, 5];
+const spyWordPlayerOptions = [4, 5, 6, 7, 8, 9, 10];
+const spyWordDifficulties = [
+  { id: "easy", label: "Easy" },
+  { id: "medium", label: "Medium" },
+  { id: "hard", label: "Hard" }
+];
+const boostDefaultNames = [
+  "Perambalur",
+  "Ariyalur",
+  "Trichy",
+  "Kovai",
+  "Madurai"
+];
+
+function resizeBoostNames(names, count) {
+  return Array.from({ length: count }, (_entry, index) => names[index] || boostDefaultNames[index] || `Card ${index + 1}`);
+}
 
 function getGameById(gameId) {
   return games.find((game) => game.id === gameId) || null;
@@ -108,6 +183,22 @@ function getActiveRoomMode(room) {
     return "5 letters";
   }
 
+  if (room.gameType === "spy-word") {
+    return `${room.spyWordDifficulty || "easy"} / 5 rounds`;
+  }
+
+  if (room.gameType === "boost") {
+    return `${room.maxPlayers || 4} players`;
+  }
+
+  if (room.gameType === "treasure-hunt") {
+    return `${room.maxPlayers || 10} players`;
+  }
+
+  if (room.gameType === "raja-rani" || room.gameType === "raja-rani-turns") {
+    return "10 rounds";
+  }
+
   if (room.gameType !== "hand-cricket") {
     return "Bingo";
   }
@@ -136,6 +227,10 @@ export default function Home({
   const [tagPlayerCount, setTagPlayerCount] = useState(2);
   const [tagMapId, setTagMapId] = useState("classic");
   const [tagRoundSeconds, setTagRoundSeconds] = useState(60);
+  const [boostPlayerCount, setBoostPlayerCount] = useState(4);
+  const [spyWordPlayerCount, setSpyWordPlayerCount] = useState(6);
+  const [spyWordDifficulty, setSpyWordDifficulty] = useState("easy");
+  const [boostCategoryNames, setBoostCategoryNames] = useState(boostDefaultNames.slice(0, 4));
   const [roomCode, setRoomCode] = useState(normalizeRoomCode(initialRoomCode));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -146,6 +241,10 @@ export default function Home({
   const isTag = selectedGame?.id === "tag";
   const isGuessNumber = selectedGame?.id === "guess-number";
   const isWordGuess = selectedGame?.id === "word-guess";
+  const isSpyWord = selectedGame?.id === "spy-word";
+  const isBoost = selectedGame?.id === "boost";
+  const isRajaRani = selectedGame?.id === "raja-rani";
+  const isRajaRaniTurns = selectedGame?.id === "raja-rani-turns";
   const teamMemberCount = Number(handCricketTeamMembers);
   const validTeamMembers =
     Number.isInteger(teamMemberCount) && teamMemberCount >= 2 && teamMemberCount <= 6;
@@ -169,6 +268,10 @@ export default function Home({
     setTagPlayerCount(2);
     setTagMapId("classic");
     setTagRoundSeconds(60);
+    setBoostPlayerCount(game.id === "boost" ? game.maxPlayers : 4);
+    setSpyWordPlayerCount(game.id === "spy-word" ? game.maxPlayers : 6);
+    setSpyWordDifficulty("easy");
+    setBoostCategoryNames(resizeBoostNames([], game.id === "boost" ? game.maxPlayers : 4));
     setMode(nextMode);
     setError("");
 
@@ -261,13 +364,23 @@ export default function Home({
                   ? 2
                   : isWordGuess
                     ? 2
-                    : Number(maxPlayers),
+                    : isSpyWord
+                      ? Number(spyWordPlayerCount)
+                      : isBoost
+                        ? Number(boostPlayerCount)
+                        : isRajaRani
+                          ? 5
+                          : isRajaRaniTurns
+                            ? 5
+                          : Number(maxPlayers),
             gameType: selectedGame.id,
             handCricketMode: isHandCricket ? handCricketMode : undefined,
             handCricketTeamSize:
               isHandCricket && handCricketMode === "team" ? teamMemberCount : undefined,
             tagMapId: isTag ? tagMapId : undefined,
-            tagRoundSeconds: isTag ? Number(tagRoundSeconds) : undefined
+            tagRoundSeconds: isTag ? Number(tagRoundSeconds) : undefined,
+            spyWordDifficulty: isSpyWord ? spyWordDifficulty : undefined,
+            boostCategoryLabels: isBoost ? boostCategoryNames : undefined
           })
         : await onJoinRoom({ ...payload, roomCode });
 
@@ -602,6 +715,99 @@ export default function Home({
                   </div>
                 ) : null}
 
+                {isSpyWord ? (
+                  <div className="space-y-3">
+                    <div>
+                      <span className="compact-label">Players</span>
+                      <div className="grid grid-cols-4 gap-2">
+                        {spyWordPlayerOptions.map((count) => (
+                          <button
+                            key={count}
+                            type="button"
+                            className={`rounded-md border px-3 py-2 text-sm font-extrabold transition ${
+                              Number(spyWordPlayerCount) === count
+                                ? "border-coral bg-coral text-white"
+                                : "border-ink/10 bg-white text-ink hover:border-mint"
+                            }`}
+                            onClick={() => setSpyWordPlayerCount(count)}
+                          >
+                            {count}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="compact-label">Difficulty</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {spyWordDifficulties.map((difficulty) => (
+                          <button
+                            key={difficulty.id}
+                            type="button"
+                            className={`rounded-md border px-3 py-2 text-sm font-extrabold transition ${
+                              spyWordDifficulty === difficulty.id
+                                ? "border-coral bg-coral text-white"
+                                : "border-ink/10 bg-white text-ink hover:border-mint"
+                            }`}
+                            onClick={() => setSpyWordDifficulty(difficulty.id)}
+                          >
+                            {difficulty.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {isBoost ? (
+                  <div className="space-y-3">
+                    <div>
+                      <span className="compact-label">Players</span>
+                      <div className="grid grid-cols-4 gap-2">
+                        {boostPlayerOptions.map((count) => (
+                          <button
+                            key={count}
+                            type="button"
+                            className={`rounded-md border px-3 py-2 text-sm font-extrabold transition ${
+                              Number(boostPlayerCount) === count
+                                ? "border-coral bg-coral text-white"
+                                : "border-ink/10 bg-white text-ink hover:border-mint"
+                            }`}
+                            onClick={() => {
+                              setBoostPlayerCount(count);
+                              setBoostCategoryNames((names) => resizeBoostNames(names, count));
+                            }}
+                          >
+                            {count}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="compact-label">Card Names</span>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {resizeBoostNames(boostCategoryNames, Number(boostPlayerCount)).map((name, index) => (
+                          <input
+                            key={index}
+                            className="compact-input bg-white"
+                            value={name}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setBoostCategoryNames((names) => {
+                                const nextNames = resizeBoostNames(names, Number(boostPlayerCount));
+                                nextNames[index] = value;
+                                return nextNames;
+                              });
+                            }}
+                            maxLength={18}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
                   <label className="block">
                     <span className="compact-label">Room Name</span>
@@ -631,11 +837,19 @@ export default function Home({
                         <p className="text-sm font-extrabold text-ink">{handCricketPlayers}</p>
                       </div>
                     )
-                  ) : isTag || isGuessNumber || isWordGuess ? (
+                  ) : isTag || isGuessNumber || isWordGuess || isSpyWord || isBoost || isRajaRani || isRajaRaniTurns ? (
                     <div className="rounded-md border border-ink/10 bg-white px-3 py-2">
                       <span className="compact-label">Players</span>
                       <p className="text-sm font-extrabold text-ink">
-                        {isGuessNumber || isWordGuess ? 2 : tagPlayerCount}
+                        {isGuessNumber || isWordGuess
+                          ? 2
+                          : isSpyWord
+                            ? spyWordPlayerCount
+                            : isBoost
+                              ? boostPlayerCount
+                              : isRajaRani || isRajaRaniTurns
+                                ? 5
+                                : tagPlayerCount}
                       </p>
                     </div>
                   ) : (

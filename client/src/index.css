@@ -229,6 +229,40 @@ button:disabled {
   }
 }
 
+@keyframes boost-card-selected {
+  0%,
+  100% {
+    box-shadow: 0 10px 24px rgba(23, 33, 43, 0.07);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(224, 93, 68, 0.12), 0 14px 28px rgba(23, 33, 43, 0.12);
+  }
+}
+
+@keyframes boost-pass-card {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes boost-ready-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 159, 136, 0.28);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(47, 159, 136, 0.12);
+  }
+}
+
 @keyframes trophy-bounce {
   0%,
   100% {
@@ -381,6 +415,18 @@ button:disabled {
 
   .tag-tension-frame {
     animation: tag-tension-frame 820ms ease-in-out infinite;
+  }
+
+  .boost-card-selected {
+    animation: boost-card-selected 900ms ease-in-out infinite;
+  }
+
+  .boost-pass-card {
+    animation: boost-pass-card 260ms ease-out both;
+  }
+
+  .boost-ready-pulse {
+    animation: boost-ready-pulse 900ms ease-in-out infinite;
   }
 
   .confetti-piece {

@@ -51,7 +51,115 @@ const WORD_GUESS_WORDS_PER_PLAYER = 10;
 const WORD_GUESS_MAX_ATTEMPTS = 6;
 const WORD_GUESS_GUESS_MS = 30000;
 const WORD_GUESS_LOCK_REVEAL_MS = 5000;
-const SUPPORTED_GAME_TYPES = new Set(["bingo", "hand-cricket", "tag", "guess-number", "word-guess"]);
+const SPY_WORD_MIN_PLAYERS = 4;
+const SPY_WORD_MAX_PLAYERS = 10;
+const SPY_WORD_TOTAL_ROUNDS = 5;
+const SPY_WORD_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
+const SPY_WORD_PAIRS = {
+  easy: [
+    { detective: "APPLE", spy: "FRUIT" },
+    { detective: "DOCTOR", spy: "HOSPITAL" },
+    { detective: "BEACH", spy: "OCEAN" },
+    { detective: "CAT", spy: "DOG" },
+    { detective: "DOCTOR", spy: "NURSE" },
+    { detective: "SCHOOL", spy: "TEACHER" },
+    { detective: "RAIN", spy: "UMBRELLA" },
+    { detective: "CAR", spy: "ROAD" }
+  ],
+  medium: [
+    { detective: "PIZZA", spy: "BURGER" },
+    { detective: "CRICKET", spy: "FOOTBALL" },
+    { detective: "TIGER", spy: "LION" },
+    { detective: "TRAIN", spy: "BUS" },
+    { detective: "PIANO", spy: "GUITAR" },
+    { detective: "MANGO", spy: "BANANA" },
+    { detective: "RIVER", spy: "LAKE" },
+    { detective: "MOVIE", spy: "THEATER" }
+  ],
+  hard: [
+    { detective: "KEYBOARD", spy: "MOUSE" },
+    { detective: "COFFEE", spy: "TEA" },
+    { detective: "SUN", spy: "MOON" },
+    { detective: "LOCK", spy: "KEY" },
+    { detective: "CLOCK", spy: "TIME" },
+    { detective: "CANDLE", spy: "SHADOW" },
+    { detective: "MAP", spy: "COMPASS" },
+    { detective: "MIRROR", spy: "GLASS" }
+  ]
+};
+const BOOST_DEFAULT_PLAYERS = 4;
+const BOOST_MIN_PLAYERS = 3;
+const BOOST_MAX_PLAYERS = 5;
+const BOOST_SELECT_MS = 10000;
+const BOOST_FALSE_COOLDOWN_MS = 5000;
+const BOOST_CATEGORY_TONES = ["coral", "mint", "honey", "ink"];
+const BOOST_DEFAULT_CATEGORY_LABELS = [
+  "Perambalur",
+  "Ariyalur",
+  "Trichy",
+  "Kovai",
+  "Madurai"
+];
+const RAJA_RANI_PLAYERS = 5;
+const RAJA_RANI_TOTAL_ROUNDS = 10;
+const RAJA_RANI_REVEAL_MS = 6000;
+const RAJA_RANI_ROLES = [
+  { id: "raja", label: "Raja", short: "RA", tone: "honey" },
+  { id: "rani", label: "Rani", short: "RI", tone: "coral" },
+  { id: "police", label: "Police", short: "PO", tone: "mint" },
+  { id: "thirudan", label: "Thirudan", short: "TH", tone: "ink" },
+  { id: "manthiri", label: "Manthiri", short: "MA", tone: "paper" }
+];
+const RAJA_RANI_POINTS = {
+  correct: {
+    raja: 500,
+    rani: 400,
+    manthiri: 300,
+    police: 600,
+    thirudan: 0
+  },
+  wrong: {
+    raja: 500,
+    rani: 400,
+    manthiri: 300,
+    police: 0,
+    thirudan: 600
+  }
+};
+const RAJA_RANI_TURNS_TURN_MS = 10000;
+const RAJA_RANI_TURNS_REVEAL_MS = 6000;
+const RAJA_RANI_TURNS_CORRECT_POINTS = 100;
+const RAJA_RANI_TURNS_TARGETS = {
+  raja: "rani",
+  rani: "raja",
+  manthiri: "police",
+  police: "thirudan",
+  thirudan: "police"
+};
+const TREASURE_HUNT_GRID_SIZE = 10;
+const TREASURE_HUNT_BOMB_COUNT = 20;
+const TREASURE_HUNT_TREASURE_COUNT = 15;
+const TREASURE_HUNT_TURN_MS = 10000;
+const TREASURE_HUNT_MIN_PLAYERS = 2;
+const TREASURE_HUNT_MAX_PLAYERS = 10;
+const TREASURE_HUNT_BOMB_LIMIT = 3;
+const TREASURE_HUNT_CELL_TYPES = {
+  BOMB: "bomb",
+  TREASURE: "treasure",
+  EMPTY: "empty"
+};
+const SUPPORTED_GAME_TYPES = new Set([
+  "bingo",
+  "hand-cricket",
+  "tag",
+  "guess-number",
+  "word-guess",
+  "spy-word",
+  "boost",
+  "treasure-hunt",
+  "raja-rani",
+  "raja-rani-turns"
+]);
 const HAND_CRICKET_MODES = new Set(["classic", "team"]);
 const HAND_CRICKET_TEAMS = ["red", "blue"];
 const HAND_CRICKET_NUMBERS = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -629,6 +737,46 @@ function cleanTagRoundSeconds(roundSeconds) {
   return TAG_ROUND_SECONDS.has(value) ? value : TAG_DEFAULT_ROUND_SECONDS;
 }
 
+function cleanBoostMaxPlayers(maxPlayers) {
+  const value = Number(maxPlayers || BOOST_DEFAULT_PLAYERS);
+
+  if (!Number.isInteger(value)) {
+    return BOOST_DEFAULT_PLAYERS;
+  }
+
+  return Math.max(BOOST_MIN_PLAYERS, Math.min(BOOST_MAX_PLAYERS, value));
+}
+
+function getBoostDefaultLabel(index) {
+  return BOOST_DEFAULT_CATEGORY_LABELS[index] || `Card ${index + 1}`;
+}
+
+function cleanBoostCategoryLabel(label, index) {
+  const value = String(label || "").trim().replace(/\s+/g, " ").slice(0, 18);
+  return value || getBoostDefaultLabel(index);
+}
+
+function createBoostCategories(categoryLabels = [], playerCount = BOOST_DEFAULT_PLAYERS) {
+  const count = cleanBoostMaxPlayers(playerCount);
+
+  return Array.from({ length: count }, (_entry, index) => {
+    const label = cleanBoostCategoryLabel(categoryLabels[index], index);
+
+    return {
+      id: `BOOST_${index + 1}`,
+      label,
+      short: label.slice(0, 1).toUpperCase() || String(index + 1),
+      tone: BOOST_CATEGORY_TONES[index % BOOST_CATEGORY_TONES.length]
+    };
+  });
+}
+
+function getBoostCategoryLabels(room) {
+  return (room.boost?.categories || createBoostCategories([], room.maxPlayers)).map(
+    (category) => category.label
+  );
+}
+
 function cleanGuessNumberValue(number) {
   const value = Number(number);
 
@@ -647,6 +795,49 @@ function cleanWordGuessValue(word) {
   }
 
   return value;
+}
+
+function cleanSpyWordMaxPlayers(maxPlayers) {
+  const value = Number(maxPlayers || 6);
+
+  if (!Number.isInteger(value)) {
+    return 6;
+  }
+
+  return Math.max(SPY_WORD_MIN_PLAYERS, Math.min(SPY_WORD_MAX_PLAYERS, value));
+}
+
+function cleanSpyWordDifficulty(difficulty) {
+  const value = String(difficulty || "easy").trim().toLowerCase();
+  return SPY_WORD_DIFFICULTIES.has(value) ? value : "easy";
+}
+
+function cleanSpyWordClue(clue) {
+  const value = String(clue || "").trim().replace(/\s+/g, " ");
+
+  if (!/^[A-Za-z][A-Za-z-]{0,23}$/.test(value)) {
+    throw new Error("Enter one clue word, up to 24 letters.");
+  }
+
+  return value.toUpperCase();
+}
+
+function cleanSpyWordGuess(guess) {
+  const value = String(guess || "").trim().replace(/\s+/g, " ").slice(0, 32);
+
+  if (!value) {
+    return "";
+  }
+
+  if (!/^[A-Za-z][A-Za-z -]{0,31}$/.test(value)) {
+    throw new Error("Enter a word guess using letters only.");
+  }
+
+  return value.toUpperCase();
+}
+
+function normalizeSpyWordValue(value) {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
 function shuffleWords(words) {
@@ -728,6 +919,26 @@ function cleanMaxPlayersForGame(
 
   if (gameType === "word-guess") {
     return WORD_GUESS_PLAYERS;
+  }
+
+  if (gameType === "spy-word") {
+    return cleanSpyWordMaxPlayers(maxPlayers);
+  }
+
+  if (gameType === "boost") {
+    return cleanBoostMaxPlayers(maxPlayers);
+  }
+
+  if (gameType === "treasure-hunt") {
+    const value = Number(maxPlayers);
+    if (!Number.isInteger(value) || value < TREASURE_HUNT_MIN_PLAYERS || value > TREASURE_HUNT_MAX_PLAYERS) {
+      return TREASURE_HUNT_MAX_PLAYERS;
+    }
+    return value;
+  }
+
+  if (gameType === "raja-rani" || gameType === "raja-rani-turns") {
+    return RAJA_RANI_PLAYERS;
   }
 
   return cleanMaxPlayers(maxPlayers);
@@ -1093,6 +1304,730 @@ function createWordGuessState(phase = "waiting", matchWins = {}) {
   };
 }
 
+function createSpyWordState(phase = "waiting", difficulty = "easy") {
+  return {
+    phase,
+    difficulty: cleanSpyWordDifficulty(difficulty),
+    totalRounds: SPY_WORD_TOTAL_ROUNDS,
+    round: 0,
+    turnNumber: 0,
+    currentTurnIndex: 0,
+    spyPlayerId: null,
+    spyPlayerName: null,
+    detectiveWord: null,
+    spyWord: null,
+    clues: [],
+    votes: {},
+    spyGuess: null,
+    result: null,
+    moveId: 0,
+    startedAt: null,
+    endedAt: null
+  };
+}
+
+function createRajaRaniState(phase = "waiting", scores = {}) {
+  return {
+    phase,
+    totalRounds: RAJA_RANI_TOTAL_ROUNDS,
+    revealDurationMs: RAJA_RANI_REVEAL_MS,
+    round: 0,
+    moveId: 0,
+    roles: RAJA_RANI_ROLES.map((role) => ({ ...role })),
+    rolesByPlayerId: {},
+    scores: { ...scores },
+    roundScores: {},
+    lastGuess: null,
+    history: [],
+    roundStartedAt: null,
+    revealStartedAt: null,
+    revealDeadlineAt: null,
+    startedAt: null,
+    endedAt: null
+  };
+}
+
+function createRajaRaniTurnsState(phase = "waiting", scores = {}) {
+  return {
+    phase,
+    totalRounds: RAJA_RANI_TOTAL_ROUNDS,
+    turnDurationMs: RAJA_RANI_TURNS_TURN_MS,
+    revealDurationMs: RAJA_RANI_TURNS_REVEAL_MS,
+    correctPoints: RAJA_RANI_TURNS_CORRECT_POINTS,
+    targets: { ...RAJA_RANI_TURNS_TARGETS },
+    round: 0,
+    moveId: 0,
+    roles: RAJA_RANI_ROLES.map((role) => ({ ...role })),
+    rolesByPlayerId: {},
+    scores: { ...scores },
+    roundScores: {},
+    actions: [],
+    history: [],
+    currentTurnIndex: 0,
+    activePlayerId: null,
+    activePlayerName: null,
+    turnNumber: 0,
+    turnStartedAt: null,
+    turnDeadlineAt: null,
+    revealStartedAt: null,
+    revealDeadlineAt: null,
+    roundStartedAt: null,
+    startedAt: null,
+    endedAt: null
+  };
+}
+
+function createBoostState(phase = "waiting", categories = createBoostCategories()) {
+  const cleanCategories = Array.isArray(categories) && categories.length
+    ? categories
+    : createBoostCategories();
+
+  return {
+    phase,
+    categories: cleanCategories,
+    targetCount: cleanCategories.length,
+    round: 0,
+    moveId: 0,
+    selectDurationMs: BOOST_SELECT_MS,
+    falseBoostCooldownMs: BOOST_FALSE_COOLDOWN_MS,
+    selectStartedAt: null,
+    selectDeadlineAt: null,
+    currentTurnIndex: 0,
+    activePlayerId: null,
+    activePlayerName: null,
+    turnNumber: 0,
+    hands: {},
+    lastTransfers: {},
+    falseBoostCooldowns: {},
+    falseBoosts: [],
+    winnerCategory: null,
+    resultType: null,
+    startedAt: null,
+    endedAt: null
+  };
+}
+
+function createTreasureHuntGrid() {
+  const grid = Array(TREASURE_HUNT_GRID_SIZE)
+    .fill(null)
+    .map(() =>
+      Array(TREASURE_HUNT_GRID_SIZE)
+        .fill(null)
+        .map(() => ({
+          type: TREASURE_HUNT_CELL_TYPES.EMPTY,
+          revealed: false
+        }))
+    );
+
+  // Place bombs
+  let bombsPlaced = 0;
+  while (bombsPlaced < TREASURE_HUNT_BOMB_COUNT) {
+    const row = Math.floor(Math.random() * TREASURE_HUNT_GRID_SIZE);
+    const col = Math.floor(Math.random() * TREASURE_HUNT_GRID_SIZE);
+    if (grid[row][col].type === TREASURE_HUNT_CELL_TYPES.EMPTY) {
+      grid[row][col].type = TREASURE_HUNT_CELL_TYPES.BOMB;
+      bombsPlaced += 1;
+    }
+  }
+
+  // Place treasures
+  let treasuresPlaced = 0;
+  while (treasuresPlaced < TREASURE_HUNT_TREASURE_COUNT) {
+    const row = Math.floor(Math.random() * TREASURE_HUNT_GRID_SIZE);
+    const col = Math.floor(Math.random() * TREASURE_HUNT_GRID_SIZE);
+    if (grid[row][col].type === TREASURE_HUNT_CELL_TYPES.EMPTY) {
+      grid[row][col].type = TREASURE_HUNT_CELL_TYPES.TREASURE;
+      treasuresPlaced += 1;
+    }
+  }
+
+  return grid;
+}
+
+function createTreasureHuntState() {
+  return {
+    phase: "playing",
+    board: createTreasureHuntGrid(),
+    currentPlayerIndex: 0,
+    currentTurnCount: 0,
+    cellsRevealed: 0,
+    treasuresRevealed: 0,
+    bombsRevealed: 0,
+    turnStartedAt: null,
+    turnDeadlineAt: null,
+    turnTimeMs: TREASURE_HUNT_TURN_MS,
+    winner: null,
+    finalStats: [],
+    startedAt: null,
+    endedAt: null
+  };
+}
+
+function shuffleRajaRaniRoles() {
+  const roles = RAJA_RANI_ROLES.map((role) => role.id);
+
+  for (let index = roles.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [roles[index], roles[swapIndex]] = [roles[swapIndex], roles[index]];
+  }
+
+  return roles;
+}
+
+function getRajaRaniRole(roleId) {
+  return RAJA_RANI_ROLES.find((role) => role.id === roleId) || null;
+}
+
+function createRajaRaniScores(players, currentScores = {}) {
+  return Object.fromEntries(
+    players.map((player) => [player.playerId, Number(currentScores[player.playerId] || 0)])
+  );
+}
+
+function getRajaRaniPlayerByRole(room, roleId) {
+  const state = room.rajaRani;
+  const playerId = Object.entries(state?.rolesByPlayerId || {}).find(
+    ([, assignedRole]) => assignedRole === roleId
+  )?.[0];
+
+  return room.players.find((player) => player.playerId === playerId) || null;
+}
+
+function getRajaRaniLeaderboard(room) {
+  const scores = room.rajaRani?.scores || {};
+
+  return room.players
+    .map((player) => ({
+      playerId: player.playerId,
+      name: player.name,
+      score: Number(scores[player.playerId] || 0)
+    }))
+    .sort((first, second) => second.score - first.score || first.name.localeCompare(second.name));
+}
+
+function assignRajaRaniRoles(players) {
+  const shuffledRoles = shuffleRajaRaniRoles();
+
+  return Object.fromEntries(
+    players.map((player, index) => [player.playerId, shuffledRoles[index]])
+  );
+}
+
+function startRajaRaniRound(room, round = 1) {
+  const state = room.rajaRani || createRajaRaniState();
+  const rolesByPlayerId = assignRajaRaniRoles(room.players);
+  const police = room.players.find((player) => rolesByPlayerId[player.playerId] === "police") || null;
+
+  room.rajaRani = {
+    ...state,
+    phase: "police-turn",
+    round,
+    moveId: (state.moveId || 0) + 1,
+    rolesByPlayerId,
+    scores: createRajaRaniScores(room.players, state.scores),
+    roundScores: {},
+    lastGuess: null,
+    revealStartedAt: null,
+    revealDeadlineAt: null,
+    roundStartedAt: Date.now(),
+    startedAt: state.startedAt || Date.now()
+  };
+  room.currentTurn = police ? room.players.findIndex((player) => player.playerId === police.playerId) : 0;
+}
+
+function scoreRajaRaniRound(rolesByPlayerId, correct) {
+  const pointTable = correct ? RAJA_RANI_POINTS.correct : RAJA_RANI_POINTS.wrong;
+
+  return Object.fromEntries(
+    Object.entries(rolesByPlayerId).map(([playerId, roleId]) => [
+      playerId,
+      pointTable[roleId] || 0
+    ])
+  );
+}
+
+function revealRajaRaniRound(room, police, suspect) {
+  const state = room.rajaRani;
+  const now = Date.now();
+  const thief = getRajaRaniPlayerByRole(room, "thirudan");
+  const correct = Boolean(thief && suspect?.playerId === thief.playerId);
+  const roundScores = scoreRajaRaniRound(state.rolesByPlayerId, correct);
+
+  for (const [playerId, points] of Object.entries(roundScores)) {
+    state.scores[playerId] = Number(state.scores[playerId] || 0) + points;
+  }
+
+  state.phase = "reveal";
+  state.roundScores = roundScores;
+  state.revealStartedAt = now;
+  state.revealDeadlineAt = now + RAJA_RANI_REVEAL_MS;
+  state.lastGuess = {
+    id: `${now}:${police.playerId}:${suspect.playerId}`,
+    round: state.round,
+    policePlayerId: police.playerId,
+    policePlayerName: police.name,
+    suspectPlayerId: suspect.playerId,
+    suspectPlayerName: suspect.name,
+    thiefPlayerId: thief?.playerId || null,
+    thiefPlayerName: thief?.name || null,
+    correct,
+    createdAt: now
+  };
+  state.history = [
+    ...(state.history || []),
+    {
+      round: state.round,
+      rolesByPlayerId: { ...state.rolesByPlayerId },
+      roundScores: { ...roundScores },
+      guess: { ...state.lastGuess }
+    }
+  ].slice(-RAJA_RANI_TOTAL_ROUNDS);
+}
+
+function finishRajaRaniMatch(room) {
+  const state = room.rajaRani;
+  const leaderboard = getRajaRaniLeaderboard(room);
+  const topScore = leaderboard[0]?.score || 0;
+  const tiedPlayerIds = leaderboard
+    .filter((entry) => entry.score === topScore)
+    .map((entry) => entry.playerId);
+  const winner = leaderboard[0] || null;
+
+  state.phase = "complete";
+  state.revealDeadlineAt = null;
+  state.endedAt = Date.now();
+  room.gameEnded = true;
+  room.winner = winner
+    ? {
+        playerId: winner.playerId,
+        name: winner.name,
+        score: winner.score,
+        tiedPlayerIds,
+        tied: tiedPlayerIds.length > 1
+      }
+    : null;
+}
+
+function getRajaRaniTurnsLeaderboard(room) {
+  const scores = room.rajaRaniTurns?.scores || {};
+
+  return room.players
+    .map((player) => ({
+      playerId: player.playerId,
+      name: player.name,
+      score: Number(scores[player.playerId] || 0)
+    }))
+    .sort((first, second) => second.score - first.score || first.name.localeCompare(second.name));
+}
+
+function createRoundScoreMap(players) {
+  return Object.fromEntries(players.map((player) => [player.playerId, 0]));
+}
+
+function beginRajaRaniTurnsTurn(room, turnIndex = 0, turnNumber = 1) {
+  const state = room.rajaRaniTurns;
+  const now = Date.now();
+  const playerCount = room.players.length;
+  const cleanIndex = playerCount > 0 ? turnIndex % playerCount : 0;
+  const activePlayer = room.players[cleanIndex] || null;
+
+  state.phase = "turn";
+  state.moveId = (state.moveId || 0) + 1;
+  state.currentTurnIndex = cleanIndex;
+  state.activePlayerId = activePlayer?.playerId || null;
+  state.activePlayerName = activePlayer?.name || null;
+  state.turnNumber = turnNumber;
+  state.turnStartedAt = now;
+  state.turnDeadlineAt = now + RAJA_RANI_TURNS_TURN_MS;
+  state.revealStartedAt = null;
+  state.revealDeadlineAt = null;
+  room.currentTurn = cleanIndex;
+}
+
+function startRajaRaniTurnsRound(room, round = 1) {
+  const state = room.rajaRaniTurns || createRajaRaniTurnsState();
+  const rolesByPlayerId = assignRajaRaniRoles(room.players);
+
+  room.rajaRaniTurns = {
+    ...state,
+    phase: "turn",
+    round,
+    rolesByPlayerId,
+    scores: createRajaRaniScores(room.players, state.scores),
+    roundScores: createRoundScoreMap(room.players),
+    actions: [],
+    currentTurnIndex: 0,
+    activePlayerId: null,
+    activePlayerName: null,
+    turnNumber: 0,
+    turnStartedAt: null,
+    turnDeadlineAt: null,
+    revealStartedAt: null,
+    revealDeadlineAt: null,
+    roundStartedAt: Date.now(),
+    startedAt: state.startedAt || Date.now()
+  };
+  beginRajaRaniTurnsTurn(room, 0, 1);
+}
+
+function revealRajaRaniTurnsRound(room) {
+  const state = room.rajaRaniTurns;
+  const now = Date.now();
+
+  state.phase = "reveal";
+  state.moveId = (state.moveId || 0) + 1;
+  state.activePlayerId = null;
+  state.activePlayerName = null;
+  state.turnDeadlineAt = null;
+  state.revealStartedAt = now;
+  state.revealDeadlineAt = now + RAJA_RANI_TURNS_REVEAL_MS;
+  state.history = [
+    ...(state.history || []),
+    {
+      round: state.round,
+      rolesByPlayerId: { ...state.rolesByPlayerId },
+      roundScores: { ...state.roundScores },
+      actions: (state.actions || []).map((action) => ({ ...action }))
+    }
+  ].slice(-RAJA_RANI_TOTAL_ROUNDS);
+}
+
+function finishRajaRaniTurnsMatch(room) {
+  const state = room.rajaRaniTurns;
+  const leaderboard = getRajaRaniTurnsLeaderboard(room);
+  const topScore = leaderboard[0]?.score || 0;
+  const tiedPlayerIds = leaderboard
+    .filter((entry) => entry.score === topScore)
+    .map((entry) => entry.playerId);
+  const winner = leaderboard[0] || null;
+
+  state.phase = "complete";
+  state.activePlayerId = null;
+  state.activePlayerName = null;
+  state.turnDeadlineAt = null;
+  state.revealDeadlineAt = null;
+  state.endedAt = Date.now();
+  room.gameEnded = true;
+  room.winner = winner
+    ? {
+        playerId: winner.playerId,
+        name: winner.name,
+        score: winner.score,
+        tiedPlayerIds,
+        tied: tiedPlayerIds.length > 1
+      }
+    : null;
+}
+
+function advanceRajaRaniTurnsAfterAction(room) {
+  const state = room.rajaRaniTurns;
+
+  if ((state.turnNumber || 0) >= room.players.length) {
+    revealRajaRaniTurnsRound(room);
+    return;
+  }
+
+  beginRajaRaniTurnsTurn(
+    room,
+    (state.currentTurnIndex || 0) + 1,
+    (state.turnNumber || 0) + 1
+  );
+}
+
+function addRajaRaniTurnsAction(room, actor, suspect = null, { skipped = false } = {}) {
+  const state = room.rajaRaniTurns;
+  const now = Date.now();
+  const actorRoleBefore = state.rolesByPlayerId[actor.playerId];
+  const suspectRoleBefore = suspect ? state.rolesByPlayerId[suspect.playerId] : null;
+  const targetRole = RAJA_RANI_TURNS_TARGETS[actorRoleBefore] || null;
+  const correct = Boolean(!skipped && suspectRoleBefore && suspectRoleBefore === targetRole);
+  const action = {
+    id: `${now}:${actor.playerId}:${state.turnNumber || 0}`,
+    round: state.round,
+    turnNumber: state.turnNumber || 0,
+    actorPlayerId: actor.playerId,
+    actorPlayerName: actor.name,
+    suspectPlayerId: suspect?.playerId || null,
+    suspectPlayerName: suspect?.name || null,
+    actorRoleBefore,
+    suspectRoleBefore,
+    targetRole,
+    correct,
+    skipped,
+    swapped: false,
+    points: 0,
+    actorRoleAfter: actorRoleBefore,
+    suspectRoleAfter: suspectRoleBefore,
+    createdAt: now
+  };
+
+  if (skipped) {
+    state.actions.push(action);
+    advanceRajaRaniTurnsAfterAction(room);
+    return action;
+  }
+
+  if (correct) {
+    action.points = RAJA_RANI_TURNS_CORRECT_POINTS;
+    state.roundScores[actor.playerId] =
+      Number(state.roundScores[actor.playerId] || 0) + RAJA_RANI_TURNS_CORRECT_POINTS;
+    state.scores[actor.playerId] =
+      Number(state.scores[actor.playerId] || 0) + RAJA_RANI_TURNS_CORRECT_POINTS;
+  } else {
+    state.rolesByPlayerId[actor.playerId] = suspectRoleBefore;
+    state.rolesByPlayerId[suspect.playerId] = actorRoleBefore;
+    action.swapped = true;
+    action.actorRoleAfter = suspectRoleBefore;
+    action.suspectRoleAfter = actorRoleBefore;
+  }
+
+  state.actions.push(action);
+  advanceRajaRaniTurnsAfterAction(room);
+  return action;
+}
+
+function getBoostRoomCategories(room) {
+  return room.boost?.categories?.length ? room.boost.categories : createBoostCategories([], room.maxPlayers);
+}
+
+function getBoostRoomTargetCount(room) {
+  return getBoostRoomCategories(room).length;
+}
+
+function getBoostCategory(room, categoryId) {
+  return getBoostRoomCategories(room).find((category) => category.id === categoryId) || getBoostRoomCategories(room)[0];
+}
+
+function shuffleBoostDeck(categories) {
+  const deck = [];
+
+  for (const category of categories) {
+    for (let copy = 1; copy <= categories.length; copy += 1) {
+      deck.push({
+        id: `${category.id}-${copy}`,
+        category: category.id,
+        label: category.label,
+        short: category.short,
+        tone: category.tone
+      });
+    }
+  }
+
+  for (let index = deck.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [deck[index], deck[swapIndex]] = [deck[swapIndex], deck[index]];
+  }
+
+  return deck;
+}
+
+function countBoostCategories(hand = []) {
+  return hand.reduce((counts, card) => {
+    counts[card.category] = (counts[card.category] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function getBoostWinningCategory(hand = [], targetCount = BOOST_DEFAULT_PLAYERS) {
+  const counts = countBoostCategories(hand);
+  const winningEntry = Object.entries(counts).find(([, count]) => count >= targetCount);
+
+  return winningEntry?.[0] || null;
+}
+
+function getRandomBoostCardId(hand = []) {
+  if (!hand.length) {
+    return "";
+  }
+
+  return hand[Math.floor(Math.random() * hand.length)].id;
+}
+
+function chooseBoostBotCardId(hand = []) {
+  if (!hand.length) {
+    return "";
+  }
+
+  const counts = countBoostCategories(hand);
+  const targetCategory = Object.entries(counts)
+    .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0]?.[0];
+  const offTargetCard = hand.find((card) => card.category !== targetCategory);
+
+  return (offTargetCard || hand[0]).id;
+}
+
+function beginBoostTurn(room, { advance = false } = {}) {
+  const state = room.boost;
+  const now = Date.now();
+  const playerCount = room.players.length;
+
+  if (!state || playerCount === 0) {
+    return;
+  }
+
+  const previousIndex = Number.isInteger(state.currentTurnIndex) ? state.currentTurnIndex : 0;
+  const nextIndex = advance ? (previousIndex + 1) % playerCount : previousIndex % playerCount;
+  const activePlayer = room.players[nextIndex];
+
+  if (advance && nextIndex === 0) {
+    state.round = (state.round || 0) + 1;
+  } else if (!state.round) {
+    state.round = 1;
+  }
+
+  state.phase = "selecting";
+  state.moveId = (state.moveId || 0) + 1;
+  state.turnNumber = (state.turnNumber || 0) + 1;
+  state.currentTurnIndex = nextIndex;
+  room.currentTurn = nextIndex;
+  state.activePlayerId = activePlayer?.playerId || null;
+  state.activePlayerName = activePlayer?.name || null;
+  state.selectStartedAt = now;
+  state.selectDeadlineAt = now + BOOST_SELECT_MS;
+}
+
+function removeBoostCard(hand, cardId) {
+  const index = hand.findIndex((card) => card.id === cardId);
+
+  if (index === -1) {
+    return null;
+  }
+
+  const [card] = hand.splice(index, 1);
+  return card;
+}
+
+function finishBoostGame(room, player, categoryId, resultType) {
+  const state = room.boost;
+  const category = getBoostCategory(room, categoryId);
+
+  state.phase = "result";
+  state.winnerCategory = categoryId;
+  state.resultType = resultType;
+  state.selectDeadlineAt = null;
+  state.endedAt = Date.now();
+  room.gameEnded = true;
+  room.winner = player
+    ? {
+        playerId: player.playerId,
+        socketId: player.socketId,
+        name: player.name,
+        category: category.id,
+        categoryLabel: category.label,
+        round: state.round,
+        resultType
+      }
+    : null;
+}
+
+function getBoostWinner(room) {
+  const state = room.boost;
+  const targetCount = getBoostRoomTargetCount(room);
+
+  for (const player of room.players) {
+    const categoryId = getBoostWinningCategory(state.hands[player.playerId] || [], targetCount);
+
+    if (categoryId) {
+      return {
+        player,
+        categoryId
+      };
+    }
+  }
+
+  return null;
+}
+
+function processBoostDrop(room, player, cardId, { auto = false } = {}) {
+  const state = room.boost;
+
+  if (room.gameType !== "boost" || !state || state.phase !== "selecting") {
+    return false;
+  }
+
+  const now = Date.now();
+  const activePlayer = room.players[state.currentTurnIndex] || null;
+
+  if (!activePlayer || activePlayer.playerId !== player.playerId) {
+    throw new Error("It is not your turn.");
+  }
+
+  if (state.selectDeadlineAt && Date.now() > state.selectDeadlineAt && !auto) {
+    throw new Error("Time is up for this turn.");
+  }
+
+  const hand = state.hands[player.playerId] || [];
+  const selectedCardId = String(cardId || "").trim();
+
+  if (!auto && !hand.some((card) => card.id === selectedCardId)) {
+    throw new Error("Choose a card from your hand.");
+  }
+
+  const card =
+    removeBoostCard(hand, selectedCardId) ||
+    removeBoostCard(hand, player.isBot ? chooseBoostBotCardId(hand) : getRandomBoostCardId(hand));
+
+  if (!card) {
+    return false;
+  }
+
+  const receiverIndex = (state.currentTurnIndex + 1) % room.players.length;
+  const receiver = room.players[receiverIndex];
+
+  state.hands[receiver.playerId] = [...(state.hands[receiver.playerId] || []), card];
+  state.lastTransfers = {
+    ...(state.lastTransfers || {}),
+    [player.playerId]: {
+      round: state.round,
+      turnNumber: state.turnNumber,
+      sentCard: card,
+      sentToPlayerId: receiver.playerId,
+      sentToPlayerName: receiver.name,
+      receivedCard: null,
+      receivedFromPlayerId: null,
+      receivedFromPlayerName: null,
+      processedAt: now,
+      auto
+    },
+    [receiver.playerId]: {
+      round: state.round,
+      turnNumber: state.turnNumber,
+      sentCard: null,
+      sentToPlayerId: null,
+      sentToPlayerName: null,
+      receivedCard: card,
+      receivedFromPlayerId: player.playerId,
+      receivedFromPlayerName: player.name,
+      processedAt: now,
+      auto
+    }
+  };
+  const winner = getBoostWinner(room);
+
+  if (winner) {
+    finishBoostGame(room, winner.player, winner.categoryId, "auto");
+    return true;
+  }
+
+  beginBoostTurn(room, { advance: true });
+
+  return true;
+}
+
+function createBoostHands(players, categories) {
+  const deck = shuffleBoostDeck(categories);
+
+  return Object.fromEntries(
+    players.map((player, playerIndex) => [
+      player.playerId,
+      deck.slice(
+        playerIndex * categories.length,
+        playerIndex * categories.length + categories.length
+      )
+    ])
+  );
+}
+
 function startWordGuessRound(room) {
   const state = room.wordGuess;
   const now = Date.now();
@@ -1184,6 +2119,163 @@ function resolveWordGuessRound(room) {
   }
 
   startWordGuessRound(room);
+}
+
+function chooseSpyWordPair(difficulty) {
+  const pairs = SPY_WORD_PAIRS[cleanSpyWordDifficulty(difficulty)] || SPY_WORD_PAIRS.easy;
+  return pairs[Math.floor(Math.random() * pairs.length)];
+}
+
+function getSpyWordRole(state, playerId) {
+  return state.spyPlayerId === playerId ? "spy" : "detective";
+}
+
+function startSpyWordMatch(room) {
+  const previousDifficulty = room.spyWord?.difficulty || "easy";
+  const pair = chooseSpyWordPair(previousDifficulty);
+  const spy = room.players[Math.floor(Math.random() * room.players.length)];
+  const now = Date.now();
+
+  room.spyWord = {
+    ...createSpyWordState("clue", previousDifficulty),
+    round: 1,
+    turnNumber: 1,
+    currentTurnIndex: 0,
+    spyPlayerId: spy.playerId,
+    spyPlayerName: spy.name,
+    detectiveWord: pair.detective,
+    spyWord: pair.spy,
+    moveId: 1,
+    startedAt: now
+  };
+  room.currentTurn = 0;
+}
+
+function beginSpyWordVoting(room) {
+  const state = room.spyWord;
+
+  state.phase = "voting";
+  state.currentTurnIndex = null;
+  state.votes = {};
+  state.moveId = (state.moveId || 0) + 1;
+  room.currentTurn = 0;
+}
+
+function advanceSpyWordTurn(room) {
+  const state = room.spyWord;
+  const totalTurns = room.players.length * SPY_WORD_TOTAL_ROUNDS;
+
+  if ((state.turnNumber || 0) >= totalTurns) {
+    beginSpyWordVoting(room);
+    return;
+  }
+
+  const nextTurnNumber = (state.turnNumber || 0) + 1;
+  const nextIndex = room.players.length > 0 ? (state.currentTurnIndex + 1) % room.players.length : 0;
+
+  state.turnNumber = nextTurnNumber;
+  state.currentTurnIndex = nextIndex;
+  state.round = Math.floor((nextTurnNumber - 1) / room.players.length) + 1;
+  state.moveId = (state.moveId || 0) + 1;
+  room.currentTurn = nextIndex;
+}
+
+function getSpyWordVoteTally(room) {
+  const state = room.spyWord;
+  const tally = Object.fromEntries(
+    room.players.map((player) => [
+      player.playerId,
+      {
+        playerId: player.playerId,
+        name: player.name,
+        count: 0,
+        voterIds: []
+      }
+    ])
+  );
+
+  for (const [voterId, suspectId] of Object.entries(state.votes || {})) {
+    if (!tally[suspectId]) {
+      continue;
+    }
+
+    tally[suspectId].count += 1;
+    tally[suspectId].voterIds.push(voterId);
+  }
+
+  return Object.values(tally);
+}
+
+function finishSpyWordMatch(room, winnerSide, resultType, extra = {}) {
+  const state = room.spyWord || createSpyWordState("result");
+  const spyPlayer =
+    findPlayerById(room, state.spyPlayerId) ||
+    (state.spyPlayerName
+      ? {
+          playerId: state.spyPlayerId,
+          name: state.spyPlayerName
+        }
+      : null);
+
+  state.phase = "result";
+  state.endedAt = Date.now();
+  state.result = {
+    ...(state.result || {}),
+    ...extra,
+    type: resultType,
+    winnerSide,
+    spyPlayerId: state.spyPlayerId,
+    spyPlayerName: spyPlayer?.name || state.spyPlayerName || "Spy",
+    detectiveWord: state.detectiveWord,
+    spyWord: state.spyWord
+  };
+  room.gameEnded = true;
+  room.winner =
+    winnerSide === "detectives"
+      ? {
+          playerId: null,
+          side: "detectives",
+          name: "Detectives",
+          resultType
+        }
+      : {
+          playerId: spyPlayer?.playerId || state.spyPlayerId,
+          side: "spy",
+          name: spyPlayer?.name ? `Spy (${spyPlayer.name})` : "Spy",
+          spyPlayerName: spyPlayer?.name || state.spyPlayerName || "Spy",
+          resultType
+        };
+}
+
+function resolveSpyWordVotes(room) {
+  const state = room.spyWord;
+  const tally = getSpyWordVoteTally(room);
+  const spyVotes = tally.find((entry) => entry.playerId === state.spyPlayerId)?.count || 0;
+  const majority = Math.floor(room.players.length / 2) + 1;
+  const topCount = Math.max(0, ...tally.map((entry) => entry.count));
+  const topVoted = tally.filter((entry) => entry.count === topCount && topCount > 0);
+  const tied = topVoted.length !== 1;
+  const caughtSpy = spyVotes >= majority;
+
+  state.result = {
+    type: caughtSpy ? "caught" : tied ? "tie" : "escaped",
+    winnerSide: caughtSpy ? null : "spy",
+    caughtSpy,
+    majority,
+    tied,
+    topPlayerIds: topVoted.map((entry) => entry.playerId),
+    voteTally: tally,
+    detectiveWord: caughtSpy ? null : state.detectiveWord,
+    spyWord: caughtSpy ? null : state.spyWord
+  };
+
+  if (caughtSpy) {
+    state.phase = "spy-guess";
+    state.moveId = (state.moveId || 0) + 1;
+    return;
+  }
+
+  finishSpyWordMatch(room, "spy", state.result.type, state.result);
 }
 
 function createTagInput(input = {}) {
@@ -2148,6 +3240,292 @@ function serializeWordGuess(room) {
   };
 }
 
+function serializeSpyWord(room, viewerPlayerId = null) {
+  if (room.gameType !== "spy-word") {
+    return null;
+  }
+
+  const state = room.spyWord || createSpyWordState();
+  const revealed = room.gameEnded || state.phase === "result";
+  const viewerRole = viewerPlayerId ? getSpyWordRole(state, viewerPlayerId) : null;
+  const viewerWord =
+    viewerRole === "spy"
+      ? state.spyWord
+      : viewerRole === "detective"
+        ? state.detectiveWord
+        : null;
+  const activePlayer = Number.isInteger(state.currentTurnIndex)
+    ? room.players[state.currentTurnIndex] || null
+    : null;
+  const votes = state.votes || {};
+  const readyVoterIds = Object.keys(votes).filter((playerId) =>
+    room.players.some((player) => player.playerId === playerId)
+  );
+  const votersByTarget = Object.fromEntries(room.players.map((player) => [player.playerId, []]));
+
+  if (revealed) {
+    for (const [voterId, suspectId] of Object.entries(votes)) {
+      if (votersByTarget[suspectId]) {
+        votersByTarget[suspectId].push(voterId);
+      }
+    }
+  }
+
+  return {
+    phase: state.phase,
+    difficulty: state.difficulty || "easy",
+    totalRounds: state.totalRounds || SPY_WORD_TOTAL_ROUNDS,
+    round: state.round || 0,
+    turnNumber: state.turnNumber || 0,
+    currentTurnIndex: state.currentTurnIndex,
+    activePlayerId: activePlayer?.playerId || null,
+    activePlayerName: activePlayer?.name || null,
+    viewerRole,
+    viewerWord,
+    detectiveWord: revealed ? state.detectiveWord : null,
+    spyWord: revealed ? state.spyWord : null,
+    spyPlayerId: revealed ? state.spyPlayerId : null,
+    spyPlayerName: revealed ? state.spyPlayerName : null,
+    clues: (state.clues || []).map((clue) => ({
+      ...clue,
+      role: revealed ? clue.role : null
+    })),
+    readyVoterIds,
+    myVote: viewerPlayerId ? votes[viewerPlayerId] || null : null,
+    votes: revealed
+      ? Object.entries(votes).map(([voterId, suspectId]) => {
+          const voter = findPlayerById(room, voterId);
+          const suspect = findPlayerById(room, suspectId);
+
+          return {
+            voterId,
+            voterName: voter?.name || "Player",
+            suspectId,
+            suspectName: suspect?.name || "Player"
+          };
+        })
+      : [],
+    voteTally: (state.result?.voteTally || getSpyWordVoteTally(room)).map((entry) => ({
+      playerId: entry.playerId,
+      name: entry.name,
+      count: revealed || state.phase === "spy-guess" ? entry.count : 0,
+      voterIds: revealed ? entry.voterIds || [] : votersByTarget[entry.playerId] || []
+    })),
+    spyGuess: revealed || state.phase === "spy-guess" ? state.spyGuess : null,
+    result: revealed || state.phase === "spy-guess" ? state.result : null,
+    moveId: state.moveId || 0,
+    startedAt: state.startedAt,
+    endedAt: state.endedAt
+  };
+}
+
+function serializeBoost(room, viewerPlayerId = null) {
+  if (room.gameType !== "boost") {
+    return null;
+  }
+
+  const state = room.boost || createBoostState();
+  const now = Date.now();
+  const categories = getBoostRoomCategories(room);
+  const viewerHand = viewerPlayerId ? [...(state.hands?.[viewerPlayerId] || [])] : [];
+  const handCounts = Object.fromEntries(
+    room.players.map((player) => [player.playerId, (state.hands?.[player.playerId] || []).length])
+  );
+  const cooldownUntil = viewerPlayerId ? state.falseBoostCooldowns?.[viewerPlayerId] || 0 : 0;
+
+  return {
+    phase: state.phase,
+    categories,
+    targetCount: categories.length,
+    round: state.round || 0,
+    moveId: state.moveId || 0,
+    hand: viewerHand,
+    handCounts,
+    viewerCounts: countBoostCategories(viewerHand),
+    activePlayerId: state.activePlayerId,
+    activePlayerName: state.activePlayerName,
+    currentTurnIndex: state.currentTurnIndex || 0,
+    turnNumber: state.turnNumber || 0,
+    selectDurationMs: state.selectDurationMs || BOOST_SELECT_MS,
+    selectStartedAt: state.selectStartedAt,
+    selectDeadlineAt: state.selectDeadlineAt,
+    selectLeftMs:
+      state.phase === "selecting" && state.selectDeadlineAt
+        ? Math.max(0, state.selectDeadlineAt - now)
+        : 0,
+    lastTransfer: viewerPlayerId ? state.lastTransfers?.[viewerPlayerId] || null : null,
+    falseBoostCooldownMs: state.falseBoostCooldownMs || BOOST_FALSE_COOLDOWN_MS,
+    falseBoostCooldownUntil: cooldownUntil,
+    falseBoostCooldownLeftMs: Math.max(0, cooldownUntil - now),
+    falseBoosts: [...(state.falseBoosts || [])].slice(-6),
+    winnerCategory: state.winnerCategory,
+    resultType: state.resultType,
+    startedAt: state.startedAt,
+    endedAt: state.endedAt
+  };
+}
+
+function serializeRajaRani(room, viewerPlayerId = null) {
+  if (room.gameType !== "raja-rani") {
+    return null;
+  }
+
+  const state = room.rajaRani || createRajaRaniState();
+  const now = Date.now();
+  const viewerRoleId = viewerPlayerId ? state.rolesByPlayerId?.[viewerPlayerId] || null : null;
+  const revealed = state.phase === "reveal" || state.phase === "complete" || room.gameEnded;
+  const police = getRajaRaniPlayerByRole(room, "police");
+  const thief = getRajaRaniPlayerByRole(room, "thirudan");
+  const leaderboard = getRajaRaniLeaderboard(room);
+
+  return {
+    phase: state.phase,
+    round: state.round || 0,
+    totalRounds: state.totalRounds || RAJA_RANI_TOTAL_ROUNDS,
+    moveId: state.moveId || 0,
+    roles: state.roles || RAJA_RANI_ROLES,
+    viewerRole: viewerRoleId ? getRajaRaniRole(viewerRoleId) : null,
+    revealed,
+    policePlayerId: revealed || viewerRoleId === "police" ? police?.playerId || null : null,
+    thiefPlayerId: revealed ? thief?.playerId || null : null,
+    scores: createRajaRaniScores(room.players, state.scores),
+    roundScores: { ...(state.roundScores || {}) },
+    leaderboard,
+    players: room.players.map((player) => {
+      const roleId = state.rolesByPlayerId?.[player.playerId] || null;
+      const showRole = revealed || player.playerId === viewerPlayerId;
+
+      return {
+        playerId: player.playerId,
+        name: player.name,
+        role: showRole && roleId ? getRajaRaniRole(roleId) : null,
+        score: Number(state.scores?.[player.playerId] || 0),
+        roundScore: Number(state.roundScores?.[player.playerId] || 0)
+      };
+    }),
+    suspects:
+      viewerRoleId === "police" && state.phase === "police-turn"
+        ? room.players
+            .filter((player) => player.playerId !== viewerPlayerId)
+            .map((player) => ({
+              playerId: player.playerId,
+              name: player.name,
+              score: Number(state.scores?.[player.playerId] || 0)
+            }))
+        : [],
+    lastGuess: revealed ? state.lastGuess : null,
+    history: [...(state.history || [])],
+    revealDurationMs: state.revealDurationMs || RAJA_RANI_REVEAL_MS,
+    revealStartedAt: state.revealStartedAt,
+    revealDeadlineAt: state.revealDeadlineAt,
+    revealLeftMs:
+      state.phase === "reveal" && state.revealDeadlineAt
+        ? Math.max(0, state.revealDeadlineAt - now)
+        : 0,
+    startedAt: state.startedAt,
+    endedAt: state.endedAt
+  };
+}
+
+function serializeRajaRaniTurns(room, viewerPlayerId = null) {
+  if (room.gameType !== "raja-rani-turns") {
+    return null;
+  }
+
+  const state = room.rajaRaniTurns || createRajaRaniTurnsState();
+  const now = Date.now();
+  const viewerRoleId = viewerPlayerId ? state.rolesByPlayerId?.[viewerPlayerId] || null : null;
+  const targetRoleId = viewerRoleId ? RAJA_RANI_TURNS_TARGETS[viewerRoleId] || null : null;
+  const revealed = state.phase === "reveal" || state.phase === "complete" || room.gameEnded;
+  const leaderboard = getRajaRaniTurnsLeaderboard(room);
+
+  return {
+    phase: state.phase,
+    round: state.round || 0,
+    totalRounds: state.totalRounds || RAJA_RANI_TOTAL_ROUNDS,
+    moveId: state.moveId || 0,
+    roles: state.roles || RAJA_RANI_ROLES,
+    targets: { ...(state.targets || RAJA_RANI_TURNS_TARGETS) },
+    viewerRole: viewerRoleId ? getRajaRaniRole(viewerRoleId) : null,
+    viewerTargetRole: targetRoleId ? getRajaRaniRole(targetRoleId) : null,
+    revealed,
+    scores: createRajaRaniScores(room.players, state.scores),
+    roundScores: { ...(state.roundScores || {}) },
+    leaderboard,
+    players: room.players.map((player) => {
+      const roleId = state.rolesByPlayerId?.[player.playerId] || null;
+      const showRole = revealed || player.playerId === viewerPlayerId;
+
+      return {
+        playerId: player.playerId,
+        name: player.name,
+        role: showRole && roleId ? getRajaRaniRole(roleId) : null,
+        score: Number(state.scores?.[player.playerId] || 0),
+        roundScore: Number(state.roundScores?.[player.playerId] || 0),
+        isActive: player.playerId === state.activePlayerId
+      };
+    }),
+    suspects:
+      viewerPlayerId === state.activePlayerId && state.phase === "turn"
+        ? room.players
+            .filter((player) => player.playerId !== viewerPlayerId)
+            .map((player) => ({
+              playerId: player.playerId,
+              name: player.name,
+              score: Number(state.scores?.[player.playerId] || 0)
+            }))
+        : [],
+    actions: (state.actions || []).map((action) => {
+      if (revealed) {
+        return {
+          ...action,
+          actorRoleBefore: getRajaRaniRole(action.actorRoleBefore),
+          suspectRoleBefore: getRajaRaniRole(action.suspectRoleBefore),
+          targetRole: getRajaRaniRole(action.targetRole),
+          actorRoleAfter: getRajaRaniRole(action.actorRoleAfter),
+          suspectRoleAfter: getRajaRaniRole(action.suspectRoleAfter)
+        };
+      }
+
+      return {
+        id: action.id,
+        round: action.round,
+        turnNumber: action.turnNumber,
+        actorPlayerId: action.actorPlayerId,
+        actorPlayerName: action.actorPlayerName,
+        suspectPlayerId: action.suspectPlayerId,
+        suspectPlayerName: action.suspectPlayerName,
+        correct: action.correct,
+        skipped: action.skipped,
+        swapped: action.swapped,
+        points: action.points,
+        createdAt: action.createdAt
+      };
+    }),
+    history: [...(state.history || [])],
+    activePlayerId: state.activePlayerId,
+    activePlayerName: state.activePlayerName,
+    currentTurnIndex: state.currentTurnIndex || 0,
+    turnNumber: state.turnNumber || 0,
+    turnDurationMs: state.turnDurationMs || RAJA_RANI_TURNS_TURN_MS,
+    turnStartedAt: state.turnStartedAt,
+    turnDeadlineAt: state.turnDeadlineAt,
+    turnLeftMs:
+      state.phase === "turn" && state.turnDeadlineAt
+        ? Math.max(0, state.turnDeadlineAt - now)
+        : 0,
+    revealDurationMs: state.revealDurationMs || RAJA_RANI_TURNS_REVEAL_MS,
+    revealStartedAt: state.revealStartedAt,
+    revealDeadlineAt: state.revealDeadlineAt,
+    revealLeftMs:
+      state.phase === "reveal" && state.revealDeadlineAt
+        ? Math.max(0, state.revealDeadlineAt - now)
+        : 0,
+    startedAt: state.startedAt,
+    endedAt: state.endedAt
+  };
+}
+
 function publicPlayer(player, room) {
   return {
     playerId: player.playerId,
@@ -2160,8 +3538,11 @@ function publicPlayer(player, room) {
   };
 }
 
-export function serializeRoom(room) {
+export function serializeRoom(room, viewerPlayerId = null) {
   const currentPlayer = room.players[room.currentTurn] || null;
+  const hideCurrentPlayer =
+    room.gameType === "raja-rani" &&
+    room.rajaRani?.phase === "police-turn";
 
   return {
     roomCode: room.roomCode,
@@ -2174,16 +3555,20 @@ export function serializeRoom(room) {
     boardSize: room.boardSize || null,
     players: room.players.map((player) => publicPlayer(player, room)),
     calledNumbers: [...room.calledNumbers],
-    currentTurn: room.currentTurn,
-    currentPlayerId: currentPlayer?.playerId || null,
-    currentPlayerName: currentPlayer?.name || null,
+    currentTurn: hideCurrentPlayer ? null : room.currentTurn,
+    currentPlayerId: hideCurrentPlayer ? null : currentPlayer?.playerId || null,
+    currentPlayerName: hideCurrentPlayer ? null : currentPlayer?.name || null,
     gameStarted: room.gameStarted,
     gameEnded: room.gameEnded,
     winner: room.winner,
     handCricket: serializeHandCricket(room),
     tag: serializeTag(room),
     guessNumber: serializeGuessNumber(room),
-    wordGuess: serializeWordGuess(room)
+    wordGuess: serializeWordGuess(room),
+    spyWord: serializeSpyWord(room, viewerPlayerId),
+    boost: serializeBoost(room, viewerPlayerId),
+    rajaRani: serializeRajaRani(room, viewerPlayerId),
+    rajaRaniTurns: serializeRajaRaniTurns(room, viewerPlayerId)
   };
 }
 
@@ -2195,6 +3580,7 @@ function serializeActiveRoom(room) {
     handCricketTeamSize: room.handCricketTeamSize,
     tagMapId: room.tag?.mapId || null,
     tagRoundSeconds: room.tag?.roundSeconds || null,
+    spyWordDifficulty: room.spyWord?.difficulty || null,
     roomName: room.roomName,
     playerCount: room.players.length,
     maxPlayers: room.maxPlayers,
@@ -2220,7 +3606,9 @@ export function createRoom({
   handCricketMode,
   handCricketTeamSize,
   tagMapId,
-  tagRoundSeconds
+  tagRoundSeconds,
+  spyWordDifficulty,
+  boostCategoryLabels
 }) {
   const name = cleanNickname(nickname);
   const code = generateRoomCode();
@@ -2233,6 +3621,10 @@ export function createRoom({
       : null;
   const cleanTagMap = type === "tag" ? cleanTagMapId(tagMapId) : null;
   const cleanTagRound = type === "tag" ? cleanTagRoundSeconds(tagRoundSeconds) : null;
+  const cleanSpyDifficulty = type === "spy-word" ? cleanSpyWordDifficulty(spyWordDifficulty) : null;
+  const boostPlayers = type === "boost" ? cleanBoostMaxPlayers(maxPlayers) : null;
+  const boostCategories =
+    type === "boost" ? createBoostCategories(boostCategoryLabels, boostPlayers) : null;
   const room = {
     roomCode: code,
     gameType: type,
@@ -2253,6 +3645,11 @@ export function createRoom({
     tag: type === "tag" ? createTagState("waiting", cleanTagMap, cleanTagRound) : null,
     guessNumber: type === "guess-number" ? createGuessNumberState("waiting") : null,
     wordGuess: type === "word-guess" ? createWordGuessState("waiting") : null,
+    spyWord: type === "spy-word" ? createSpyWordState("waiting", cleanSpyDifficulty) : null,
+    boost: type === "boost" ? createBoostState("waiting", boostCategories) : null,
+    treasureHunt: type === "treasure-hunt" ? createTreasureHuntState() : null,
+    rajaRani: type === "raja-rani" ? createRajaRaniState("waiting") : null,
+    rajaRaniTurns: type === "raja-rani-turns" ? createRajaRaniTurnsState("waiting") : null,
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
@@ -2303,7 +3700,9 @@ export function updateRoomSettings({
   maxPlayers,
   handCricketTeamSize,
   tagMapId,
-  tagRoundSeconds
+  tagRoundSeconds,
+  spyWordDifficulty,
+  boostCategoryLabels
 }) {
   const room = requireRoom(roomCode);
   const player = findPlayerBySocket(room, socketId);
@@ -2318,9 +3717,23 @@ export function updateRoomSettings({
         ? cleanTagMaxPlayers(maxPlayers)
         : room.gameType === "guess-number"
           ? GUESS_NUMBER_PLAYERS
-          : room.gameType === "word-guess"
-            ? WORD_GUESS_PLAYERS
-            : cleanRoomSize(maxPlayers);
+        : room.gameType === "word-guess"
+          ? WORD_GUESS_PLAYERS
+          : room.gameType === "spy-word"
+            ? cleanSpyWordMaxPlayers(maxPlayers || room.maxPlayers)
+            : room.gameType === "boost"
+              ? cleanBoostMaxPlayers(maxPlayers || room.maxPlayers)
+              : room.gameType === "treasure-hunt"
+                ? (() => {
+                    const value = Number(maxPlayers || room.maxPlayers);
+                    if (!Number.isInteger(value) || value < TREASURE_HUNT_MIN_PLAYERS || value > TREASURE_HUNT_MAX_PLAYERS) {
+                      return room.maxPlayers || TREASURE_HUNT_MAX_PLAYERS;
+                    }
+                    return value;
+                  })()
+              : room.gameType === "raja-rani"
+                ? RAJA_RANI_PLAYERS
+                : cleanRoomSize(maxPlayers);
 
   if (!player || room.host !== player.playerId) {
     throw new Error("Only the host can change room settings.");
@@ -2349,6 +3762,20 @@ export function updateRoomSettings({
   if (room.gameType === "tag") {
     room.tag.mapId = cleanTagMapId(tagMapId || room.tag.mapId);
     room.tag.roundSeconds = cleanTagRoundSeconds(tagRoundSeconds || room.tag.roundSeconds);
+  }
+
+  if (room.gameType === "boost") {
+    room.boost = room.boost || createBoostState("waiting");
+    room.boost.categories = createBoostCategories(
+      boostCategoryLabels || getBoostCategoryLabels(room),
+      nextMaxPlayers
+    );
+    room.boost.targetCount = nextMaxPlayers;
+  }
+
+  if (room.gameType === "spy-word") {
+    room.spyWord = room.spyWord || createSpyWordState("waiting");
+    room.spyWord.difficulty = cleanSpyWordDifficulty(spyWordDifficulty || room.spyWord.difficulty);
   }
 
   room.roomName = cleanRoomName(roomName);
@@ -2390,8 +3817,8 @@ export function addBot({ socketId, roomCode }) {
   const room = requireRoom(roomCode);
   const player = findPlayerBySocket(room, socketId);
 
-  if (room.gameType !== "bingo") {
-    throw new Error("Bots are only available for Bingo right now.");
+  if (room.gameType !== "bingo" && room.gameType !== "boost") {
+    throw new Error("Bots are only available for Bingo and BOOST right now.");
   }
 
   if (!player || room.host !== player.playerId) {
@@ -2514,6 +3941,27 @@ export function startGame({ socketId, roomCode }) {
     return room;
   }
 
+  if (room.gameType === "spy-word") {
+    if (
+      room.players.length < SPY_WORD_MIN_PLAYERS ||
+      room.players.length > SPY_WORD_MAX_PLAYERS
+    ) {
+      throw new Error(
+        `Spy Word needs ${SPY_WORD_MIN_PLAYERS}-${SPY_WORD_MAX_PLAYERS} players.`
+      );
+    }
+
+    room.calledNumbers = [];
+    room.currentTurn = 0;
+    room.gameStarted = true;
+    room.gameEnded = false;
+    room.winner = null;
+    startSpyWordMatch(room);
+    touch(room);
+
+    return room;
+  }
+
   if (room.gameType === "tag") {
     if (room.players.length < TAG_MIN_PLAYERS) {
       throw new Error(`TAG needs at least ${TAG_MIN_PLAYERS} players.`);
@@ -2561,6 +4009,97 @@ export function startGame({ socketId, roomCode }) {
       wickets: { red: 0, blue: 0 }
     };
     syncHandCricketTeams(room);
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "boost") {
+    if (room.players.length !== room.maxPlayers) {
+      throw new Error(`BOOST needs exactly ${room.maxPlayers} players.`);
+    }
+
+    const categories = createBoostCategories(getBoostCategoryLabels(room), room.maxPlayers);
+    room.calledNumbers = [];
+    room.currentTurn = 0;
+    room.gameStarted = true;
+    room.gameEnded = false;
+    room.winner = null;
+    room.boost = {
+      ...createBoostState("selecting", categories),
+      hands: createBoostHands(room.players, categories),
+      startedAt: Date.now()
+    };
+    beginBoostTurn(room);
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "raja-rani") {
+    if (room.players.length !== RAJA_RANI_PLAYERS) {
+      throw new Error(`Raja Rani needs exactly ${RAJA_RANI_PLAYERS} players.`);
+    }
+
+    room.calledNumbers = [];
+    room.currentTurn = 0;
+    room.gameStarted = true;
+    room.gameEnded = false;
+    room.winner = null;
+    room.rajaRani = createRajaRaniState("police-turn");
+    startRajaRaniRound(room, 1);
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "raja-rani-turns") {
+    if (room.players.length !== RAJA_RANI_PLAYERS) {
+      throw new Error(`Raja Rani Turns needs exactly ${RAJA_RANI_PLAYERS} players.`);
+    }
+
+    room.calledNumbers = [];
+    room.currentTurn = 0;
+    room.gameStarted = true;
+    room.gameEnded = false;
+    room.winner = null;
+    room.rajaRaniTurns = createRajaRaniTurnsState("turn");
+    startRajaRaniTurnsRound(room, 1);
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "treasure-hunt") {
+    if (
+      room.players.length < TREASURE_HUNT_MIN_PLAYERS ||
+      room.players.length > TREASURE_HUNT_MAX_PLAYERS
+    ) {
+      throw new Error(
+        `Treasure Hunt needs ${TREASURE_HUNT_MIN_PLAYERS}-${TREASURE_HUNT_MAX_PLAYERS} players.`
+      );
+    }
+
+    room.calledNumbers = [];
+    room.currentTurn = 0;
+    room.gameStarted = true;
+    room.gameEnded = false;
+    room.winner = null;
+
+    // Initialize player states for treasure hunt
+    room.players.forEach((player) => {
+      player.treasures = 0;
+      player.bombs = 0;
+      player.eliminated = false;
+    });
+
+    room.treasureHunt = {
+      ...createTreasureHuntState(),
+      startedAt: Date.now(),
+      turnStartedAt: Date.now(),
+      turnDeadlineAt: Date.now() + TREASURE_HUNT_TURN_MS
+    };
+
     touch(room);
 
     return room;
@@ -2630,6 +4169,34 @@ export function restartGame({ socketId, roomCode }) {
     return room;
   }
 
+  if (room.gameType === "spy-word") {
+    room.spyWord = createSpyWordState("waiting", room.spyWord?.difficulty || "easy");
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "boost") {
+    room.boost = createBoostState("waiting", createBoostCategories(getBoostCategoryLabels(room), room.maxPlayers));
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "raja-rani") {
+    room.rajaRani = createRajaRaniState("waiting");
+    touch(room);
+
+    return room;
+  }
+
+  if (room.gameType === "raja-rani-turns") {
+    room.rajaRaniTurns = createRajaRaniTurnsState("waiting");
+    touch(room);
+
+    return room;
+  }
+
   for (const entry of room.players) {
     if (entry.isBot) {
       const boardSize = getSetupBingoBoardSize(room);
@@ -2642,6 +4209,389 @@ export function restartGame({ socketId, roomCode }) {
   touch(room);
 
   return room;
+}
+
+function selectBoostCardForPlayer(room, player, cardId) {
+  const state = room.boost;
+
+  if (state.phase !== "selecting") {
+    throw new Error("Card drop is not active.");
+  }
+
+  processBoostDrop(room, player, cardId);
+}
+
+export function submitBoostSelection({ socketId, roomCode, cardId }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.boost;
+
+  if (room.gameType !== "boost" || !state) {
+    throw new Error("BOOST is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded) {
+    throw new Error("Game is not active.");
+  }
+
+  selectBoostCardForPlayer(room, player, cardId);
+  touch(room);
+
+  return room;
+}
+
+export function submitBoostBotSelections({ roomCode }) {
+  const room = requireRoom(roomCode);
+  const state = room.boost;
+  let selectedCount = 0;
+
+  if (room.gameType !== "boost" || !state || !room.gameStarted || room.gameEnded) {
+    return {
+      room,
+      selectedCount
+    };
+  }
+
+  if (state.phase !== "selecting") {
+    return {
+      room,
+      selectedCount
+    };
+  }
+
+  const activePlayer = room.players[state.currentTurnIndex] || null;
+
+  if (!activePlayer?.isBot) {
+    return {
+      room,
+      selectedCount
+    };
+  }
+
+  const cardId = chooseBoostBotCardId(state.hands[activePlayer.playerId] || []);
+
+  if (cardId) {
+    processBoostDrop(room, activePlayer, cardId);
+    selectedCount = 1;
+  }
+
+  if (selectedCount > 0) {
+    touch(room);
+  }
+
+  return {
+    room,
+    selectedCount
+  };
+}
+
+export function claimBoost({ socketId, roomCode }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.boost;
+  const now = Date.now();
+
+  if (room.gameType !== "boost" || !state) {
+    throw new Error("BOOST is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded) {
+    throw new Error("Game is not active.");
+  }
+
+  const cooldownUntil = state.falseBoostCooldowns[player.playerId] || 0;
+
+  if (cooldownUntil > now) {
+    return {
+      room,
+      valid: false,
+      cooldownMs: cooldownUntil - now
+    };
+  }
+
+  const categoryId = getBoostWinningCategory(
+    state.hands[player.playerId] || [],
+    getBoostRoomTargetCount(room)
+  );
+
+  if (categoryId) {
+    finishBoostGame(room, player, categoryId, "claim");
+    touch(room);
+
+    return {
+      room,
+      valid: true,
+      winner: room.winner
+    };
+  }
+
+  const nextCooldownUntil = now + BOOST_FALSE_COOLDOWN_MS;
+  state.falseBoostCooldowns[player.playerId] = nextCooldownUntil;
+  state.falseBoosts = [
+    ...(state.falseBoosts || []),
+    {
+      id: `${now}:${player.playerId}`,
+      playerId: player.playerId,
+      playerName: player.name,
+      round: state.round,
+      createdAt: now,
+      cooldownUntil: nextCooldownUntil
+    }
+  ].slice(-8);
+  touch(room);
+
+  return {
+    room,
+    valid: false,
+    cooldownMs: BOOST_FALSE_COOLDOWN_MS
+  };
+}
+
+export function resolveBoostRoundTimeout({ roomCode, moveId }) {
+  const room = requireRoom(roomCode);
+  const state = room.boost;
+
+  if (room.gameType !== "boost" || !state || !room.gameStarted || room.gameEnded) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if (moveId !== undefined && state.moveId !== moveId) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if (state.phase === "selecting") {
+    if (!state.selectDeadlineAt || Date.now() < state.selectDeadlineAt) {
+      return {
+        room,
+        changed: false
+      };
+    }
+
+    const activePlayer = room.players[state.currentTurnIndex] || null;
+    const cardId = activePlayer
+      ? activePlayer.isBot
+        ? chooseBoostBotCardId(state.hands[activePlayer.playerId] || [])
+        : getRandomBoostCardId(state.hands[activePlayer.playerId] || [])
+      : "";
+    const changed = activePlayer ? processBoostDrop(room, activePlayer, cardId, { auto: true }) : false;
+    touch(room);
+
+    return {
+      room,
+      changed
+    };
+  }
+
+  return {
+    room,
+    changed: false
+  };
+}
+
+export function submitRajaRaniGuess({ socketId, roomCode, suspectPlayerId }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.rajaRani;
+  const suspectId = String(suspectPlayerId || "").trim();
+
+  if (room.gameType !== "raja-rani" || !state) {
+    throw new Error("Raja Rani is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "police-turn") {
+    throw new Error("Police turn is not active.");
+  }
+
+  if (state.rolesByPlayerId[player.playerId] !== "police") {
+    throw new Error("Only Police can catch the thief.");
+  }
+
+  if (suspectId === player.playerId) {
+    throw new Error("Choose one of the other players.");
+  }
+
+  const suspect = room.players.find((entry) => entry.playerId === suspectId);
+
+  if (!suspect) {
+    throw new Error("Choose a player in this room.");
+  }
+
+  revealRajaRaniRound(room, player, suspect);
+  touch(room);
+
+  return {
+    room,
+    guess: state.lastGuess
+  };
+}
+
+export function resolveRajaRaniReveal({ roomCode, moveId }) {
+  const room = requireRoom(roomCode);
+  const state = room.rajaRani;
+
+  if (room.gameType !== "raja-rani" || !state || !room.gameStarted || room.gameEnded) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if (moveId !== undefined && state.moveId !== moveId) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if (state.phase !== "reveal" || !state.revealDeadlineAt || Date.now() < state.revealDeadlineAt) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if ((state.round || 0) >= RAJA_RANI_TOTAL_ROUNDS) {
+    finishRajaRaniMatch(room);
+  } else {
+    startRajaRaniRound(room, (state.round || 0) + 1);
+  }
+
+  touch(room);
+
+  return {
+    room,
+    changed: true
+  };
+}
+
+export function submitRajaRaniTurnsSelection({ socketId, roomCode, suspectPlayerId }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.rajaRaniTurns;
+  const suspectId = String(suspectPlayerId || "").trim();
+
+  if (room.gameType !== "raja-rani-turns" || !state) {
+    throw new Error("Raja Rani Turns is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "turn") {
+    throw new Error("Turn is not active.");
+  }
+
+  if (state.activePlayerId !== player.playerId) {
+    throw new Error("It is not your turn.");
+  }
+
+  if (state.turnDeadlineAt && Date.now() > state.turnDeadlineAt) {
+    throw new Error("Time is up for this turn.");
+  }
+
+  if (suspectId === player.playerId) {
+    throw new Error("Choose another player.");
+  }
+
+  const suspect = room.players.find((entry) => entry.playerId === suspectId);
+
+  if (!suspect) {
+    throw new Error("Choose a player in this room.");
+  }
+
+  const action = addRajaRaniTurnsAction(room, player, suspect);
+  touch(room);
+
+  return {
+    room,
+    action
+  };
+}
+
+export function resolveRajaRaniTurnsTimer({ roomCode, moveId }) {
+  const room = requireRoom(roomCode);
+  const state = room.rajaRaniTurns;
+
+  if (room.gameType !== "raja-rani-turns" || !state || !room.gameStarted || room.gameEnded) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if (moveId !== undefined && state.moveId !== moveId) {
+    return {
+      room,
+      changed: false
+    };
+  }
+
+  if (state.phase === "turn") {
+    if (!state.turnDeadlineAt || Date.now() < state.turnDeadlineAt) {
+      return {
+        room,
+        changed: false
+      };
+    }
+
+    const activePlayer = room.players[state.currentTurnIndex] || null;
+
+    if (activePlayer) {
+      addRajaRaniTurnsAction(room, activePlayer, null, { skipped: true });
+      touch(room);
+    }
+
+    return {
+      room,
+      changed: Boolean(activePlayer)
+    };
+  }
+
+  if (state.phase === "reveal") {
+    if (!state.revealDeadlineAt || Date.now() < state.revealDeadlineAt) {
+      return {
+        room,
+        changed: false
+      };
+    }
+
+    if ((state.round || 0) >= RAJA_RANI_TOTAL_ROUNDS) {
+      finishRajaRaniTurnsMatch(room);
+    } else {
+      startRajaRaniTurnsRound(room, (state.round || 0) + 1);
+    }
+
+    touch(room);
+
+    return {
+      room,
+      changed: true
+    };
+  }
+
+  return {
+    room,
+    changed: false
+  };
 }
 
 export function setGuessNumberSecret({ socketId, roomCode, number }) {
@@ -2904,6 +4854,164 @@ export function resolveWordGuessTimeout({ roomCode, moveId }) {
   return {
     room,
     changed: false
+  };
+}
+
+export function submitSpyWordClue({ socketId, roomCode, clue }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.spyWord;
+  const value = cleanSpyWordClue(clue);
+  const activePlayer = Number.isInteger(state?.currentTurnIndex)
+    ? room.players[state.currentTurnIndex] || null
+    : null;
+
+  if (room.gameType !== "spy-word" || !state) {
+    throw new Error("Spy Word is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "clue") {
+    throw new Error("Clue turns are not active.");
+  }
+
+  if (!activePlayer || activePlayer.playerId !== player.playerId) {
+    throw new Error("It is not your turn.");
+  }
+
+  if (
+    normalizeSpyWordValue(value) === normalizeSpyWordValue(state.detectiveWord) ||
+    normalizeSpyWordValue(value) === normalizeSpyWordValue(state.spyWord)
+  ) {
+    throw new Error("Your clue cannot be one of the secret words.");
+  }
+
+  const now = Date.now();
+  const clueEntry = {
+    id: `${now}:${player.playerId}:${state.turnNumber}`,
+    round: state.round,
+    turnNumber: state.turnNumber,
+    turnInRound: ((state.turnNumber - 1) % room.players.length) + 1,
+    playerId: player.playerId,
+    playerName: player.name,
+    role: getSpyWordRole(state, player.playerId),
+    clue: value,
+    createdAt: now
+  };
+
+  state.clues.push(clueEntry);
+  advanceSpyWordTurn(room);
+  touch(room);
+
+  return {
+    room,
+    clue: clueEntry
+  };
+}
+
+export function submitSpyWordVote({ socketId, roomCode, suspectPlayerId }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.spyWord;
+  const suspectId = String(suspectPlayerId || "").trim();
+
+  if (room.gameType !== "spy-word" || !state) {
+    throw new Error("Spy Word is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "voting") {
+    throw new Error("Voting is not active.");
+  }
+
+  if (state.votes[player.playerId]) {
+    throw new Error("Your vote is already locked.");
+  }
+
+  if (suspectId === player.playerId) {
+    throw new Error("Choose another player.");
+  }
+
+  const suspect = findPlayerById(room, suspectId);
+
+  if (!suspect) {
+    throw new Error("Choose a player in this room.");
+  }
+
+  state.votes[player.playerId] = suspectId;
+
+  if (room.players.every((entry) => state.votes[entry.playerId])) {
+    resolveSpyWordVotes(room);
+  }
+
+  touch(room);
+
+  return {
+    room,
+    vote: {
+      voterId: player.playerId,
+      voterName: player.name,
+      suspectId: suspect.playerId,
+      suspectName: suspect.name
+    }
+  };
+}
+
+export function submitSpyWordGuess({ socketId, roomCode, guess }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.spyWord;
+  const value = cleanSpyWordGuess(guess);
+
+  if (room.gameType !== "spy-word" || !state) {
+    throw new Error("Spy Word is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "spy-guess") {
+    throw new Error("The spy guess is not active.");
+  }
+
+  if (player.playerId !== state.spyPlayerId) {
+    throw new Error("Only the spy can make the final guess.");
+  }
+
+  const correct =
+    value &&
+    normalizeSpyWordValue(value) === normalizeSpyWordValue(state.detectiveWord);
+  const spyGuess = {
+    playerId: player.playerId,
+    playerName: player.name,
+    guess: value,
+    correct: Boolean(correct),
+    skipped: !value,
+    createdAt: Date.now()
+  };
+
+  state.spyGuess = spyGuess;
+  finishSpyWordMatch(
+    room,
+    correct ? "spy" : "detectives",
+    correct ? "spy-guessed-word" : value ? "spy-missed-word" : "spy-skipped-guess",
+    {
+      ...(state.result || {}),
+      spyGuess
+    }
+  );
+  touch(room);
+
+  return {
+    room,
+    spyGuess
   };
 }
 
@@ -3804,6 +5912,94 @@ function removePlayerAtIndex(room, leavingIndex) {
     }
   }
 
+  if (room.gameType === "spy-word") {
+    room.spyWord = room.spyWord || createSpyWordState("result");
+
+    if (room.gameStarted && !room.gameEnded) {
+      const leavingSpy = room.spyWord.spyPlayerId === player.playerId;
+
+      finishSpyWordMatch(
+        room,
+        leavingSpy ? "detectives" : "spy",
+        "forfeit",
+        {
+          forfeitingPlayerId: player.playerId,
+          forfeitingPlayerName: player.name
+        }
+      );
+    }
+  }
+
+  if (room.gameType === "boost") {
+    room.boost = room.boost || createBoostState("result");
+
+    delete room.boost.hands?.[player.playerId];
+    delete room.boost.lastTransfers?.[player.playerId];
+    delete room.boost.falseBoostCooldowns?.[player.playerId];
+
+    if (room.gameStarted && !room.gameEnded && room.players.length < room.maxPlayers) {
+      const remainingPlayer = room.players.find((entry) => !entry.isBot) || room.players[0] || null;
+
+      room.gameEnded = true;
+      room.boost.phase = "result";
+      room.boost.endedAt = Date.now();
+      room.boost.resultType = "forfeit";
+      room.winner = remainingPlayer
+        ? {
+            playerId: remainingPlayer.playerId,
+            name: remainingPlayer.name,
+            byForfeit: true
+          }
+        : null;
+    }
+  }
+
+  if (room.gameType === "raja-rani") {
+    room.rajaRani = room.rajaRani || createRajaRaniState("complete");
+    delete room.rajaRani.rolesByPlayerId?.[player.playerId];
+    delete room.rajaRani.scores?.[player.playerId];
+    delete room.rajaRani.roundScores?.[player.playerId];
+
+    if (room.gameStarted && !room.gameEnded && room.players.length < RAJA_RANI_PLAYERS) {
+      const remainingPlayer = getRajaRaniLeaderboard(room)[0] || room.players[0] || null;
+
+      room.gameEnded = true;
+      room.rajaRani.phase = "complete";
+      room.rajaRani.endedAt = Date.now();
+      room.winner = remainingPlayer
+        ? {
+            playerId: remainingPlayer.playerId,
+            name: remainingPlayer.name,
+            score: remainingPlayer.score || 0,
+            byForfeit: true
+          }
+        : null;
+    }
+  }
+
+  if (room.gameType === "raja-rani-turns") {
+    room.rajaRaniTurns = room.rajaRaniTurns || createRajaRaniTurnsState("complete");
+    delete room.rajaRaniTurns.rolesByPlayerId?.[player.playerId];
+    delete room.rajaRaniTurns.scores?.[player.playerId];
+    delete room.rajaRaniTurns.roundScores?.[player.playerId];
+
+    if (room.gameStarted && !room.gameEnded && room.players.length < RAJA_RANI_PLAYERS) {
+      const remainingPlayer = getRajaRaniTurnsLeaderboard(room)[0] || room.players[0] || null;
+
+      room.gameEnded = true;
+      room.rajaRaniTurns.phase = "complete";
+      room.rajaRaniTurns.endedAt = Date.now();
+      room.winner = remainingPlayer
+        ? {
+            playerId: remainingPlayer.playerId,
+            name: remainingPlayer.name,
+            score: remainingPlayer.score || 0,
+            byForfeit: true
+          }
+        : null;
+    }
+  }
+
   syncBingoBoardsForRoster(room);
 
   if (room.currentTurn >= room.players.length) {
@@ -3869,4 +6065,131 @@ export function cleanupDisconnectedPlayer({ roomCode, playerId }) {
   }
 
   return removePlayerAtIndex(room, playerIndex);
+}
+
+export function selectTreasureHuntCell({ socketId, roomCode, row, col }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.treasureHunt;
+
+  if (room.gameType !== "treasure-hunt" || !state) {
+    throw new Error("Treasure Hunt is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (room.gameEnded) {
+    throw new Error("Game has ended.");
+  }
+
+  const currentPlayer = room.players[state.currentPlayerIndex];
+  if (currentPlayer.playerId !== player.playerId) {
+    throw new Error("It is not your turn.");
+  }
+
+  if (currentPlayer.eliminated) {
+    throw new Error("You have been eliminated.");
+  }
+
+  // Validate cell coordinates
+  if (
+    !Number.isInteger(row) ||
+    !Number.isInteger(col) ||
+    row < 0 ||
+    row >= TREASURE_HUNT_GRID_SIZE ||
+    col < 0 ||
+    col >= TREASURE_HUNT_GRID_SIZE
+  ) {
+    throw new Error("Invalid cell coordinates.");
+  }
+
+  const cell = state.board[row][col];
+  if (cell.revealed) {
+    throw new Error("Cell already revealed.");
+  }
+
+  // Reveal the cell
+  cell.revealed = true;
+  state.cellsRevealed += 1;
+
+  let resultType = cell.type;
+  let message = "";
+
+  if (cell.type === TREASURE_HUNT_CELL_TYPES.TREASURE) {
+    currentPlayer.treasures += 1;
+    state.treasuresRevealed += 1;
+    message = `Found treasure! ${currentPlayer.treasures} total`;
+  } else if (cell.type === TREASURE_HUNT_CELL_TYPES.BOMB) {
+    currentPlayer.bombs += 1;
+    state.bombsRevealed += 1;
+    message = `Hit bomb! ${currentPlayer.bombs}/3 bombs`;
+
+    if (currentPlayer.bombs >= TREASURE_HUNT_BOMB_LIMIT) {
+      currentPlayer.eliminated = true;
+      message = `Eliminated! 💣 ${currentPlayer.bombs} bombs`;
+    }
+  } else {
+    message = "Empty cell";
+  }
+
+  // Check if game should end
+  const activePlayers = room.players.filter((p) => !p.eliminated);
+  const totalNonBombCells =
+    TREASURE_HUNT_GRID_SIZE * TREASURE_HUNT_GRID_SIZE -
+    TREASURE_HUNT_BOMB_COUNT;
+  const allNonBombCellsRevealed =
+    state.cellsRevealed >= totalNonBombCells;
+
+  if (activePlayers.length === 1 || allNonBombCellsRevealed) {
+    endTreasureHuntGame(room);
+  } else {
+    // Move to next player
+    state.currentPlayerIndex = (state.currentPlayerIndex + 1) % room.players.length;
+    while (
+      room.players[state.currentPlayerIndex].eliminated &&
+      state.currentPlayerIndex !== room.players.findIndex((p) => !p.eliminated)
+    ) {
+      state.currentPlayerIndex = (state.currentPlayerIndex + 1) % room.players.length;
+    }
+    state.turnStartedAt = Date.now();
+    state.turnDeadlineAt = Date.now() + TREASURE_HUNT_TURN_MS;
+  }
+
+  touch(room);
+
+  return {
+    room,
+    cellType: resultType,
+    message
+  };
+}
+
+function endTreasureHuntGame(room) {
+  const activePlayers = room.players.filter((p) => !p.eliminated);
+
+  let winner = null;
+  if (activePlayers.length > 0) {
+    winner = activePlayers.reduce((best, player) => {
+      if (player.treasures > best.treasures) return player;
+      if (player.treasures === best.treasures && player.bombs < best.bombs) return player;
+      return best;
+    });
+  }
+
+  const finalStats = room.players
+    .map((player) => ({
+      name: player.name,
+      treasures: player.treasures,
+      bombs: player.bombs,
+      eliminated: player.eliminated
+    }))
+    .sort((a, b) => b.treasures - a.treasures || a.bombs - b.bombs);
+
+  room.treasureHunt.winner = winner;
+  room.treasureHunt.finalStats = finalStats;
+  room.treasureHunt.endedAt = Date.now();
+  room.winner = winner;
+  room.gameEnded = true;
 }

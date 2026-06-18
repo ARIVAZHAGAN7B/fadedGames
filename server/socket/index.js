@@ -2,6 +2,7 @@ import {
   addBot,
   callNumber,
   callBotNumber,
+  claimBoost,
   claimBingo,
   cleanupDisconnectedPlayer,
   createRoom,
@@ -21,15 +22,26 @@ import {
   resolveHandCricketReveal,
   resolveHandCricketTeamSelectionTimeout,
   resolveHandCricketTossTimeout,
+  resolveBoostRoundTimeout,
+  resolveRajaRaniReveal,
+  resolveRajaRaniTurnsTimer,
   resolveWordGuessTimeout,
+  selectTreasureHuntCell,
   serializeRoom,
   selectHandCricketTeamPlayer,
   setGuessNumberSecret,
   setPlayerBoard,
   setWordGuessSecret,
+  submitBoostBotSelections,
+  submitBoostSelection,
   startGame,
   submitHandCricketNumber,
   submitGuessNumberGuess,
+  submitRajaRaniGuess,
+  submitRajaRaniTurnsSelection,
+  submitSpyWordClue,
+  submitSpyWordGuess,
+  submitSpyWordVote,
   submitTagInput,
   submitWordGuessGuess,
   tickTagRoom,
@@ -38,12 +50,17 @@ import {
 
 const DISCONNECT_GRACE_MS = 60_000;
 const BOT_TURN_DELAY_MS = 900;
+const BOOST_BOT_DELAY_MS = 900;
 const TAG_LOOP_INTERVAL_MS = 1000 / 60;
 const disconnectTimers = new Map();
 const botTurnTimers = new Map();
 const handCricketMoveTimers = new Map();
 const tagRoomLoops = new Map();
 const wordGuessTimers = new Map();
+const boostRoundTimers = new Map();
+const boostBotTimers = new Map();
+const rajaRaniRevealTimers = new Map();
+const rajaRaniTurnsTimers = new Map();
 
 function timerKey(roomCode, playerId) {
   return `${roomCode}:${playerId}`;
@@ -68,18 +85,25 @@ function scheduleDisconnectCleanup(io, roomCode, playerId) {
     const result = cleanupDisconnectedPlayer({ roomCode, playerId });
 
     if (result && !result.deleted) {
-      io.to(result.room.roomCode).emit("player-left", {
-        player: result.player,
-        room: serializeRoom(result.room)
+      emitRoomEvent(io, result.room, "player-left", {
+        player: result.player
       });
       emitRoomUpdate(io, result.room);
       scheduleWordGuessTimer(io, result.room);
+      scheduleBoostRound(io, result.room);
+      scheduleBoostBotTurn(io, result.room);
+      scheduleRajaRaniReveal(io, result.room);
+      scheduleRajaRaniTurnsTimer(io, result.room);
       emitActiveRooms(io);
     } else if (result?.deleted) {
       cancelBotTurn(roomCode);
       cancelHandCricketMove(roomCode);
       cancelTagLoop(roomCode);
       cancelWordGuessTimer(roomCode);
+      cancelBoostRound(roomCode);
+      cancelBoostBotTurn(roomCode);
+      cancelRajaRaniReveal(roomCode);
+      cancelRajaRaniTurnsTimer(roomCode);
       emitActiveRooms(io);
     }
   }, DISCONNECT_GRACE_MS);
@@ -103,10 +127,25 @@ function callbackError(socket, callback, error) {
   }
 }
 
+function serializeRoomForSocket(room, socket) {
+  return serializeRoom(room, socket?.data?.playerId || null);
+}
+
+function emitRoomEvent(io, room, event, payload = {}) {
+  for (const player of room.players) {
+    if (!player.socketId) {
+      continue;
+    }
+
+    io.to(player.socketId).emit(event, {
+      ...payload,
+      room: serializeRoom(room, player.playerId)
+    });
+  }
+}
+
 function emitRoomUpdate(io, room) {
-  io.to(room.roomCode).emit("room-updated", {
-    room: serializeRoom(room)
-  });
+  emitRoomEvent(io, room, "room-updated");
 }
 
 function emitActiveRooms(io) {
@@ -120,9 +159,8 @@ function emitGameEndedIfNeeded(io, room) {
     return false;
   }
 
-  io.to(room.roomCode).emit("game-ended", {
+  emitRoomEvent(io, room, "game-ended", {
     winner: room.winner,
-    room: serializeRoom(room)
   });
   emitActiveRooms(io);
 
@@ -162,6 +200,42 @@ function cancelWordGuessTimer(roomCode) {
   if (timer) {
     clearTimeout(timer);
     wordGuessTimers.delete(roomCode);
+  }
+}
+
+function cancelBoostRound(roomCode) {
+  const timer = boostRoundTimers.get(roomCode);
+
+  if (timer) {
+    clearTimeout(timer);
+    boostRoundTimers.delete(roomCode);
+  }
+}
+
+function cancelBoostBotTurn(roomCode) {
+  const timer = boostBotTimers.get(roomCode);
+
+  if (timer) {
+    clearTimeout(timer);
+    boostBotTimers.delete(roomCode);
+  }
+}
+
+function cancelRajaRaniReveal(roomCode) {
+  const timer = rajaRaniRevealTimers.get(roomCode);
+
+  if (timer) {
+    clearTimeout(timer);
+    rajaRaniRevealTimers.delete(roomCode);
+  }
+}
+
+function cancelRajaRaniTurnsTimer(roomCode) {
+  const timer = rajaRaniTurnsTimers.get(roomCode);
+
+  if (timer) {
+    clearTimeout(timer);
+    rajaRaniTurnsTimers.delete(roomCode);
   }
 }
 
@@ -216,6 +290,202 @@ function scheduleWordGuessTimer(io, room) {
   }, delay);
 
   wordGuessTimers.set(roomCode, timer);
+}
+
+function scheduleBoostRound(io, room) {
+  cancelBoostRound(room.roomCode);
+
+  const state = room.boost;
+
+  if (
+    room.gameType !== "boost" ||
+    !room.gameStarted ||
+    room.gameEnded ||
+    !state
+  ) {
+    cancelBoostBotTurn(room.roomCode);
+    return;
+  }
+
+  const deadlineAt =
+    state.phase === "selecting"
+      ? state.selectDeadlineAt
+      : null;
+
+  if (!deadlineAt) {
+    return;
+  }
+
+  const roomCode = room.roomCode;
+  const moveId = state.moveId;
+  const delay = Math.max(0, deadlineAt - Date.now()) + 25;
+  const timer = setTimeout(() => {
+    boostRoundTimers.delete(roomCode);
+
+    try {
+      const result = resolveBoostRoundTimeout({ roomCode, moveId });
+
+      if (!result.changed) {
+        scheduleBoostRound(io, result.room);
+        scheduleBoostBotTurn(io, result.room);
+        return;
+      }
+
+      if (!emitGameEndedIfNeeded(io, result.room)) {
+        emitRoomUpdate(io, result.room);
+        scheduleBoostRound(io, result.room);
+        scheduleBoostBotTurn(io, result.room);
+      } else {
+        cancelBoostRound(roomCode);
+        cancelBoostBotTurn(roomCode);
+      }
+    } catch {
+      cancelBoostRound(roomCode);
+      cancelBoostBotTurn(roomCode);
+    }
+  }, delay);
+
+  boostRoundTimers.set(roomCode, timer);
+}
+
+function scheduleBoostBotTurn(io, room) {
+  cancelBoostBotTurn(room.roomCode);
+
+  const state = room.boost;
+
+  if (
+    room.gameType !== "boost" ||
+    !room.gameStarted ||
+    room.gameEnded ||
+    state?.phase !== "selecting"
+  ) {
+    return;
+  }
+
+  const activePlayer = room.players[state.currentTurnIndex] || null;
+
+  if (!activePlayer?.isBot) {
+    return;
+  }
+
+  const roomCode = room.roomCode;
+  const timer = setTimeout(() => {
+    boostBotTimers.delete(roomCode);
+
+    try {
+      const result = submitBoostBotSelections({ roomCode });
+
+      if (result.selectedCount > 0) {
+        if (!emitGameEndedIfNeeded(io, result.room)) {
+          emitRoomUpdate(io, result.room);
+          scheduleBoostRound(io, result.room);
+          scheduleBoostBotTurn(io, result.room);
+        } else {
+          cancelBoostRound(roomCode);
+        }
+      }
+    } catch {
+      cancelBoostBotTurn(roomCode);
+    }
+  }, BOOST_BOT_DELAY_MS);
+
+  boostBotTimers.set(roomCode, timer);
+}
+
+function scheduleRajaRaniReveal(io, room) {
+  cancelRajaRaniReveal(room.roomCode);
+
+  const state = room.rajaRani;
+
+  if (
+    room.gameType !== "raja-rani" ||
+    !room.gameStarted ||
+    room.gameEnded ||
+    state?.phase !== "reveal" ||
+    !state.revealDeadlineAt
+  ) {
+    return;
+  }
+
+  const roomCode = room.roomCode;
+  const moveId = state.moveId;
+  const delay = Math.max(0, state.revealDeadlineAt - Date.now()) + 25;
+  const timer = setTimeout(() => {
+    rajaRaniRevealTimers.delete(roomCode);
+
+    try {
+      const result = resolveRajaRaniReveal({ roomCode, moveId });
+
+      if (!result.changed) {
+        scheduleRajaRaniReveal(io, result.room);
+        return;
+      }
+
+      if (!emitGameEndedIfNeeded(io, result.room)) {
+        emitRoomUpdate(io, result.room);
+        scheduleRajaRaniReveal(io, result.room);
+      } else {
+        cancelRajaRaniReveal(roomCode);
+      }
+    } catch {
+      cancelRajaRaniReveal(roomCode);
+    }
+  }, delay);
+
+  rajaRaniRevealTimers.set(roomCode, timer);
+}
+
+function scheduleRajaRaniTurnsTimer(io, room) {
+  cancelRajaRaniTurnsTimer(room.roomCode);
+
+  const state = room.rajaRaniTurns;
+
+  if (
+    room.gameType !== "raja-rani-turns" ||
+    !room.gameStarted ||
+    room.gameEnded ||
+    !state
+  ) {
+    return;
+  }
+
+  const deadlineAt =
+    state.phase === "turn"
+      ? state.turnDeadlineAt
+      : state.phase === "reveal"
+        ? state.revealDeadlineAt
+        : null;
+
+  if (!deadlineAt) {
+    return;
+  }
+
+  const roomCode = room.roomCode;
+  const moveId = state.moveId;
+  const delay = Math.max(0, deadlineAt - Date.now()) + 25;
+  const timer = setTimeout(() => {
+    rajaRaniTurnsTimers.delete(roomCode);
+
+    try {
+      const result = resolveRajaRaniTurnsTimer({ roomCode, moveId });
+
+      if (!result.changed) {
+        scheduleRajaRaniTurnsTimer(io, result.room);
+        return;
+      }
+
+      if (!emitGameEndedIfNeeded(io, result.room)) {
+        emitRoomUpdate(io, result.room);
+        scheduleRajaRaniTurnsTimer(io, result.room);
+      } else {
+        cancelRajaRaniTurnsTimer(roomCode);
+      }
+    } catch {
+      cancelRajaRaniTurnsTimer(roomCode);
+    }
+  }, delay);
+
+  rajaRaniTurnsTimers.set(roomCode, timer);
 }
 
 function scheduleTagLoop(io, room) {
@@ -403,6 +673,10 @@ function leaveCurrentRoom(io, socket, { broadcastActiveRooms = true } = {}) {
     cancelHandCricketMove(result.roomCode);
     cancelTagLoop(result.roomCode);
     cancelWordGuessTimer(result.roomCode);
+    cancelBoostRound(result.roomCode);
+    cancelBoostBotTurn(result.roomCode);
+    cancelRajaRaniReveal(result.roomCode);
+    cancelRajaRaniTurnsTimer(result.roomCode);
     if (broadcastActiveRooms) {
       emitActiveRooms(io);
     }
@@ -410,15 +684,16 @@ function leaveCurrentRoom(io, socket, { broadcastActiveRooms = true } = {}) {
   }
 
   if (!result.deleted) {
-    const payload = {
-      player: result.player,
-      room: serializeRoom(result.room)
-    };
-
-    io.to(result.room.roomCode).emit("player-left", payload);
+    emitRoomEvent(io, result.room, "player-left", {
+      player: result.player
+    });
     emitRoomUpdate(io, result.room);
     scheduleBotTurn(io, result.room);
     scheduleWordGuessTimer(io, result.room);
+    scheduleBoostRound(io, result.room);
+    scheduleBoostBotTurn(io, result.room);
+    scheduleRajaRaniReveal(io, result.room);
+    scheduleRajaRaniTurnsTimer(io, result.room);
   }
 
   if (broadcastActiveRooms) {
@@ -453,7 +728,9 @@ export function registerSocketHandlers(io) {
           handCricketMode: payload?.handCricketMode,
           handCricketTeamSize: payload?.handCricketTeamSize,
           tagMapId: payload?.tagMapId,
-          tagRoundSeconds: payload?.tagRoundSeconds
+          tagRoundSeconds: payload?.tagRoundSeconds,
+          spyWordDifficulty: payload?.spyWordDifficulty,
+          boostCategoryLabels: payload?.boostCategoryLabels
         });
 
         socket.data.roomCode = room.roomCode;
@@ -463,7 +740,7 @@ export function registerSocketHandlers(io) {
         callbackSuccess(callback, {
           roomCode: room.roomCode,
           player,
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
         emitActiveRooms(io);
       } catch (error) {
@@ -485,17 +762,15 @@ export function registerSocketHandlers(io) {
         socket.data.playerId = player.playerId;
         socket.join(room.roomCode);
 
-        const roomState = serializeRoom(room);
-        socket.to(room.roomCode).emit("player-joined", {
-          player,
-          room: roomState
+        emitRoomEvent(io, room, "player-joined", {
+          player
         });
         emitRoomUpdate(io, room);
 
         callbackSuccess(callback, {
           roomCode: room.roomCode,
           player,
-          room: roomState
+          room: serializeRoomForSocket(room, socket)
         });
         emitActiveRooms(io);
       } catch (error) {
@@ -520,13 +795,17 @@ export function registerSocketHandlers(io) {
         scheduleHandCricketMove(io, room);
         scheduleTagLoop(io, room);
         scheduleWordGuessTimer(io, room);
+        scheduleBoostRound(io, room);
+        scheduleBoostBotTurn(io, room);
+        scheduleRajaRaniReveal(io, room);
+        scheduleRajaRaniTurnsTimer(io, room);
         emitActiveRooms(io);
 
         callbackSuccess(callback, {
           roomCode: room.roomCode,
           player,
           board,
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -539,18 +818,15 @@ export function registerSocketHandlers(io) {
           socketId: socket.id,
           roomCode: payload?.roomCode || socket.data.roomCode
         });
-        const roomState = serializeRoom(room);
-
-        io.to(room.roomCode).emit("player-joined", {
-          player,
-          room: roomState
+        emitRoomEvent(io, room, "player-joined", {
+          player
         });
         emitRoomUpdate(io, room);
         emitActiveRooms(io);
 
         callbackSuccess(callback, {
           player,
-          room: roomState
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -568,7 +844,7 @@ export function registerSocketHandlers(io) {
         emitRoomUpdate(io, room);
         emitActiveRooms(io);
         callbackSuccess(callback, {
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -584,13 +860,15 @@ export function registerSocketHandlers(io) {
           maxPlayers: payload?.maxPlayers,
           handCricketTeamSize: payload?.handCricketTeamSize,
           tagMapId: payload?.tagMapId,
-          tagRoundSeconds: payload?.tagRoundSeconds
+          tagRoundSeconds: payload?.tagRoundSeconds,
+          spyWordDifficulty: payload?.spyWordDifficulty,
+          boostCategoryLabels: payload?.boostCategoryLabels
         });
 
         emitRoomUpdate(io, room);
         emitActiveRooms(io);
         callbackSuccess(callback, {
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -608,7 +886,7 @@ export function registerSocketHandlers(io) {
         emitRoomUpdate(io, room);
         scheduleHandCricketMove(io, room);
         callbackSuccess(callback, {
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -625,7 +903,7 @@ export function registerSocketHandlers(io) {
 
         emitRoomUpdate(io, room);
         callbackSuccess(callback, {
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -639,7 +917,7 @@ export function registerSocketHandlers(io) {
           roomCode: payload?.roomCode || socket.data.roomCode,
           number: payload?.number
         });
-        const roomState = serializeRoom(room);
+        const roomState = serializeRoomForSocket(room, socket);
 
         if (!emitGameEndedIfNeeded(io, room)) {
           emitRoomUpdate(io, room);
@@ -667,7 +945,7 @@ export function registerSocketHandlers(io) {
         emitRoomUpdate(io, room);
         scheduleHandCricketMove(io, room);
         callbackSuccess(callback, {
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -686,7 +964,7 @@ export function registerSocketHandlers(io) {
         emitRoomUpdate(io, room);
         scheduleHandCricketMove(io, room);
         callbackSuccess(callback, {
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -703,7 +981,7 @@ export function registerSocketHandlers(io) {
         emitRoomUpdate(io, room);
         scheduleHandCricketMove(io, room);
         callbackSuccess(callback, {
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -717,17 +995,17 @@ export function registerSocketHandlers(io) {
           roomCode: payload?.roomCode || socket.data.roomCode
         });
 
-        io.to(room.roomCode).emit("start-game", {
-          room: serializeRoom(room)
-        });
+        emitRoomEvent(io, room, "start-game");
         scheduleBotTurn(io, room);
         scheduleHandCricketMove(io, room);
         scheduleTagLoop(io, room);
         scheduleWordGuessTimer(io, room);
+        scheduleBoostRound(io, room);
+        scheduleBoostBotTurn(io, room);
         emitActiveRooms(io);
 
         callbackSuccess(callback, {
-          room: serializeRoom(room)
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -752,6 +1030,104 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    socket.on("boost-select-card", (payload, callback) => {
+      try {
+        const room = submitBoostSelection({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          cardId: payload?.cardId
+        });
+
+        if (!emitGameEndedIfNeeded(io, room)) {
+          emitRoomUpdate(io, room);
+          scheduleBoostRound(io, room);
+          scheduleBoostBotTurn(io, room);
+        } else {
+          cancelBoostRound(room.roomCode);
+          cancelBoostBotTurn(room.roomCode);
+        }
+
+        callbackSuccess(callback, {
+          room: serializeRoomForSocket(room, socket)
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("boost-claim", (payload, callback) => {
+      try {
+        const result = claimBoost({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode
+        });
+
+        if (result.valid) {
+          emitRoomEvent(io, result.room, "game-ended", {
+            winner: result.winner
+          });
+          cancelBoostRound(result.room.roomCode);
+          cancelBoostBotTurn(result.room.roomCode);
+          emitActiveRooms(io);
+        } else {
+          emitRoomUpdate(io, result.room);
+        }
+
+        callbackSuccess(callback, {
+          cooldownMs: result.cooldownMs,
+          room: serializeRoomForSocket(result.room, socket),
+          valid: result.valid,
+          winner: result.winner
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("raja-rani-guess", (payload, callback) => {
+      try {
+        const result = submitRajaRaniGuess({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          suspectPlayerId: payload?.suspectPlayerId
+        });
+
+        emitRoomUpdate(io, result.room);
+        scheduleRajaRaniReveal(io, result.room);
+
+        callbackSuccess(callback, {
+          guess: result.guess,
+          room: serializeRoomForSocket(result.room, socket)
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("raja-rani-turns-select", (payload, callback) => {
+      try {
+        const result = submitRajaRaniTurnsSelection({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          suspectPlayerId: payload?.suspectPlayerId
+        });
+
+        if (!emitGameEndedIfNeeded(io, result.room)) {
+          emitRoomUpdate(io, result.room);
+          scheduleRajaRaniTurnsTimer(io, result.room);
+        } else {
+          cancelRajaRaniTurnsTimer(result.room.roomCode);
+        }
+
+        callbackSuccess(callback, {
+          action: result.action,
+          room: serializeRoomForSocket(result.room, socket)
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
     socket.on("guess-number-set-secret", (payload, callback) => {
       try {
         const room = setGuessNumberSecret({
@@ -759,14 +1135,10 @@ export function registerSocketHandlers(io) {
           roomCode: payload?.roomCode || socket.data.roomCode,
           number: payload?.number
         });
-        const roomState = serializeRoom(room);
-
-        io.to(room.roomCode).emit("room-updated", {
-          room: roomState
-        });
+        emitRoomUpdate(io, room);
 
         callbackSuccess(callback, {
-          room: roomState
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -780,12 +1152,10 @@ export function registerSocketHandlers(io) {
           roomCode: payload?.roomCode || socket.data.roomCode,
           number: payload?.number
         });
-        const roomState = serializeRoom(result.room);
+        const roomState = serializeRoomForSocket(result.room, socket);
 
         if (!emitGameEndedIfNeeded(io, result.room)) {
-          io.to(result.room.roomCode).emit("room-updated", {
-            room: roomState
-          });
+          emitRoomUpdate(io, result.room);
         }
 
         callbackSuccess(callback, {
@@ -804,15 +1174,11 @@ export function registerSocketHandlers(io) {
           roomCode: payload?.roomCode || socket.data.roomCode,
           word: payload?.word
         });
-        const roomState = serializeRoom(room);
-
-        io.to(room.roomCode).emit("room-updated", {
-          room: roomState
-        });
+        emitRoomUpdate(io, room);
         scheduleWordGuessTimer(io, room);
 
         callbackSuccess(callback, {
-          room: roomState
+          room: serializeRoomForSocket(room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -826,12 +1192,10 @@ export function registerSocketHandlers(io) {
           roomCode: payload?.roomCode || socket.data.roomCode,
           word: payload?.word
         });
-        const roomState = serializeRoom(result.room);
+        const roomState = serializeRoomForSocket(result.room, socket);
 
         if (!emitGameEndedIfNeeded(io, result.room)) {
-          io.to(result.room.roomCode).emit("room-updated", {
-            room: roomState
-          });
+          emitRoomUpdate(io, result.room);
           scheduleWordGuessTimer(io, result.room);
         } else {
           cancelWordGuessTimer(result.room.roomCode);
@@ -840,6 +1204,63 @@ export function registerSocketHandlers(io) {
         callbackSuccess(callback, {
           guess: result.guess,
           room: roomState
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("spy-word-submit-clue", (payload, callback) => {
+      try {
+        const result = submitSpyWordClue({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          clue: payload?.clue
+        });
+
+        emitRoomUpdate(io, result.room);
+        callbackSuccess(callback, {
+          clue: result.clue,
+          room: serializeRoomForSocket(result.room, socket)
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("spy-word-vote", (payload, callback) => {
+      try {
+        const result = submitSpyWordVote({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          suspectPlayerId: payload?.suspectPlayerId
+        });
+
+        if (!emitGameEndedIfNeeded(io, result.room)) {
+          emitRoomUpdate(io, result.room);
+        }
+
+        callbackSuccess(callback, {
+          room: serializeRoomForSocket(result.room, socket),
+          vote: result.vote
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("spy-word-submit-guess", (payload, callback) => {
+      try {
+        const result = submitSpyWordGuess({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          guess: payload?.guess
+        });
+
+        emitGameEndedIfNeeded(io, result.room);
+        callbackSuccess(callback, {
+          room: serializeRoomForSocket(result.room, socket),
+          spyGuess: result.spyGuess
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -856,7 +1277,7 @@ export function registerSocketHandlers(io) {
 
         if (typeof callback === "function") {
           callbackSuccess(callback, {
-            room: serializeRoom(room)
+            room: serializeRoomForSocket(room, socket)
           });
         }
       } catch (error) {
@@ -870,7 +1291,7 @@ export function registerSocketHandlers(io) {
           socketId: socket.id,
           roomCode: payload?.roomCode || socket.data.roomCode
         });
-        const roomState = serializeRoom(result.room);
+        const roomState = serializeRoomForSocket(result.room, socket);
 
         if (!result.valid) {
           callbackSuccess(callback, {
@@ -885,9 +1306,8 @@ export function registerSocketHandlers(io) {
           return;
         }
 
-        io.to(result.room.roomCode).emit("game-ended", {
+        emitRoomEvent(io, result.room, "game-ended", {
           winner: result.winner,
-          room: roomState
         });
         cancelBotTurn(result.room.roomCode);
         emitActiveRooms(io);
@@ -909,20 +1329,50 @@ export function registerSocketHandlers(io) {
           socketId: socket.id,
           roomCode: payload?.roomCode || socket.data.roomCode
         });
-        const roomState = serializeRoom(room);
+        const roomState = serializeRoomForSocket(room, socket);
 
         cancelBotTurn(room.roomCode);
         cancelHandCricketMove(room.roomCode);
         cancelTagLoop(room.roomCode);
         cancelWordGuessTimer(room.roomCode);
-        io.to(room.roomCode).emit("room-restarted", {
-          room: roomState
-        });
+        cancelBoostRound(room.roomCode);
+        cancelBoostBotTurn(room.roomCode);
+        cancelRajaRaniReveal(room.roomCode);
+        cancelRajaRaniTurnsTimer(room.roomCode);
+        emitRoomEvent(io, room, "room-restarted");
         emitRoomUpdate(io, room);
         emitActiveRooms(io);
 
         callbackSuccess(callback, {
           room: roomState
+        });
+      } catch (error) {
+        callbackError(socket, callback, error);
+      }
+    });
+
+    socket.on("treasure-hunt:select-cell", (payload, callback) => {
+      try {
+        const result = selectTreasureHuntCell({
+          socketId: socket.id,
+          roomCode: payload?.roomCode || socket.data.roomCode,
+          row: payload?.row,
+          col: payload?.col
+        });
+
+        if (!emitGameEndedIfNeeded(io, result.room)) {
+          emitRoomUpdate(io, result.room);
+          emitRoomEvent(io, result.room, "treasure-hunt:state-update", result.room.treasureHunt);
+          emitRoomEvent(io, result.room, "treasure-hunt:cell-revealed", {
+            cellType: result.cellType,
+            message: result.message
+          });
+        } else {
+          emitActiveRooms(io);
+        }
+
+        callbackSuccess(callback, {
+          room: serializeRoomForSocket(result.room, socket)
         });
       } catch (error) {
         callbackError(socket, callback, error);
@@ -945,6 +1395,10 @@ export function registerSocketHandlers(io) {
         scheduleDisconnectCleanup(io, result.room.roomCode, result.player.playerId);
         emitRoomUpdate(io, result.room);
         scheduleWordGuessTimer(io, result.room);
+        scheduleBoostRound(io, result.room);
+        scheduleBoostBotTurn(io, result.room);
+        scheduleRajaRaniReveal(io, result.room);
+        scheduleRajaRaniTurnsTimer(io, result.room);
       }
     });
   });

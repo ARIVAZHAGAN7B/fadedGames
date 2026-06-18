@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
+import Boost from "./pages/Boost.jsx";
 import Game from "./pages/Game.jsx";
 import GuessNumber from "./pages/GuessNumber.jsx";
 import HandCricket from "./pages/HandCricket.jsx";
 import Home from "./pages/Home.jsx";
 import Lobby from "./pages/Lobby.jsx";
+import RajaRani from "./pages/RajaRani.jsx";
+import RajaRaniTurns from "./pages/RajaRaniTurns.jsx";
 import Result from "./pages/Result.jsx";
+import SpyWord from "./pages/SpyWord.jsx";
 import TagGame from "./pages/TagGame.jsx";
+import TreasureHunt from "./pages/TreasureHunt.jsx";
 import WordGuess from "./pages/WordGuess.jsx";
 import { socket } from "./socket/client.js";
 import { getGameTypeFromUrl, getRoomCodeFromUrl, setRoomCodeInUrl } from "./utils/roomLink.js";
@@ -61,12 +66,32 @@ function viewForRoom(room, fallback = "lobby") {
     return "word-guess";
   }
 
+  if (room.gameType === "spy-word" && (room.gameStarted || room.gameEnded)) {
+    return "spy-word";
+  }
+
   if (room.gameType === "tag" && (room.gameStarted || room.gameEnded)) {
     return "tag";
   }
 
   if (room.gameType === "hand-cricket" && (room.gameStarted || room.gameEnded)) {
     return "hand-cricket";
+  }
+
+  if (room.gameType === "boost" && (room.gameStarted || room.gameEnded)) {
+    return "boost";
+  }
+
+  if (room.gameType === "treasure-hunt" && (room.gameStarted || room.gameEnded)) {
+    return "treasure-hunt";
+  }
+
+  if (room.gameType === "raja-rani" && (room.gameStarted || room.gameEnded)) {
+    return "raja-rani";
+  }
+
+  if (room.gameType === "raja-rani-turns" && (room.gameStarted || room.gameEnded)) {
+    return "raja-rani-turns";
   }
 
   if (room.gameEnded) {
@@ -483,6 +508,103 @@ export default function App() {
     return response;
   };
 
+  const handleSpyWordSubmitClue = async (clue) => {
+    const response = await emitWithAck("spy-word-submit-clue", {
+      roomCode: session.roomCode,
+      clue
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
+  const handleSpyWordVote = async (suspectPlayerId) => {
+    const response = await emitWithAck("spy-word-vote", {
+      roomCode: session.roomCode,
+      suspectPlayerId
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
+  const handleSpyWordSubmitGuess = async (guess) => {
+    const response = await emitWithAck("spy-word-submit-guess", {
+      roomCode: session.roomCode,
+      guess
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
+  const handleBoostSelectCard = async (cardId) => {
+    const response = await emitWithAck("boost-select-card", {
+      roomCode: session.roomCode,
+      cardId
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
+  const handleBoostClaim = async () => {
+    const response = await emitWithAck("boost-claim", {
+      roomCode: session.roomCode
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
+  const handleRajaRaniGuess = async (suspectPlayerId) => {
+    const response = await emitWithAck("raja-rani-guess", {
+      roomCode: session.roomCode,
+      suspectPlayerId
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
+  const handleRajaRaniTurnsSelect = async (suspectPlayerId) => {
+    const response = await emitWithAck("raja-rani-turns-select", {
+      roomCode: session.roomCode,
+      suspectPlayerId
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
   const handleRestartGame = async () => {
     const response = await emitWithAck("restart-game", {
       roomCode: session.roomCode
@@ -578,6 +700,57 @@ export default function App() {
     );
   }
 
+  if (view === "spy-word" && room) {
+    return (
+      <SpyWord
+        room={room}
+        session={session}
+        onSubmitClue={handleSpyWordSubmitClue}
+        onVote={handleSpyWordVote}
+        onSubmitSpyGuess={handleSpyWordSubmitGuess}
+        onRestartGame={handleRestartGame}
+        onLeaveRoom={handleLeaveRoom}
+      />
+    );
+  }
+
+  if (view === "boost" && room) {
+    return (
+      <Boost
+        room={room}
+        session={session}
+        onSelectCard={handleBoostSelectCard}
+        onClaimBoost={handleBoostClaim}
+        onRestartGame={handleRestartGame}
+        onLeaveRoom={handleLeaveRoom}
+      />
+    );
+  }
+
+  if (view === "raja-rani" && room) {
+    return (
+      <RajaRani
+        room={room}
+        session={session}
+        onGuess={handleRajaRaniGuess}
+        onRestartGame={handleRestartGame}
+        onLeaveRoom={handleLeaveRoom}
+      />
+    );
+  }
+
+  if (view === "raja-rani-turns" && room) {
+    return (
+      <RajaRaniTurns
+        room={room}
+        session={session}
+        onSelect={handleRajaRaniTurnsSelect}
+        onRestartGame={handleRestartGame}
+        onLeaveRoom={handleLeaveRoom}
+      />
+    );
+  }
+
   if (view === "game" && room && !room.gameEnded) {
     const expectedBoardSize = room.boardSize || getBoardSize(room.players.length);
     const expectedBoardCells = expectedBoardSize * expectedBoardSize;
@@ -604,6 +777,16 @@ export default function App() {
         onTagInput={handleTagInput}
         onRestartGame={handleRestartGame}
         onLeaveRoom={handleLeaveRoom}
+      />
+    );
+  }
+
+  if (view === "treasure-hunt" && room) {
+    return (
+      <TreasureHunt
+        socket={socket}
+        room={room}
+        session={session}
       />
     );
   }
