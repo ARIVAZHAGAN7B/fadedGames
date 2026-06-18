@@ -421,7 +421,8 @@ export function createSocketTimers(context) {
         if (!context.emitGameEndedIfNeeded(result.room)) {
           context.emitRoomUpdate(result.room);
           context.emitRoomEvent(result.room, "treasure-hunt:turn-timeout", {
-            skippedPlayer: result.skippedPlayer
+            skippedPlayer: result.skippedPlayer,
+            message: result.message
           });
           scheduleTreasureHuntTimer(result.room);
         } else {

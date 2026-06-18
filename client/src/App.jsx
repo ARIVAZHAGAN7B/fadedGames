@@ -670,6 +670,34 @@ export default function App() {
     return response;
   };
 
+  const handleRajaRaniPickCard = async (cardId) => {
+    const response = await emitWithAck("raja-rani-pick-card", {
+      roomCode: session.roomCode,
+      cardId
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
+  const handleRajaRaniTurnsPickCard = async (cardId) => {
+    const response = await emitWithAck("raja-rani-turns-pick-card", {
+      roomCode: session.roomCode,
+      cardId
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
   const handleRajaRaniTurnsSelect = async (suspectPlayerId) => {
     const response = await emitWithAck("raja-rani-turns-select", {
       roomCode: session.roomCode,
@@ -811,6 +839,7 @@ export default function App() {
       <RajaRani
         room={room}
         session={session}
+        onPickCard={handleRajaRaniPickCard}
         onGuess={handleRajaRaniGuess}
         onRestartGame={handleRestartGame}
         onLeaveRoom={handleLeaveRoom}
@@ -823,6 +852,7 @@ export default function App() {
       <RajaRaniTurns
         room={room}
         session={session}
+        onPickCard={handleRajaRaniTurnsPickCard}
         onSelect={handleRajaRaniTurnsSelect}
         onRestartGame={handleRestartGame}
         onLeaveRoom={handleLeaveRoom}

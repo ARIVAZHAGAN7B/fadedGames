@@ -113,7 +113,7 @@ const games = [
     defaultRoomName: "Treasure Hunt",
     maxPlayers: 10,
     logo: treasureHuntLogo,
-    summary: "Explore a 10x10 grid to find treasures and avoid bombs. Last survivor wins!"
+    summary: "Find 10 diamonds, dodge 25 bombs, and protect your lives."
   }
 ];
 

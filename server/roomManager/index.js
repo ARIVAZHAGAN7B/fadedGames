@@ -137,12 +137,12 @@ const RAJA_RANI_TURNS_TARGETS = {
   thirudan: "police"
 };
 const TREASURE_HUNT_GRID_SIZE = 10;
-const TREASURE_HUNT_BOMB_COUNT = 20;
-const TREASURE_HUNT_TREASURE_COUNT = 15;
+const TREASURE_HUNT_BOMB_COUNT = 25;
+const TREASURE_HUNT_TREASURE_COUNT = 10;
 const TREASURE_HUNT_TURN_MS = 10000;
 const TREASURE_HUNT_MIN_PLAYERS = 2;
 const TREASURE_HUNT_MAX_PLAYERS = 10;
-const TREASURE_HUNT_BOMB_LIMIT = 3;
+const TREASURE_HUNT_STARTING_LIVES = 3;
 const TREASURE_HUNT_CELL_TYPES = {
   BOMB: "bomb",
   TREASURE: "treasure",
@@ -1339,6 +1339,13 @@ function createRajaRaniState(phase = "waiting", scores = {}) {
     roundScores: {},
     lastGuess: null,
     history: [],
+    cardDeck: [],
+    cardPickOrder: [],
+    cardPickIndex: 0,
+    activePickerId: null,
+    activePickerName: null,
+    pickedCards: [],
+    cardPickStartedAt: null,
     roundStartedAt: null,
     revealStartedAt: null,
     revealDeadlineAt: null,
@@ -1363,6 +1370,13 @@ function createRajaRaniTurnsState(phase = "waiting", scores = {}) {
     roundScores: {},
     actions: [],
     history: [],
+    cardDeck: [],
+    cardPickOrder: [],
+    cardPickIndex: 0,
+    activePickerId: null,
+    activePickerName: null,
+    pickedCards: [],
+    cardPickStartedAt: null,
     currentTurnIndex: 0,
     activePlayerId: null,
     activePlayerName: null,
@@ -1465,8 +1479,35 @@ function createTreasureHuntState() {
   };
 }
 
+function getTreasureHuntLives(player) {
+  if (Number.isInteger(player?.lives)) {
+    return Math.max(0, player.lives);
+  }
+
+  return Math.max(0, TREASURE_HUNT_STARTING_LIVES - (player?.bombs || 0));
+}
+
+function resetTreasureHuntPlayer(player) {
+  player.treasures = 0;
+  player.bombs = 0;
+  player.lives = TREASURE_HUNT_STARTING_LIVES;
+  player.missedTurns = 0;
+  player.eliminated = false;
+}
+
+function changeTreasureHuntLives(player, delta) {
+  const nextLives = Math.max(0, getTreasureHuntLives(player) + delta);
+  player.lives = nextLives;
+
+  if (nextLives <= 0) {
+    player.eliminated = true;
+  }
+
+  return nextLives;
+}
+
 function getActiveTreasureHuntPlayers(room) {
-  return room.players.filter((player) => !player.eliminated);
+  return room.players.filter((player) => !player.eliminated && getTreasureHuntLives(player) > 0);
 }
 
 function getNextTreasureHuntPlayerIndex(room, fromIndex) {
@@ -1560,17 +1601,170 @@ function assignRajaRaniRoles(players) {
   );
 }
 
+function createRajaRaniRoleDeck() {
+  return shuffleRajaRaniRoles().map((roleId, index) => ({
+    id: `role-card-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+    roleId
+  }));
+}
+
+function createRajaRaniPickOrder(players, round = 1) {
+  if (players.length === 0) {
+    return [];
+  }
+
+  const startIndex = Math.max(0, (Number(round || 1) - 1) % players.length);
+
+  return players.map((_, index) => players[(startIndex + index) % players.length].playerId);
+}
+
+function getRajaRaniActivePicker(room, state) {
+  return room.players.find((player) => player.playerId === state.activePickerId) || null;
+}
+
+function setRajaRaniActivePicker(room, state, playerId) {
+  const activePlayer = room.players.find((player) => player.playerId === playerId) || null;
+
+  state.activePickerId = activePlayer?.playerId || null;
+  state.activePickerName = activePlayer?.name || null;
+  room.currentTurn = activePlayer
+    ? room.players.findIndex((player) => player.playerId === activePlayer.playerId)
+    : 0;
+}
+
+function beginRajaRaniCardPick(room, state, round) {
+  const pickOrder = createRajaRaniPickOrder(room.players, round);
+
+  state.phase = "card-pick";
+  state.moveId = (state.moveId || 0) + 1;
+  state.round = round;
+  state.rolesByPlayerId = {};
+  state.cardDeck = createRajaRaniRoleDeck();
+  state.cardPickOrder = pickOrder;
+  state.cardPickIndex = 0;
+  state.pickedCards = [];
+  state.cardPickStartedAt = Date.now();
+  setRajaRaniActivePicker(room, state, pickOrder[0] || null);
+}
+
+function clearRajaRaniCardPick(state) {
+  state.cardDeck = [];
+  state.cardPickOrder = [];
+  state.cardPickIndex = 0;
+  state.activePickerId = null;
+  state.activePickerName = null;
+  state.cardPickStartedAt = null;
+}
+
+function getRandomRajaRaniCardId(state) {
+  const deck = state.cardDeck || [];
+
+  if (deck.length === 0) {
+    return "";
+  }
+
+  return deck[Math.floor(Math.random() * deck.length)].id;
+}
+
+function completeRajaRaniCardPick(room, state, onComplete) {
+  clearRajaRaniCardPick(state);
+  onComplete();
+}
+
+function processRajaRaniCardPick(room, state, player, cardId, onComplete) {
+  if (state.phase !== "card-pick") {
+    throw new Error("Card selection is not active.");
+  }
+
+  if (state.activePickerId !== player.playerId) {
+    throw new Error("It is not your card pick.");
+  }
+
+  const selectedCardId = String(cardId || "").trim();
+  const cardIndex = (state.cardDeck || []).findIndex((card) => card.id === selectedCardId);
+
+  if (cardIndex < 0) {
+    throw new Error("Choose one of the visible cards.");
+  }
+
+  const [card] = state.cardDeck.splice(cardIndex, 1);
+
+  state.rolesByPlayerId[player.playerId] = card.roleId;
+  state.pickedCards = [
+    ...(state.pickedCards || []),
+    {
+      playerId: player.playerId,
+      playerName: player.name,
+      cardId: card.id,
+      pickNumber: (state.pickedCards || []).length + 1,
+      pickedAt: Date.now()
+    }
+  ];
+
+  if ((state.cardDeck || []).length === 0 || Object.keys(state.rolesByPlayerId || {}).length >= room.players.length) {
+    completeRajaRaniCardPick(room, state, onComplete);
+    return {
+      completed: true,
+      roleId: card.roleId
+    };
+  }
+
+  state.cardPickIndex = (state.cardPickIndex || 0) + 1;
+  setRajaRaniActivePicker(room, state, state.cardPickOrder?.[state.cardPickIndex] || null);
+  state.moveId = (state.moveId || 0) + 1;
+
+  return {
+    completed: false,
+    roleId: card.roleId
+  };
+}
+
+function autoPickRajaRaniBotCards(room, state, onComplete) {
+  let selectedCount = 0;
+
+  while (state.phase === "card-pick") {
+    const activePlayer = getRajaRaniActivePicker(room, state);
+
+    if (!activePlayer?.isBot) {
+      break;
+    }
+
+    const cardId = getRandomRajaRaniCardId(state);
+
+    if (!cardId) {
+      break;
+    }
+
+    processRajaRaniCardPick(room, state, activePlayer, cardId, onComplete);
+    selectedCount += 1;
+
+    if (selectedCount > RAJA_RANI_PLAYERS) {
+      break;
+    }
+  }
+
+  return selectedCount;
+}
+
+function beginRajaRaniPoliceTurn(room) {
+  const state = room.rajaRani;
+  const police = room.players.find((player) => state.rolesByPlayerId[player.playerId] === "police") || null;
+
+  state.phase = "police-turn";
+  state.moveId = (state.moveId || 0) + 1;
+  state.roundStartedAt = state.roundStartedAt || Date.now();
+  room.currentTurn = police ? room.players.findIndex((player) => player.playerId === police.playerId) : 0;
+}
+
 function startRajaRaniRound(room, round = 1) {
   const state = room.rajaRani || createRajaRaniState();
-  const rolesByPlayerId = assignRajaRaniRoles(room.players);
-  const police = room.players.find((player) => rolesByPlayerId[player.playerId] === "police") || null;
 
   room.rajaRani = {
     ...state,
-    phase: "police-turn",
+    phase: "card-pick",
     round,
-    moveId: (state.moveId || 0) + 1,
-    rolesByPlayerId,
+    moveId: state.moveId || 0,
+    rolesByPlayerId: {},
     scores: createRajaRaniScores(room.players, state.scores),
     roundScores: {},
     lastGuess: null,
@@ -1579,7 +1773,8 @@ function startRajaRaniRound(room, round = 1) {
     roundStartedAt: Date.now(),
     startedAt: state.startedAt || Date.now()
   };
-  room.currentTurn = police ? room.players.findIndex((player) => player.playerId === police.playerId) : 0;
+  beginRajaRaniCardPick(room, room.rajaRani, round);
+  autoPickRajaRaniBotCards(room, room.rajaRani, () => beginRajaRaniPoliceTurn(room));
 }
 
 function scoreRajaRaniRound(rolesByPlayerId, correct) {
@@ -1691,15 +1886,19 @@ function beginRajaRaniTurnsTurn(room, turnIndex = 0, turnNumber = 1) {
   room.currentTurn = cleanIndex;
 }
 
+function beginRajaRaniTurnsPlay(room) {
+  beginRajaRaniTurnsTurn(room, 0, 1);
+}
+
 function startRajaRaniTurnsRound(room, round = 1) {
   const state = room.rajaRaniTurns || createRajaRaniTurnsState();
-  const rolesByPlayerId = assignRajaRaniRoles(room.players);
 
   room.rajaRaniTurns = {
     ...state,
-    phase: "turn",
+    phase: "card-pick",
     round,
-    rolesByPlayerId,
+    moveId: state.moveId || 0,
+    rolesByPlayerId: {},
     scores: createRajaRaniScores(room.players, state.scores),
     roundScores: createRoundScoreMap(room.players),
     actions: [],
@@ -1714,7 +1913,8 @@ function startRajaRaniTurnsRound(room, round = 1) {
     roundStartedAt: Date.now(),
     startedAt: state.startedAt || Date.now()
   };
-  beginRajaRaniTurnsTurn(room, 0, 1);
+  beginRajaRaniCardPick(room, room.rajaRaniTurns, round);
+  autoPickRajaRaniBotCards(room, room.rajaRaniTurns, () => beginRajaRaniTurnsPlay(room));
 }
 
 function revealRajaRaniTurnsRound(room) {
@@ -3412,6 +3612,44 @@ function serializeBoost(room, viewerPlayerId = null) {
   };
 }
 
+function serializeRajaRaniCardPick(room, state, viewerPlayerId = null) {
+  if (state.phase !== "card-pick") {
+    return null;
+  }
+
+  const pickedPlayerIds = new Set((state.pickedCards || []).map((pick) => pick.playerId));
+
+  return {
+    activePlayerId: state.activePickerId || null,
+    activePlayerName: state.activePickerName || null,
+    cards: (state.cardDeck || []).map((card, index) => ({
+      id: card.id,
+      position: index + 1
+    })),
+    remainingCount: (state.cardDeck || []).length,
+    totalCount: room.players.length,
+    pickNumber: (state.cardPickIndex || 0) + 1,
+    isViewerTurn: viewerPlayerId === state.activePickerId,
+    viewerHasPicked: viewerPlayerId ? pickedPlayerIds.has(viewerPlayerId) : false,
+    pickedPlayers: (state.pickedCards || []).map((pick) => ({
+      playerId: pick.playerId,
+      playerName: pick.playerName,
+      pickNumber: pick.pickNumber
+    })),
+    order: (state.cardPickOrder || []).map((playerId, index) => {
+      const player = room.players.find((entry) => entry.playerId === playerId);
+
+      return {
+        playerId,
+        playerName: player?.name || "Player",
+        pickNumber: index + 1,
+        picked: pickedPlayerIds.has(playerId),
+        active: playerId === state.activePickerId
+      };
+    })
+  };
+}
+
 function serializeRajaRani(room, viewerPlayerId = null) {
   if (room.gameType !== "raja-rani") {
     return null;
@@ -3433,6 +3671,7 @@ function serializeRajaRani(room, viewerPlayerId = null) {
     roles: state.roles || RAJA_RANI_ROLES,
     viewerRole: viewerRoleId ? getRajaRaniRole(viewerRoleId) : null,
     revealed,
+    cardPick: serializeRajaRaniCardPick(room, state, viewerPlayerId),
     policePlayerId: revealed || viewerRoleId === "police" ? police?.playerId || null : null,
     thiefPlayerId: revealed ? thief?.playerId || null : null,
     scores: createRajaRaniScores(room.players, state.scores),
@@ -3496,6 +3735,7 @@ function serializeRajaRaniTurns(room, viewerPlayerId = null) {
     viewerRole: viewerRoleId ? getRajaRaniRole(viewerRoleId) : null,
     viewerTargetRole: targetRoleId ? getRajaRaniRole(targetRoleId) : null,
     revealed,
+    cardPick: serializeRajaRaniCardPick(room, state, viewerPlayerId),
     scores: createRajaRaniScores(room.players, state.scores),
     roundScores: { ...(state.roundScores || {}) },
     leaderboard,
@@ -3586,6 +3826,8 @@ function publicPlayer(player, room) {
       ? {
           treasures: player.treasures || 0,
           bombs: player.bombs || 0,
+          lives: getTreasureHuntLives(player),
+          missedTurns: player.missedTurns || 0,
           eliminated: Boolean(player.eliminated)
         }
       : {})
@@ -4133,7 +4375,7 @@ export function startGame({ socketId, roomCode }) {
     room.gameStarted = true;
     room.gameEnded = false;
     room.winner = null;
-    room.rajaRani = createRajaRaniState("police-turn");
+    room.rajaRani = createRajaRaniState("card-pick");
     startRajaRaniRound(room, 1);
     touch(room);
 
@@ -4150,7 +4392,7 @@ export function startGame({ socketId, roomCode }) {
     room.gameStarted = true;
     room.gameEnded = false;
     room.winner = null;
-    room.rajaRaniTurns = createRajaRaniTurnsState("turn");
+    room.rajaRaniTurns = createRajaRaniTurnsState("card-pick");
     startRajaRaniTurnsRound(room, 1);
     touch(room);
 
@@ -4173,11 +4415,8 @@ export function startGame({ socketId, roomCode }) {
     room.gameEnded = false;
     room.winner = null;
 
-    // Initialize player states for treasure hunt
     room.players.forEach((player) => {
-      player.treasures = 0;
-      player.bombs = 0;
-      player.eliminated = false;
+      resetTreasureHuntPlayer(player);
     });
 
     const now = Date.now();
@@ -4275,9 +4514,7 @@ export function restartGame({ socketId, roomCode }) {
 
   if (room.gameType === "treasure-hunt") {
     room.players.forEach((entry) => {
-      entry.treasures = 0;
-      entry.bombs = 0;
-      entry.eliminated = false;
+      resetTreasureHuntPlayer(entry);
     });
     room.treasureHunt = createTreasureHuntState();
     touch(room);
@@ -4504,6 +4741,35 @@ export function resolveBoostRoundTimeout({ roomCode, moveId }) {
   };
 }
 
+export function submitRajaRaniCardPick({ socketId, roomCode, cardId }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.rajaRani;
+
+  if (room.gameType !== "raja-rani" || !state) {
+    throw new Error("Raja Rani is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "card-pick") {
+    throw new Error("Card selection is not active.");
+  }
+
+  const pick = processRajaRaniCardPick(room, state, player, cardId, () => beginRajaRaniPoliceTurn(room));
+  autoPickRajaRaniBotCards(room, state, () => beginRajaRaniPoliceTurn(room));
+  touch(room);
+
+  return {
+    room,
+    pick: {
+      completed: pick.completed
+    }
+  };
+}
+
 export function submitRajaRaniGuess({ socketId, roomCode, suspectPlayerId }) {
   const room = requireRoom(roomCode);
   const player = findPlayerBySocket(room, socketId);
@@ -4581,6 +4847,35 @@ export function resolveRajaRaniReveal({ roomCode, moveId }) {
   return {
     room,
     changed: true
+  };
+}
+
+export function submitRajaRaniTurnsCardPick({ socketId, roomCode, cardId }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.rajaRaniTurns;
+
+  if (room.gameType !== "raja-rani-turns" || !state) {
+    throw new Error("Raja Rani Turns is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "card-pick") {
+    throw new Error("Card selection is not active.");
+  }
+
+  const pick = processRajaRaniCardPick(room, state, player, cardId, () => beginRajaRaniTurnsPlay(room));
+  autoPickRajaRaniBotCards(room, state, () => beginRajaRaniTurnsPlay(room));
+  touch(room);
+
+  return {
+    room,
+    pick: {
+      completed: pick.completed
+    }
   };
 }
 
@@ -6231,6 +6526,8 @@ export function selectTreasureHuntCell({ socketId, roomCode, row, col }) {
     throw new Error("You have been eliminated.");
   }
 
+  currentPlayer.lives = getTreasureHuntLives(currentPlayer);
+
   // Validate cell coordinates
   if (
     !Number.isInteger(row) ||
@@ -6256,17 +6553,18 @@ export function selectTreasureHuntCell({ socketId, roomCode, row, col }) {
   let message = "";
 
   if (cell.type === TREASURE_HUNT_CELL_TYPES.TREASURE) {
-    currentPlayer.treasures += 1;
+    currentPlayer.treasures = (currentPlayer.treasures || 0) + 1;
+    const livesLeft = changeTreasureHuntLives(currentPlayer, 1);
     state.treasuresRevealed += 1;
-    message = `Found treasure! ${currentPlayer.treasures} total`;
+    message = `Found a diamond! +1 life (${livesLeft} lives)`;
   } else if (cell.type === TREASURE_HUNT_CELL_TYPES.BOMB) {
-    currentPlayer.bombs += 1;
+    currentPlayer.bombs = (currentPlayer.bombs || 0) + 1;
     state.bombsRevealed += 1;
-    message = `Hit bomb! ${currentPlayer.bombs}/3 bombs`;
+    const livesLeft = changeTreasureHuntLives(currentPlayer, -1);
+    message = `Hit a bomb! -1 life (${livesLeft} left)`;
 
-    if (currentPlayer.bombs >= TREASURE_HUNT_BOMB_LIMIT) {
-      currentPlayer.eliminated = true;
-      message = `Eliminated! ${currentPlayer.bombs} bombs`;
+    if (currentPlayer.eliminated) {
+      message = "Eliminated! No lives left";
     }
   } else {
     message = "Empty cell";
@@ -6322,6 +6620,17 @@ export function resolveTreasureHuntTimeout({ roomCode, turnNumber }) {
   }
 
   const skippedPlayer = room.players[state.currentPlayerIndex] || null;
+  let message = "Turn skipped";
+
+  if (skippedPlayer && !skippedPlayer.eliminated) {
+    skippedPlayer.missedTurns = (skippedPlayer.missedTurns || 0) + 1;
+    const livesLeft = changeTreasureHuntLives(skippedPlayer, -1);
+    message = `Missed the turn! -1 life (${livesLeft} left)`;
+
+    if (skippedPlayer.eliminated) {
+      message = "Eliminated! No lives left";
+    }
+  }
 
   if (shouldEndTreasureHunt(room)) {
     endTreasureHuntGame(room);
@@ -6337,9 +6646,11 @@ export function resolveTreasureHuntTimeout({ roomCode, turnNumber }) {
     skippedPlayer: skippedPlayer
       ? {
           playerId: skippedPlayer.playerId,
-          name: skippedPlayer.name
+          name: skippedPlayer.name,
+          lives: getTreasureHuntLives(skippedPlayer)
         }
-      : null
+      : null,
+    message
   };
 }
 
@@ -6349,8 +6660,22 @@ function endTreasureHuntGame(room) {
   let winner = null;
   if (activePlayers.length > 0) {
     winner = activePlayers.reduce((best, player) => {
-      if (player.treasures > best.treasures) return player;
-      if (player.treasures === best.treasures && player.bombs < best.bombs) return player;
+      const playerTreasures = player.treasures || 0;
+      const bestTreasures = best.treasures || 0;
+      const playerLives = getTreasureHuntLives(player);
+      const bestLives = getTreasureHuntLives(best);
+
+      if (playerTreasures > bestTreasures) return player;
+      if (playerTreasures === bestTreasures && playerLives > bestLives) {
+        return player;
+      }
+      if (
+        playerTreasures === bestTreasures &&
+        playerLives === bestLives &&
+        (player.bombs || 0) < (best.bombs || 0)
+      ) {
+        return player;
+      }
       return best;
     });
   }
@@ -6361,16 +6686,19 @@ function endTreasureHuntGame(room) {
       name: player.name,
       treasures: player.treasures || 0,
       bombs: player.bombs || 0,
+      lives: getTreasureHuntLives(player),
+      missedTurns: player.missedTurns || 0,
       eliminated: Boolean(player.eliminated)
     }))
-    .sort((a, b) => b.treasures - a.treasures || a.bombs - b.bombs);
+    .sort((a, b) => b.treasures - a.treasures || b.lives - a.lives || a.bombs - b.bombs);
 
   const publicWinner = winner
     ? {
         playerId: winner.playerId,
         name: winner.name,
         treasures: winner.treasures || 0,
-        bombs: winner.bombs || 0
+        bombs: winner.bombs || 0,
+        lives: getTreasureHuntLives(winner)
       }
     : null;
 

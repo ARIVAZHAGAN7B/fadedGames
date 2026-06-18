@@ -2,6 +2,7 @@ import {
   Bomb,
   Crown,
   Gem,
+  Heart,
   Square,
   Timer,
   Trophy,
@@ -17,7 +18,7 @@ import { useNow } from "../hooks/useNow.js";
 import { formatSeconds, getTimeLeft } from "../utils/time.js";
 
 const GRID_SIZE = 10;
-const BOMB_LIMIT = 3;
+const STARTING_LIVES = 3;
 const CELL_TYPES = {
   BOMB: "bomb",
   TREASURE: "treasure",
@@ -76,21 +77,24 @@ function StatTile({ icon: Icon, label, value, tone = "ink" }) {
           : "bg-ink/10 text-ink";
 
   return (
-    <div className="rounded-md border border-ink/10 bg-white p-3">
-      <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-md ${toneClass}`}>
-        <Icon className="h-5 w-5" aria-hidden="true" />
+    <div className="rounded-md border border-ink/10 bg-white p-2.5">
+      <div className={`mb-1.5 flex h-8 w-8 items-center justify-center rounded-md ${toneClass}`}>
+        <Icon className="h-4 w-4" aria-hidden="true" />
       </div>
-      <p className="text-xl font-extrabold leading-tight text-ink">{value}</p>
-      <p className="mt-1 text-xs font-extrabold uppercase text-ink/50">{label}</p>
+      <p className="text-lg font-extrabold leading-tight text-ink">{value}</p>
+      <p className="mt-0.5 text-[0.68rem] font-extrabold uppercase text-ink/50">{label}</p>
     </div>
   );
 }
 
 const GameGrid = memo(function GameGrid({ board, canSelect, onSelectCell }) {
   return (
-    <section className="surface p-3 sm:p-4">
+    <section
+      className="surface mx-auto w-full p-2 sm:p-3"
+      style={{ width: "min(100%, clamp(18rem, calc(100vh - 13.5rem), 34rem))" }}
+    >
       <div
-        className="grid w-full gap-1"
+        className="grid w-full gap-0.5 sm:gap-1"
         style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))` }}
       >
         {board.map((row, rowIndex) =>
@@ -126,6 +130,10 @@ const GameGrid = memo(function GameGrid({ board, canSelect, onSelectCell }) {
 
 const PlayerCard = memo(function PlayerCard({ player, isCurrent, isMe }) {
   const bombs = player.bombs || 0;
+  const lives = Number.isInteger(player.lives)
+    ? Math.max(0, player.lives)
+    : Math.max(0, STARTING_LIVES - bombs);
+  const lifePips = Math.max(STARTING_LIVES, lives);
 
   return (
     <div
@@ -154,26 +162,32 @@ const PlayerCard = memo(function PlayerCard({ player, isCurrent, isMe }) {
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-sm font-extrabold">
+      <div className="grid grid-cols-3 gap-2 text-sm font-extrabold">
         <div className="rounded bg-honey/20 px-2 py-1.5 text-ink">
           <span className="mr-1 inline-block align-[-2px]">
             <Gem className="h-4 w-4" aria-hidden="true" />
           </span>
           {player.treasures || 0}
         </div>
+        <div className="rounded bg-mint/10 px-2 py-1.5 text-mint">
+          <span className="mr-1 inline-block align-[-2px]">
+            <Heart className="h-4 w-4" aria-hidden="true" />
+          </span>
+          {lives}
+        </div>
         <div className="rounded bg-coral/10 px-2 py-1.5 text-coral">
           <span className="mr-1 inline-block align-[-2px]">
             <Bomb className="h-4 w-4" aria-hidden="true" />
           </span>
-          {bombs}/{BOMB_LIMIT}
+          {bombs}
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-1">
-        {Array.from({ length: BOMB_LIMIT }).map((_, index) => (
+      <div className="mt-3 flex flex-wrap gap-1">
+        {Array.from({ length: lifePips }).map((_, index) => (
           <span
             key={index}
-            className={`h-1.5 rounded-full ${index < bombs ? "bg-coral" : "bg-ink/10"}`}
+            className={`h-1.5 min-w-4 flex-1 rounded-full ${index < lives ? "bg-mint" : "bg-ink/10"}`}
           />
         ))}
       </div>
@@ -183,10 +197,10 @@ const PlayerCard = memo(function PlayerCard({ player, isCurrent, isMe }) {
 
 const PlayerPanel = memo(function PlayerPanel({ players, currentPlayerIndex, sessionPlayerId }) {
   return (
-    <section className="surface p-3 sm:p-4">
+    <section className="surface p-2.5 sm:p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-base font-extrabold text-ink">
-          <Users className="h-5 w-5" aria-hidden="true" />
+        <h2 className="flex items-center gap-2 text-sm font-extrabold text-ink">
+          <Users className="h-4 w-4" aria-hidden="true" />
           Players
         </h2>
         <span className="rounded-full bg-mint px-2.5 py-1 text-xs font-extrabold text-white">
@@ -213,11 +227,11 @@ const StatusPanel = memo(function StatusPanel({ currentPlayer, isMyTurn, timeLef
   const danger = seconds <= 3 && !roomEnded;
 
   return (
-    <section className="surface p-3 sm:p-4">
-      <div className="grid gap-3 sm:grid-cols-[1fr_12rem] sm:items-center">
+    <section className="surface p-2.5 sm:p-3">
+      <div className="grid gap-2 sm:grid-cols-[1fr_10rem] sm:items-center">
         <div className="min-w-0">
           <p className="text-xs font-extrabold uppercase text-ink/50">Current Turn</p>
-          <h2 className="truncate text-2xl font-extrabold text-ink">
+          <h2 className="truncate text-xl font-extrabold text-ink">
             {roomEnded ? "Game Over" : currentPlayer?.name || "Waiting"}
           </h2>
           <p
@@ -229,7 +243,7 @@ const StatusPanel = memo(function StatusPanel({ currentPlayer, isMyTurn, timeLef
           </p>
         </div>
 
-        <div className="rounded-md border border-ink/10 bg-paper p-3">
+        <div className="rounded-md border border-ink/10 bg-paper p-2.5">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="flex items-center gap-1.5 text-xs font-extrabold uppercase text-ink/55">
               <Timer className="h-4 w-4" aria-hidden="true" />
@@ -273,13 +287,17 @@ function ResultPanel({ winner, finalStats }) {
           {finalStats.map((stat, index) => (
             <div
               key={stat.playerId || stat.name}
-              className="grid grid-cols-[2rem_1fr_auto_auto] items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-extrabold"
+              className="grid grid-cols-[2rem_1fr_auto_auto_auto] items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-extrabold"
             >
               <span className="text-ink/45">{index + 1}</span>
               <span className="truncate">{stat.name}</span>
               <span className="flex items-center gap-1 text-ink">
                 <Gem className="h-4 w-4 text-honey" aria-hidden="true" />
                 {stat.treasures || 0}
+              </span>
+              <span className="flex items-center gap-1 text-mint">
+                <Heart className="h-4 w-4" aria-hidden="true" />
+                {stat.lives || 0}
               </span>
               <span className="flex items-center gap-1 text-coral">
                 <Bomb className="h-4 w-4" aria-hidden="true" />
@@ -343,8 +361,8 @@ export default function TreasureHunt({
   const isMyTurn = currentPlayer?.playerId === session.playerId && !room.gameEnded;
   const canSelect = isMyTurn && !me?.eliminated && !room.gameEnded;
   const timeLeftMs = getTimeLeft(state.turnDeadlineAt, now);
-  const totalTreasures = state.totalTreasures || 15;
-  const totalBombs = state.totalBombs || 20;
+  const totalTreasures = state.totalTreasures || 10;
+  const totalBombs = state.totalBombs || 25;
   const winner = room.winner || state.winner || null;
   const finalStats = state.finalStats || [];
   const cellsRevealed = state.cellsRevealed || 0;
@@ -380,7 +398,7 @@ export default function TreasureHunt({
         type === CELL_TYPES.BOMB
           ? "Bomb"
           : type === CELL_TYPES.TREASURE
-            ? "Treasure"
+            ? "Diamond"
             : "Empty";
 
       showReveal({
@@ -394,9 +412,11 @@ export default function TreasureHunt({
       showReveal({
         type: "timeout",
         title: "Time up",
-        message: payload.skippedPlayer?.name
-          ? `${payload.skippedPlayer.name} lost the turn`
-          : "Turn skipped"
+        message:
+          payload.message ||
+          (payload.skippedPlayer?.name
+            ? `${payload.skippedPlayer.name} missed the turn`
+            : "Turn skipped")
       });
     };
 
@@ -448,7 +468,7 @@ export default function TreasureHunt({
   };
 
   return (
-    <GamePage className="px-3 sm:px-6">
+    <GamePage className="px-3 py-3 sm:px-4" contentClassName="gap-2 sm:gap-3">
         <RoomHeader
           room={room}
           codeLabel="TH"
@@ -472,32 +492,33 @@ export default function TreasureHunt({
           roomEnded={room.gameEnded}
         />
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile
-            icon={Gem}
-            label="Treasures"
-            value={`${state.treasuresRevealed || 0}/${totalTreasures}`}
-            tone="honey"
-          />
-          <StatTile
-            icon={Bomb}
-            label="Bombs"
-            value={`${state.bombsRevealed || 0}/${totalBombs}`}
-            tone="coral"
-          />
-          <StatTile icon={Square} label="Revealed" value={`${cellsRevealed}/100`} tone="mint" />
-          <StatTile icon={Users} label="Active" value={`${activePlayers.length}/${players.length}`} />
-        </section>
-
         {room.gameEnded ? <ResultPanel winner={winner} finalStats={finalStats} /> : null}
 
-        <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]">
           <GameGrid board={board} canSelect={canSelect} onSelectCell={handleSelectCell} />
-          <PlayerPanel
-            players={players}
-            currentPlayerIndex={currentPlayerIndex}
-            sessionPlayerId={session.playerId}
-          />
+          <aside className="grid gap-3">
+            <section className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2">
+              <StatTile
+                icon={Gem}
+                label="Diamonds"
+                value={`${state.treasuresRevealed || 0}/${totalTreasures}`}
+                tone="honey"
+              />
+              <StatTile
+                icon={Bomb}
+                label="Bombs"
+                value={`${state.bombsRevealed || 0}/${totalBombs}`}
+                tone="coral"
+              />
+              <StatTile icon={Square} label="Revealed" value={`${cellsRevealed}/100`} tone="mint" />
+              <StatTile icon={Users} label="Active" value={`${activePlayers.length}/${players.length}`} />
+            </section>
+            <PlayerPanel
+              players={players}
+              currentPlayerIndex={currentPlayerIndex}
+              sessionPlayerId={session.playerId}
+            />
+          </aside>
         </section>
 
         {room.gameEnded ? (

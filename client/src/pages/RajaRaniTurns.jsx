@@ -19,7 +19,9 @@ import {
   RoomHeader,
   StatusMessage
 } from "../components/game/GameLayout.jsx";
+import RajaRaniCardPicker from "../components/game/RajaRaniCardPicker.jsx";
 import { useNow } from "../hooks/useNow.js";
+import { getRajaRaniRoleImage } from "../utils/rajaRaniRoleImages.js";
 import { formatSeconds, getTimeLeft } from "../utils/time.js";
 
 const roleToneClasses = {
@@ -50,26 +52,55 @@ function RoleIcon({ roleId, className = "h-5 w-5" }) {
   return <KeyRound className={className} aria-hidden="true" />;
 }
 
+function RoleArtwork({ role, compact }) {
+  const image = getRajaRaniRoleImage(role?.id);
+
+  if (!image) {
+    return (
+      <p className={`${compact ? "text-2xl" : "text-4xl"} font-extrabold leading-none`}>
+        {role?.short || "?"}
+      </p>
+    );
+  }
+
+  return (
+    <div
+      className={`mb-3 overflow-hidden rounded-md border border-white/60 bg-white/75 p-1 shadow-sm ${
+        compact ? "h-16 w-16" : "h-28 w-28"
+      }`}
+    >
+      <img
+        src={image}
+        alt=""
+        decoding="async"
+        loading={compact ? "lazy" : "eager"}
+        className="h-full w-full object-contain"
+      />
+    </div>
+  );
+}
+
 function RoleCard({ player, title = "", compact = false }) {
   const role = player.role;
   const tone = roleToneClasses[role?.tone] || roleToneClasses.paper;
 
   return (
-    <div className={`rounded-md border p-3 ${tone} ${compact ? "" : "min-h-36"}`}>
+    <div className={`rounded-md border p-3 ${tone} ${compact ? "min-h-36" : "min-h-56"}`}>
       <div className="mb-3 flex items-center justify-between gap-2">
         <span className="truncate text-sm font-extrabold">{title || player.name}</span>
         {role ? <RoleIcon roleId={role.id} className="h-4 w-4 shrink-0" /> : null}
       </div>
       {role ? (
         <>
-          <p className={`${compact ? "text-2xl" : "text-4xl"} font-extrabold leading-none`}>
-            {role.short}
+          <RoleArtwork role={role} compact={compact} />
+          <p className={`${compact ? "text-base" : "text-4xl"} font-extrabold leading-tight`}>
+            {compact ? role.label : role.short}
           </p>
-          <p className="mt-2 truncate text-sm font-extrabold">{role.label}</p>
+          {!compact ? <p className="mt-2 truncate text-sm font-extrabold">{role.label}</p> : null}
         </>
       ) : (
         <>
-          <p className={`${compact ? "text-2xl" : "text-4xl"} font-extrabold leading-none`}>?</p>
+          <RoleArtwork role={role} compact={compact} />
           <p className="mt-2 truncate text-sm font-extrabold">Hidden</p>
         </>
       )}
@@ -148,6 +179,7 @@ function ActionLog({ actions = [], revealed = false }) {
 export default function RajaRaniTurns({
   room,
   session,
+  onPickCard,
   onSelect,
   onRestartGame,
   onLeaveRoom
@@ -222,6 +254,8 @@ export default function RajaRaniTurns({
                   <h2 className="text-2xl font-extrabold">
                     {room.gameEnded
                       ? "Match Result"
+                      : state.phase === "card-pick"
+                        ? "Choose Cards"
                       : state.phase === "reveal"
                         ? "Round Reveal"
                         : isMyTurn
@@ -265,6 +299,29 @@ export default function RajaRaniTurns({
                     onLeaveRoom={onLeaveRoom}
                     onRestart={handleRestart}
                     restartDisabled={!isHost}
+                  />
+                </div>
+              ) : state.phase === "card-pick" ? (
+                <div className="grid gap-3 lg:grid-cols-[18rem_1fr]">
+                  <div className="space-y-3">
+                    <RoleCard player={myPlayer} title="Your Role" />
+                    {myTargetRole ? (
+                      <div className="rounded-md border border-ink/10 bg-paper p-3">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Repeat2 className="h-4 w-4 text-mint" aria-hidden="true" />
+                          <p className="text-sm font-extrabold">Target</p>
+                        </div>
+                        <div className={`rounded-md border p-3 ${roleToneClasses[myTargetRole.tone] || roleToneClasses.paper}`}>
+                          <RoleArtwork role={myTargetRole} compact />
+                          <p className="text-base font-extrabold leading-tight">{myTargetRole.label}</p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                  <RajaRaniCardPicker
+                    cardPick={state.cardPick}
+                    session={session}
+                    onPickCard={onPickCard}
                   />
                 </div>
               ) : state.phase === "reveal" ? (
@@ -318,8 +375,8 @@ export default function RajaRaniTurns({
                           <p className="text-sm font-extrabold">Target</p>
                         </div>
                         <div className={`rounded-md border p-3 ${roleToneClasses[myTargetRole.tone] || roleToneClasses.paper}`}>
-                          <p className="text-2xl font-extrabold leading-none">{myTargetRole.short}</p>
-                          <p className="mt-1 text-sm font-extrabold">{myTargetRole.label}</p>
+                          <RoleArtwork role={myTargetRole} compact />
+                          <p className="text-base font-extrabold leading-tight">{myTargetRole.label}</p>
                         </div>
                       </div>
                     ) : null}

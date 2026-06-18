@@ -1,9 +1,29 @@
 import {
   submitRajaRaniGuess,
+  submitRajaRaniCardPick,
+  submitRajaRaniTurnsCardPick,
   submitRajaRaniTurnsSelection
 } from "../../services/games/rajaRaniService.js";
 
 export function registerRajaRaniHandlers(socket, context, timers) {
+  socket.on("raja-rani-pick-card", (payload, callback) => {
+    try {
+      const result = submitRajaRaniCardPick({
+        socketId: socket.id,
+        roomCode: payload?.roomCode || socket.data.roomCode,
+        cardId: payload?.cardId
+      });
+
+      context.emitRoomUpdate(result.room);
+      context.callbackSuccess(callback, {
+        pick: result.pick,
+        room: context.serializeRoomForSocket(result.room, socket)
+      });
+    } catch (error) {
+      context.callbackError(socket, callback, error);
+    }
+  });
+
   socket.on("raja-rani-guess", (payload, callback) => {
     try {
       const result = submitRajaRaniGuess({
@@ -17,6 +37,25 @@ export function registerRajaRaniHandlers(socket, context, timers) {
 
       context.callbackSuccess(callback, {
         guess: result.guess,
+        room: context.serializeRoomForSocket(result.room, socket)
+      });
+    } catch (error) {
+      context.callbackError(socket, callback, error);
+    }
+  });
+
+  socket.on("raja-rani-turns-pick-card", (payload, callback) => {
+    try {
+      const result = submitRajaRaniTurnsCardPick({
+        socketId: socket.id,
+        roomCode: payload?.roomCode || socket.data.roomCode,
+        cardId: payload?.cardId
+      });
+
+      context.emitRoomUpdate(result.room);
+      timers.scheduleRajaRaniTurnsTimer(result.room);
+      context.callbackSuccess(callback, {
+        pick: result.pick,
         room: context.serializeRoomForSocket(result.room, socket)
       });
     } catch (error) {

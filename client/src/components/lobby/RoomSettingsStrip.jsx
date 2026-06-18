@@ -45,7 +45,9 @@ export default function RoomSettingsStrip({ room, canStart, isHost, onAddBot, on
     isRajaRani ? "10 rounds" : null,
     isRajaRaniTurns ? "Clockwise turns" : null,
     isRajaRaniTurns ? "10s timer" : null,
-    isTreasureHunt ? "10x10 grid" : null,
+    isTreasureHunt ? "10 diamonds" : null,
+    isTreasureHunt ? "25 bombs" : null,
+    isTreasureHunt ? "3 lives" : null,
     isTreasureHunt ? "10s turns" : null,
     isHandCricket ? (isTeamHandCricket ? `Teams of ${room.handCricketTeamSize || 2}` : "Classic") : null
   ].filter(Boolean);

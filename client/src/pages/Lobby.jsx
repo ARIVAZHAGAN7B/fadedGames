@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bomb, Clock, Crown, Gem, KeyRound, Keyboard, MessageSquare, Settings, Shield, Square, Users, Zap } from "lucide-react";
+import { Bomb, Clock, Crown, Gem, Heart, KeyRound, Keyboard, MessageSquare, Settings, Shield, Square, Users, Zap } from "lucide-react";
 import BoardSetup from "../components/BoardSetup.jsx";
 import { GamePage, RoomHeader, StatusMessage } from "../components/game/GameLayout.jsx";
 import PlayerList from "../components/PlayerList.jsx";
 import RoomSettingsStrip from "../components/lobby/RoomSettingsStrip.jsx";
 import { resizeBoostNames, spyWordDifficulties, tagMaps, tagRoundOptions } from "../game/options.js";
+import { getRajaRaniRoleImage } from "../utils/rajaRaniRoleImages.js";
 
 const teamMeta = {
   red: {
@@ -19,8 +20,52 @@ const teamMeta = {
   }
 };
 
-const rajaRaniRoles = ["Raja", "Rani", "Police", "Thirudan", "Manthiri"];
-const rajaRaniTurnRoles = ["Raja", "Rani", "Manthiri", "Police", "Thirudan"];
+const rajaRaniRoles = [
+  { id: "raja", label: "Raja" },
+  { id: "rani", label: "Rani" },
+  { id: "police", label: "Police" },
+  { id: "thirudan", label: "Thirudan" },
+  { id: "manthiri", label: "Manthiri" }
+];
+const rajaRaniTurnRoles = [
+  { id: "raja", label: "Raja" },
+  { id: "rani", label: "Rani" },
+  { id: "manthiri", label: "Manthiri" },
+  { id: "police", label: "Police" },
+  { id: "thirudan", label: "Thirudan" }
+];
+const rajaRaniPreviewClasses = {
+  manthiri: "border-ink/10 bg-white text-ink",
+  police: "border-mint bg-mint/10 text-mint",
+  raja: "border-honey bg-honey/20 text-ink",
+  rani: "border-coral bg-coral/10 text-coral",
+  thirudan: "border-ink bg-ink text-white"
+};
+
+function RajaRaniRolePreview({ role }) {
+  const image = getRajaRaniRoleImage(role.id);
+
+  return (
+    <div className={`rounded-md border p-3 ${rajaRaniPreviewClasses[role.id] || rajaRaniPreviewClasses.manthiri}`}>
+      <div className="mb-3 h-16 w-16 overflow-hidden rounded-md border border-white/60 bg-white/75 p-1 shadow-sm">
+        {image ? (
+          <img
+            src={image}
+            alt=""
+            decoding="async"
+            loading="lazy"
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center text-sm font-extrabold">
+            {role.label.slice(0, 2).toUpperCase()}
+          </div>
+        )}
+      </div>
+      <p className="truncate text-sm font-extrabold">{role.label}</p>
+    </div>
+  );
+}
 
 function TeamSetup({ room, session, onJoinTeam }) {
   const [status, setStatus] = useState("");
@@ -293,25 +338,8 @@ function RajaRaniSetup({ room }) {
       </div>
 
       <div className="grid gap-2 sm:grid-cols-5">
-        {rajaRaniTurnRoles.map((role, index) => (
-          <div key={role} className="rounded-md border border-ink/10 bg-paper p-3">
-            <div
-              className={`mb-3 flex h-9 w-9 items-center justify-center rounded-md ${
-                index === 0
-                  ? "bg-honey text-ink"
-                  : index === 1
-                    ? "bg-coral text-white"
-                    : index === 2
-                      ? "bg-mint text-white"
-                      : index === 3
-                        ? "bg-ink text-white"
-                        : "bg-white text-ink"
-              }`}
-            >
-              {role === "Police" ? <Shield className="h-4 w-4" aria-hidden="true" /> : role.slice(0, 2).toUpperCase()}
-            </div>
-            <p className="truncate text-sm font-extrabold">{role}</p>
-          </div>
+        {rajaRaniTurnRoles.map((role) => (
+          <RajaRaniRolePreview key={role.id} role={role} />
         ))}
       </div>
 
@@ -350,25 +378,8 @@ function RajaRaniTurnsSetup({ room }) {
       </div>
 
       <div className="grid gap-2 sm:grid-cols-5">
-        {rajaRaniRoles.map((role, index) => (
-          <div key={role} className="rounded-md border border-ink/10 bg-paper p-3">
-            <div
-              className={`mb-3 flex h-9 w-9 items-center justify-center rounded-md ${
-                index === 0
-                  ? "bg-honey text-ink"
-                  : index === 1
-                    ? "bg-coral text-white"
-                    : index === 2
-                      ? "bg-mint text-white"
-                      : index === 3
-                        ? "bg-ink text-white"
-                        : "bg-white text-ink"
-              }`}
-            >
-              {index === 2 ? <Shield className="h-4 w-4" aria-hidden="true" /> : role.slice(0, 2).toUpperCase()}
-            </div>
-            <p className="truncate text-sm font-extrabold">{role}</p>
-          </div>
+        {rajaRaniRoles.map((role) => (
+          <RajaRaniRolePreview key={role.id} role={role} />
         ))}
       </div>
 
@@ -433,8 +444,6 @@ function BoostSetup({ room }) {
 }
 
 function TreasureHuntSetup({ room }) {
-  const neededPlayers = Math.max(0, 2 - room.players.length);
-
   return (
     <section className="surface p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -458,18 +467,18 @@ function TreasureHuntSetup({ room }) {
         </div>
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <Gem className="mb-2 h-5 w-5 text-honey" aria-hidden="true" />
-          <p className="text-xs font-extrabold uppercase text-ink/45">Treasures</p>
-          <p className="text-xl font-extrabold">15</p>
+          <p className="text-xs font-extrabold uppercase text-ink/45">Diamonds</p>
+          <p className="text-xl font-extrabold">10</p>
         </div>
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <Bomb className="mb-2 h-5 w-5 text-coral" aria-hidden="true" />
-          <p className="text-xs font-extrabold uppercase text-ink/45">Bomb Limit</p>
-          <p className="text-xl font-extrabold">3</p>
+          <p className="text-xs font-extrabold uppercase text-ink/45">Bombs</p>
+          <p className="text-xl font-extrabold">25</p>
         </div>
         <div className="rounded-md border border-ink/10 bg-paper p-3">
-          <Users className="mb-2 h-5 w-5 text-ink" aria-hidden="true" />
-          <p className="text-xs font-extrabold uppercase text-ink/45">Needed</p>
-          <p className="text-xl font-extrabold">{neededPlayers}</p>
+          <Heart className="mb-2 h-5 w-5 text-mint" aria-hidden="true" />
+          <p className="text-xs font-extrabold uppercase text-ink/45">Lives</p>
+          <p className="text-xl font-extrabold">3</p>
         </div>
       </div>
     </section>
