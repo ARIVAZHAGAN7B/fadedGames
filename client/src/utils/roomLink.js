@@ -17,11 +17,6 @@ const supportedGameTypes = new Set([
   "raja-rani-turns"
 ]);
 
-const routeSlugByGameType = {
-  "raja-rani": "thirudan-police",
-  "raja-rani-turns": "raja-rani"
-};
-
 const gameTypeByRouteSlug = {
   "thirudan-police": "raja-rani",
   "raja-rani": "raja-rani-turns"
@@ -41,20 +36,23 @@ function normalizeGameTypeFromPath(gameType) {
   return gameTypeByRouteSlug[slug] || normalizeGameType(slug);
 }
 
-function getRouteSlug(gameType) {
+function setQueryRoute(url, gameType, roomCode = "") {
   const game = normalizeGameType(gameType);
-  return routeSlugByGameType[game] || game;
-}
-
-function buildGamePath(gameType, roomCode = "") {
-  const slug = getRouteSlug(gameType);
   const code = normalizeRoomCode(roomCode);
 
-  if (!slug) {
-    return "/";
+  url.pathname = "/";
+  url.search = "";
+  url.hash = "";
+
+  if (game) {
+    url.searchParams.set("game", game);
   }
 
-  return code ? `/${slug}/${encodeURIComponent(code)}` : `/${slug}`;
+  if (code) {
+    url.searchParams.set("room", code);
+  }
+
+  return url;
 }
 
 function readPathRoute(pathname) {
@@ -100,21 +98,7 @@ export function buildRoomLink(roomCode, gameType) {
   const game = normalizeGameType(gameType);
   const code = normalizeRoomCode(roomCode);
 
-  url.search = "";
-  url.hash = "";
-
-  if (game) {
-    url.pathname = buildGamePath(game, code);
-    return url.toString();
-  }
-
-  url.pathname = "/";
-
-  if (code) {
-    url.searchParams.set("room", code);
-  }
-
-  return url.toString();
+  return setQueryRoute(url, game, code).toString();
 }
 
 function updateRoute(url, mode) {
@@ -134,9 +118,7 @@ export function setGameRouteInUrl(gameType, roomCode = "", { replace = false } =
   const game = normalizeGameType(gameType);
   const code = normalizeRoomCode(roomCode);
 
-  url.pathname = buildGamePath(game, code);
-  url.search = "";
-  url.hash = "";
+  setQueryRoute(url, game, code);
 
   updateRoute(url, replace ? "replace" : "push");
 }
@@ -146,9 +128,7 @@ export function setRoomCodeInUrl(roomCode, gameType) {
   const code = normalizeRoomCode(roomCode);
   const game = normalizeGameType(gameType);
 
-  url.pathname = code || game ? buildGamePath(game || "bingo", code) : "/";
-  url.search = "";
-  url.hash = "";
+  setQueryRoute(url, code || game ? game || "bingo" : "", code);
 
   updateRoute(url, "replace");
 }
