@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: fadedgame
+    runtime: static
+    buildCommand: npm run build
+    staticPublishPath: ./client/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
