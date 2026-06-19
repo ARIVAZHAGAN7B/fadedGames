@@ -191,8 +191,8 @@ export default function RajaRani({
     <GamePage>
       <RoomHeader
         room={room}
-        codeLabel="RR"
-        eyebrow="Raja Rani Room"
+        codeLabel="TP"
+        eyebrow="Thirudan Police Room"
         onStatus={setStatus}
         onLeaveRoom={onLeaveRoom}
         actions={<RestartButton onRestart={handleRestart} disabled={!isHost} />}
@@ -212,13 +212,13 @@ export default function RajaRani({
                     {room.gameEnded
                       ? "Match Result"
                       : state.phase === "card-pick"
-                        ? "Choose Cards"
+                        ? "Card Selection"
                       : state.phase === "reveal"
                         ? lastGuess?.correct
-                          ? "Police caught the thief"
-                          : "Thief escaped"
+                          ? "Police found Thirudan"
+                          : "Thirudan escaped"
                         : isPolice
-                          ? "Catch Thief"
+                          ? "Find Thirudan"
                           : "Role Locked"}
                   </h2>
                 </div>
@@ -255,6 +255,7 @@ export default function RajaRani({
                   <RoleCard player={myPlayer} />
                   <RajaRaniCardPicker
                     cardPick={state.cardPick}
+                    gameLabel="Thirudan Police"
                     session={session}
                     onPickCard={onPickCard}
                   />
@@ -326,7 +327,7 @@ export default function RajaRani({
                         disabled={!selectedSuspectId}
                       >
                         <Shield className="h-5 w-5" aria-hidden="true" />
-                        Catch Thief
+                        Catch Thirudan
                       </button>
                     </div>
                   ) : (

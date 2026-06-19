@@ -321,15 +321,15 @@ function SpyWordSetup({ room }) {
   );
 }
 
-function RajaRaniSetup({ room }) {
+function ThirudanPoliceSetup({ room }) {
   return (
     <section className="surface p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <p className="text-xs font-extrabold uppercase text-mint">Hidden Roles</p>
           <h2 className="flex items-center gap-1.5 text-lg font-extrabold">
-            <Crown className="h-4 w-4 text-honey" aria-hidden="true" />
-            Raja Rani
+            <Shield className="h-4 w-4 text-mint" aria-hidden="true" />
+            Thirudan Police
           </h2>
         </div>
         <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-extrabold text-ink/65">
@@ -369,7 +369,7 @@ function RajaRaniTurnsSetup({ room }) {
           <p className="text-xs font-extrabold uppercase text-mint">Clockwise Roles</p>
           <h2 className="flex items-center gap-1.5 text-lg font-extrabold">
             <Crown className="h-4 w-4 text-honey" aria-hidden="true" />
-            Raja Rani Turns
+            Raja Rani
           </h2>
         </div>
         <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-extrabold text-ink/65">
@@ -514,7 +514,7 @@ export default function Lobby({
   const isWordGuess = room.gameType === "word-guess";
   const isSpyWord = room.gameType === "spy-word";
   const isBoost = room.gameType === "boost";
-  const isRajaRani = room.gameType === "raja-rani";
+  const isThirudanPolice = room.gameType === "thirudan-police" || room.gameType === "raja-rani";
   const isRajaRaniTurns = room.gameType === "raja-rani-turns";
   const isTreasureHunt = room.gameType === "treasure-hunt";
   const isTeamHandCricket = room.handCricketMode === "team";
@@ -535,7 +535,7 @@ export default function Lobby({
         ? room.players.length >= 4 && room.players.length <= 10
         : isBoost
           ? room.players.length === room.maxPlayers
-          : isRajaRani
+          : isThirudanPolice
             ? room.players.length === 5
             : isRajaRaniTurns
               ? room.players.length === 5
@@ -600,10 +600,10 @@ export default function Lobby({
         ? "GN"
         : isBoost
           ? "BO"
-          : isRajaRani
-            ? "RR"
+          : isThirudanPolice
+            ? "TP"
             : isRajaRaniTurns
-              ? "RT"
+              ? "RR"
               : isTreasureHunt
                 ? "TH"
                 : isTag
@@ -619,10 +619,10 @@ export default function Lobby({
         ? "Spy Word Lobby"
         : isBoost
           ? "BOOST Lobby"
-          : isRajaRani
-            ? "Raja Rani Lobby"
+          : isThirudanPolice
+            ? "Thirudan Police Lobby"
             : isRajaRaniTurns
-              ? "Raja Rani Turns Lobby"
+              ? "Raja Rani Lobby"
               : isTreasureHunt
                 ? "Treasure Hunt Lobby"
                 : isTag
@@ -865,8 +865,8 @@ export default function Lobby({
             <SpyWordSetup room={room} />
           ) : isBoost ? (
             <BoostSetup room={room} />
-          ) : isRajaRani ? (
-            <RajaRaniSetup room={room} />
+          ) : isThirudanPolice ? (
+            <ThirudanPoliceSetup room={room} />
           ) : isRajaRaniTurns ? (
             <RajaRaniTurnsSetup room={room} />
           ) : isTreasureHunt ? (

@@ -315,7 +315,7 @@ export function createSocketTimers(context) {
     const state = room.rajaRani;
 
     if (
-      room.gameType !== "raja-rani" ||
+      !["thirudan-police", "raja-rani"].includes(room.gameType) ||
       !room.gameStarted ||
       room.gameEnded ||
       state?.phase !== "reveal" ||

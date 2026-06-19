@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, LogIn, Plus, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, Check, LogIn, Pencil, Plus, UserRound, Wifi, WifiOff } from "lucide-react";
 import bingoLogo from "../images/optimized/bingo.webp";
 import boostLogo from "../images/optimized/boost.webp";
 import fadedGamesLogo from "../images/optimized/FGlogo.webp";
@@ -76,7 +76,7 @@ const games = [
     summary: "One spy gets a related word while detectives trade careful clues."
   },
   {
-    id: "raja-rani",
+    id: "thirudan-police",
     name: "Thirudan Police",
     status: "Ready",
     available: true,
@@ -90,7 +90,7 @@ const games = [
     name: "Raja Rani",
     status: "Ready",
     available: true,
-    defaultRoomName: "Raja Rani Turns",
+    defaultRoomName: "Raja Rani Table",
     maxPlayers: 5,
     logo: rajaRaniLogo,
     summary: "Clockwise hidden-role turns with instant swaps on wrong guesses."
@@ -139,6 +139,23 @@ const boostDefaultNames = [
   "Kovai",
   "Madurai"
 ];
+const PLAYER_NAME_STORAGE_KEY = "faded-games-player-name";
+
+function readStoredPlayerName() {
+  try {
+    return String(window.localStorage.getItem(PLAYER_NAME_STORAGE_KEY) || "").trim().slice(0, 24);
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredPlayerName(name) {
+  try {
+    window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, name);
+  } catch {
+    // The saved name is only a convenience; gameplay still works in the current tab.
+  }
+}
 
 function resizeBoostNames(names, count) {
   return Array.from({ length: count }, (_entry, index) => names[index] || boostDefaultNames[index] || `Card ${index + 1}`);
@@ -148,11 +165,16 @@ function getGameById(gameId) {
   return games.find((game) => game.id === gameId) || null;
 }
 
+function getPublicGameType(gameType) {
+  return gameType === "raja-rani" ? "thirudan-police" : gameType;
+}
+
 function getInitialGameId(gameType, roomCode) {
   const game = normalizeGameType(gameType);
+  const publicGame = getPublicGameType(game);
 
-  if (game) {
-    return game;
+  if (getGameById(publicGame)) {
+    return publicGame;
   }
 
   return normalizeRoomCode(roomCode) ? "bingo" : "";
@@ -195,7 +217,11 @@ function getActiveRoomMode(room) {
     return `${room.maxPlayers || 10} players`;
   }
 
-  if (room.gameType === "raja-rani" || room.gameType === "raja-rani-turns") {
+  if (
+    room.gameType === "thirudan-police" ||
+    room.gameType === "raja-rani" ||
+    room.gameType === "raja-rani-turns"
+  ) {
     return "10 rounds";
   }
 
@@ -204,6 +230,87 @@ function getActiveRoomMode(room) {
   }
 
   return room.handCricketMode === "team" ? "Team" : "Classic";
+}
+
+function PlayerNameModal({
+  canCancel,
+  inputRef,
+  nameDraft,
+  onCancel,
+  onNameDraftChange,
+  onSubmit
+}) {
+  const canSave = nameDraft.trim().length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/25 px-4 py-6 backdrop-blur-[2px]">
+      <form
+        className="w-full max-w-sm rounded-md border border-white/60 bg-white/75 p-4 text-center shadow-soft backdrop-blur-xl"
+        onSubmit={onSubmit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="player-name-title"
+      >
+        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-md bg-ink text-white">
+          <UserRound className="h-6 w-6" aria-hidden="true" />
+        </div>
+        <h2 id="player-name-title" className="text-2xl font-extrabold text-ink">
+          Enter Your Name
+        </h2>
+        <label className="mt-4 block text-left">
+          <span className="compact-label">Player Name</span>
+          <input
+            ref={inputRef}
+            className="compact-input bg-white/90 text-base"
+            value={nameDraft}
+            onChange={(event) => onNameDraftChange(event.target.value)}
+            placeholder="Arivazhagan"
+            maxLength={24}
+            autoComplete="name"
+          />
+        </label>
+        <div className={`mt-4 grid gap-2 ${canCancel ? "grid-cols-2" : ""}`}>
+          {canCancel ? (
+            <button
+              type="button"
+              className="compact-button border border-ink/15 bg-white/75 text-ink hover:border-coral hover:text-coral"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+          ) : null}
+          <button
+            type="submit"
+            className="compact-button bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
+            disabled={!canSave}
+          >
+            <Check className="h-5 w-5" aria-hidden="true" />
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function PlayerNameButton({ nickname, onClick }) {
+  if (!nickname) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      className="inline-flex min-h-8 max-w-44 items-center gap-1.5 rounded-full border border-ink/10 bg-white px-2.5 py-1 text-xs font-extrabold text-ink shadow-soft transition hover:border-coral hover:text-coral"
+      onClick={onClick}
+      title="Change player name"
+      aria-label="Change player name"
+    >
+      <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <span className="truncate">{nickname}</span>
+      <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+    </button>
+  );
 }
 
 export default function Home({
@@ -217,7 +324,9 @@ export default function Home({
 }) {
   const initialSelectedGameId = getInitialGameId(initialGameType, initialRoomCode);
   const initialSelectedGame = getGameById(initialSelectedGameId);
-  const [nickname, setNickname] = useState("");
+  const [nickname, setNickname] = useState(() => readStoredPlayerName());
+  const [nameDraft, setNameDraft] = useState(() => readStoredPlayerName());
+  const [nameModalOpen, setNameModalOpen] = useState(() => !readStoredPlayerName());
   const [mode, setMode] = useState(initialRoomCode ? "join" : "create");
   const [selectedGameId, setSelectedGameId] = useState(initialSelectedGameId);
   const [handCricketMode, setHandCricketMode] = useState("classic");
@@ -236,6 +345,7 @@ export default function Home({
   const [submitting, setSubmitting] = useState(false);
   const [pickingGameId, setPickingGameId] = useState("");
   const pickingGameTimerRef = useRef(null);
+  const nameInputRef = useRef(null);
   const selectedGame = getGameById(selectedGameId);
   const isHandCricket = selectedGame?.id === "hand-cricket";
   const isTag = selectedGame?.id === "tag";
@@ -243,15 +353,51 @@ export default function Home({
   const isWordGuess = selectedGame?.id === "word-guess";
   const isSpyWord = selectedGame?.id === "spy-word";
   const isBoost = selectedGame?.id === "boost";
-  const isRajaRani = selectedGame?.id === "raja-rani";
+  const isThirudanPolice = selectedGame?.id === "thirudan-police";
   const isRajaRaniTurns = selectedGame?.id === "raja-rani-turns";
+  const isTreasureHunt = selectedGame?.id === "treasure-hunt";
   const teamMemberCount = Number(handCricketTeamMembers);
   const validTeamMembers =
     Number.isInteger(teamMemberCount) && teamMemberCount >= 2 && teamMemberCount <= 6;
   const handCricketPlayers = handCricketMode === "team" ? teamMemberCount * 2 : 2;
+  const treasureHuntPlayers = Number(maxPlayers);
+  const validTreasureHuntPlayers =
+    !isTreasureHunt ||
+    (Number.isInteger(treasureHuntPlayers) && treasureHuntPlayers >= 2 && treasureHuntPlayers <= 10);
   const selectedGameRooms = selectedGame
-    ? activeRooms.filter((activeRoom) => activeRoom.gameType === selectedGame.id)
+    ? activeRooms.filter((activeRoom) => getPublicGameType(activeRoom.gameType) === selectedGame.id)
     : [];
+
+  const openNameModal = () => {
+    setNameDraft(nickname);
+    setNameModalOpen(true);
+  };
+
+  const closeNameModal = () => {
+    if (!nickname.trim()) {
+      return;
+    }
+
+    setNameDraft(nickname);
+    setNameModalOpen(false);
+  };
+
+  const handleNameSubmit = (event) => {
+    event.preventDefault();
+
+    const nextName = nameDraft.trim();
+
+    if (!nextName) {
+      setNameDraft("");
+      return;
+    }
+
+    setNickname(nextName);
+    setNameDraft(nextName);
+    writeStoredPlayerName(nextName);
+    setNameModalOpen(false);
+    setError("");
+  };
 
   const selectGame = (gameId, nextMode = "create") => {
     const game = getGameById(gameId);
@@ -308,6 +454,18 @@ export default function Home({
   }, []);
 
   useEffect(() => {
+    if (!nameModalOpen) {
+      return undefined;
+    }
+
+    const focusTimer = window.setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(focusTimer);
+  }, [nameModalOpen]);
+
+  useEffect(() => {
     if (connected && selectedGameId && typeof onRefreshActiveRooms === "function") {
       onRefreshActiveRooms();
     }
@@ -341,10 +499,16 @@ export default function Home({
     nickname.trim().length > 0 &&
     (mode === "create" ? selectedGame.available : roomCode.trim().length > 0) &&
     (!isHandCricket || handCricketMode !== "team" || validTeamMembers) &&
+    (mode !== "create" || validTreasureHuntPlayers) &&
     connected;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (!nickname.trim()) {
+      setNameModalOpen(true);
+      return;
+    }
 
     if (!canSubmit || !selectedGame) {
       return;
@@ -373,11 +537,13 @@ export default function Home({
                       ? Number(spyWordPlayerCount)
                       : isBoost
                         ? Number(boostPlayerCount)
-                        : isRajaRani
+                        : isThirudanPolice
                           ? 5
                           : isRajaRaniTurns
                             ? 5
-                          : Number(maxPlayers),
+                            : isTreasureHunt
+                              ? treasureHuntPlayers
+                              : Number(maxPlayers),
             gameType: selectedGame.id,
             handCricketMode: isHandCricket ? handCricketMode : undefined,
             handCricketTeamSize:
@@ -396,6 +562,17 @@ export default function Home({
     setSubmitting(false);
   };
 
+  const nameModal = nameModalOpen ? (
+    <PlayerNameModal
+      canCancel={Boolean(nickname.trim())}
+      inputRef={nameInputRef}
+      nameDraft={nameDraft}
+      onCancel={closeNameModal}
+      onNameDraftChange={setNameDraft}
+      onSubmit={handleNameSubmit}
+    />
+  ) : null;
+
   if (!selectedGame) {
     return (
       <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
@@ -411,13 +588,16 @@ export default function Home({
               />
               <h1 className="text-2xl font-extrabold text-ink sm:text-3xl">Faded Games</h1>
             </div>
-            <div
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
-                connected ? "bg-mint text-white" : "bg-coral text-white"
-              }`}
-            >
-              {connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-              {connected ? "Online" : "Offline"}
+            <div className="flex items-center justify-end gap-2">
+              <PlayerNameButton nickname={nickname} onClick={openNameModal} />
+              <div
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+                  connected ? "bg-mint text-white" : "bg-coral text-white"
+                }`}
+              >
+                {connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+                {connected ? "Online" : "Offline"}
+              </div>
             </div>
           </header>
 
@@ -458,6 +638,7 @@ export default function Home({
             })}
           </section>
         </div>
+        {nameModal}
       </main>
     );
   }
@@ -493,13 +674,16 @@ export default function Home({
               <h1 className="truncate text-2xl font-extrabold text-ink">{selectedGame.name}</h1>
             </div>
           </div>
-          <div
-            className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
-              connected ? "bg-mint text-white" : "bg-coral text-white"
-            }`}
-          >
-            {connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-            {connected ? "Online" : "Offline"}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <PlayerNameButton nickname={nickname} onClick={openNameModal} />
+            <div
+              className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+                connected ? "bg-mint text-white" : "bg-coral text-white"
+              }`}
+            >
+              {connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+              {connected ? "Online" : "Offline"}
+            </div>
           </div>
         </header>
 
@@ -630,16 +814,22 @@ export default function Home({
               </button>
             </div>
 
-            <label className="mb-3 block">
-              <span className="compact-label">Nickname</span>
-              <input
-                className="compact-input bg-white"
-                value={nickname}
-                onChange={(event) => setNickname(event.target.value)}
-                placeholder="Arivazhagan"
-                maxLength={24}
-              />
-            </label>
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-ink/10 bg-white px-3 py-2">
+              <div className="min-w-0">
+                <span className="compact-label mb-0">Player</span>
+                <p className="truncate text-sm font-extrabold text-ink">
+                  {nickname || "Name needed"}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="compact-button shrink-0 border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
+                onClick={openNameModal}
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Change
+              </button>
+            </div>
 
             {mode === "create" ? (
               <div className="space-y-3">
@@ -861,7 +1051,7 @@ export default function Home({
                         <p className="text-sm font-extrabold text-ink">{handCricketPlayers}</p>
                       </div>
                     )
-                  ) : isTag || isGuessNumber || isWordGuess || isSpyWord || isBoost || isRajaRani || isRajaRaniTurns ? (
+                  ) : isTag || isGuessNumber || isWordGuess || isSpyWord || isBoost || isThirudanPolice || isRajaRaniTurns ? (
                     <div className="rounded-md border border-ink/10 bg-white px-3 py-2">
                       <span className="compact-label">Players</span>
                       <p className="text-sm font-extrabold text-ink">
@@ -871,7 +1061,7 @@ export default function Home({
                             ? spyWordPlayerCount
                             : isBoost
                               ? boostPlayerCount
-                              : isRajaRani || isRajaRaniTurns
+                              : isThirudanPolice || isRajaRaniTurns
                                 ? 5
                                 : tagPlayerCount}
                       </p>
@@ -882,8 +1072,8 @@ export default function Home({
                       <input
                         className="compact-input bg-white"
                         type="number"
-                        min="1"
-                        max="12"
+                        min={isTreasureHunt ? "2" : "1"}
+                        max={isTreasureHunt ? "10" : "12"}
                         value={maxPlayers}
                         onChange={(event) => setMaxPlayers(event.target.value)}
                       />
@@ -917,6 +1107,7 @@ export default function Home({
           </section>
         </form>
       </div>
+      {nameModal}
     </main>
   );
 }

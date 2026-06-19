@@ -235,8 +235,8 @@ export default function RajaRaniTurns({
     <GamePage>
       <RoomHeader
         room={room}
-        codeLabel="RT"
-        eyebrow="Raja Rani Turns"
+        codeLabel="RR"
+        eyebrow="Raja Rani"
         onStatus={setStatus}
         onLeaveRoom={onLeaveRoom}
         actions={<RestartButton onRestart={handleRestart} disabled={!isHost} />}
@@ -321,6 +321,7 @@ export default function RajaRaniTurns({
                   </div>
                   <RajaRaniCardPicker
                     cardPick={state.cardPick}
+                    gameLabel="Raja Rani"
                     session={session}
                     onPickCard={onPickCard}
                   />

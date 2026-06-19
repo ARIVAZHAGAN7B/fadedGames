@@ -8,7 +8,7 @@ export default function RoomSettingsStrip({ room, canStart, isHost, onAddBot, on
   const isGuessNumber = room.gameType === "guess-number";
   const isWordGuess = room.gameType === "word-guess";
   const isSpyWord = room.gameType === "spy-word";
-  const isRajaRani = room.gameType === "raja-rani";
+  const isThirudanPolice = room.gameType === "thirudan-police" || room.gameType === "raja-rani";
   const isRajaRaniTurns = room.gameType === "raja-rani-turns";
   const isTreasureHunt = room.gameType === "treasure-hunt";
   const isHandCricket = room.gameType === "hand-cricket";
@@ -21,14 +21,14 @@ export default function RoomSettingsStrip({ room, canStart, isHost, onAddBot, on
       ? 4
       : isTag || isGuessNumber || isWordGuess || isTreasureHunt
         ? 2
-        : isRajaRani || isRajaRaniTurns
+        : isThirudanPolice || isRajaRaniTurns
           ? 5
           : room.maxPlayers) - room.players.length
   );
   const readyLabel = canStart
     ? "Ready"
     : neededPlayers > 0
-      ? `Need ${neededPlayers}`
+      ? `Need ${neededPlayers} player${neededPlayers === 1 ? "" : "s"}`
       : isBingo
         ? "Boards pending"
         : "Waiting";
@@ -41,10 +41,12 @@ export default function RoomSettingsStrip({ room, canStart, isHost, onAddBot, on
     isWordGuess ? "5 letters" : null,
     isSpyWord ? `${room.spyWord?.difficulty || "easy"} difficulty` : null,
     isSpyWord ? "5 clue rounds" : null,
-    isRajaRani ? "5 hidden roles" : null,
-    isRajaRani ? "10 rounds" : null,
+    isThirudanPolice ? "5 hidden roles" : null,
+    isThirudanPolice ? "Police guess" : null,
+    isThirudanPolice ? "10 rounds" : null,
     isRajaRaniTurns ? "Clockwise turns" : null,
     isRajaRaniTurns ? "10s timer" : null,
+    isTreasureHunt ? "2-10 players" : null,
     isTreasureHunt ? "10 diamonds" : null,
     isTreasureHunt ? "25 bombs" : null,
     isTreasureHunt ? "3 lives" : null,

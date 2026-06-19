@@ -13,7 +13,7 @@ const GuessNumber = lazy(() => import("./pages/GuessNumber.jsx"));
 const HandCricket = lazy(() => import("./pages/HandCricket.jsx"));
 const Home = lazy(() => import("./pages/Home.jsx"));
 const Lobby = lazy(() => import("./pages/Lobby.jsx"));
-const RajaRani = lazy(() => import("./pages/RajaRani.jsx"));
+const ThirudanPolice = lazy(() => import("./pages/RajaRani.jsx"));
 const RajaRaniTurns = lazy(() => import("./pages/RajaRaniTurns.jsx"));
 const Result = lazy(() => import("./pages/Result.jsx"));
 const SpyWord = lazy(() => import("./pages/SpyWord.jsx"));
@@ -117,8 +117,11 @@ function viewForRoom(room, fallback = "lobby") {
     return "treasure-hunt";
   }
 
-  if (room.gameType === "raja-rani" && (room.gameStarted || room.gameEnded)) {
-    return "raja-rani";
+  if (
+    (room.gameType === "thirudan-police" || room.gameType === "raja-rani") &&
+    (room.gameStarted || room.gameEnded)
+  ) {
+    return "thirudan-police";
   }
 
   if (room.gameType === "raja-rani-turns" && (room.gameStarted || room.gameEnded)) {
@@ -656,8 +659,8 @@ export default function App() {
     return response;
   };
 
-  const handleRajaRaniGuess = async (suspectPlayerId) => {
-    const response = await emitWithAck("raja-rani-guess", {
+  const handleThirudanPoliceGuess = async (suspectPlayerId) => {
+    const response = await emitWithAck("thirudan-police-guess", {
       roomCode: session.roomCode,
       suspectPlayerId
     });
@@ -670,8 +673,8 @@ export default function App() {
     return response;
   };
 
-  const handleRajaRaniPickCard = async (cardId) => {
-    const response = await emitWithAck("raja-rani-pick-card", {
+  const handleThirudanPolicePickCard = async (cardId) => {
+    const response = await emitWithAck("thirudan-police-pick-card", {
       roomCode: session.roomCode,
       cardId
     });
@@ -834,13 +837,13 @@ export default function App() {
     );
   }
 
-  if (view === "raja-rani" && room) {
+  if (view === "thirudan-police" && room) {
     return screen(
-      <RajaRani
+      <ThirudanPolice
         room={room}
         session={session}
-        onPickCard={handleRajaRaniPickCard}
-        onGuess={handleRajaRaniGuess}
+        onPickCard={handleThirudanPolicePickCard}
+        onGuess={handleThirudanPoliceGuess}
         onRestartGame={handleRestartGame}
         onLeaveRoom={handleLeaveRoom}
       />

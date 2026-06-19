@@ -13,12 +13,12 @@ const supportedGameTypes = new Set([
   "spy-word",
   "boost",
   "treasure-hunt",
+  "thirudan-police",
   "raja-rani",
   "raja-rani-turns"
 ]);
 
 const gameTypeByRouteSlug = {
-  "thirudan-police": "raja-rani",
   "raja-rani": "raja-rani-turns"
 };
 

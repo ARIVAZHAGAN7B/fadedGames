@@ -6,7 +6,7 @@ import {
 } from "../../services/games/rajaRaniService.js";
 
 export function registerRajaRaniHandlers(socket, context, timers) {
-  socket.on("raja-rani-pick-card", (payload, callback) => {
+  const handleThirudanPolicePickCard = (payload, callback) => {
     try {
       const result = submitRajaRaniCardPick({
         socketId: socket.id,
@@ -22,9 +22,9 @@ export function registerRajaRaniHandlers(socket, context, timers) {
     } catch (error) {
       context.callbackError(socket, callback, error);
     }
-  });
+  };
 
-  socket.on("raja-rani-guess", (payload, callback) => {
+  const handleThirudanPoliceGuess = (payload, callback) => {
     try {
       const result = submitRajaRaniGuess({
         socketId: socket.id,
@@ -42,7 +42,12 @@ export function registerRajaRaniHandlers(socket, context, timers) {
     } catch (error) {
       context.callbackError(socket, callback, error);
     }
-  });
+  };
+
+  socket.on("thirudan-police-pick-card", handleThirudanPolicePickCard);
+  socket.on("raja-rani-pick-card", handleThirudanPolicePickCard);
+  socket.on("thirudan-police-guess", handleThirudanPoliceGuess);
+  socket.on("raja-rani-guess", handleThirudanPoliceGuess);
 
   socket.on("raja-rani-turns-pick-card", (payload, callback) => {
     try {

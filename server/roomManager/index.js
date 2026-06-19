@@ -157,12 +157,17 @@ const SUPPORTED_GAME_TYPES = new Set([
   "spy-word",
   "boost",
   "treasure-hunt",
+  "thirudan-police",
   "raja-rani",
   "raja-rani-turns"
 ]);
 const HAND_CRICKET_MODES = new Set(["classic", "team"]);
 const HAND_CRICKET_TEAMS = ["red", "blue"];
 const HAND_CRICKET_NUMBERS = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+function isThirudanPoliceGameType(gameType) {
+  return gameType === "thirudan-police" || gameType === "raja-rani";
+}
 const WORD_GUESS_WORD_BANK = [
   "ABOUT",
   "ADAPT",
@@ -937,7 +942,7 @@ function cleanMaxPlayersForGame(
     return value;
   }
 
-  if (gameType === "raja-rani" || gameType === "raja-rani-turns") {
+  if (isThirudanPoliceGameType(gameType) || gameType === "raja-rani-turns") {
     return RAJA_RANI_PLAYERS;
   }
 
@@ -3752,7 +3757,7 @@ function serializeRajaRaniCardPick(room, state, viewerPlayerId = null) {
 }
 
 function serializeRajaRani(room, viewerPlayerId = null) {
-  if (room.gameType !== "raja-rani") {
+  if (!isThirudanPoliceGameType(room.gameType)) {
     return null;
   }
 
@@ -3976,7 +3981,7 @@ function serializeTreasureHunt(room) {
 export function serializeRoom(room, viewerPlayerId = null) {
   const currentPlayer = room.players[room.currentTurn] || null;
   const hideCurrentPlayer =
-    room.gameType === "raja-rani" &&
+    isThirudanPoliceGameType(room.gameType) &&
     room.rajaRani?.phase === "police-turn";
 
   return {
@@ -4084,7 +4089,7 @@ export function createRoom({
     spyWord: type === "spy-word" ? createSpyWordState("waiting", cleanSpyDifficulty) : null,
     boost: type === "boost" ? createBoostState("waiting", boostCategories) : null,
     treasureHunt: type === "treasure-hunt" ? createTreasureHuntState() : null,
-    rajaRani: type === "raja-rani" ? createRajaRaniState("waiting") : null,
+    rajaRani: isThirudanPoliceGameType(type) ? createRajaRaniState("waiting") : null,
     rajaRaniTurns: type === "raja-rani-turns" ? createRajaRaniTurnsState("waiting") : null,
     createdAt: Date.now(),
     updatedAt: Date.now()
@@ -4167,7 +4172,7 @@ export function updateRoomSettings({
                     }
                     return value;
                   })()
-              : room.gameType === "raja-rani"
+              : isThirudanPoliceGameType(room.gameType) || room.gameType === "raja-rani-turns"
                 ? RAJA_RANI_PLAYERS
                 : cleanRoomSize(maxPlayers);
 
@@ -4472,9 +4477,9 @@ export function startGame({ socketId, roomCode }) {
     return room;
   }
 
-  if (room.gameType === "raja-rani") {
+  if (isThirudanPoliceGameType(room.gameType)) {
     if (room.players.length !== RAJA_RANI_PLAYERS) {
-      throw new Error(`Raja Rani needs exactly ${RAJA_RANI_PLAYERS} players.`);
+      throw new Error(`Thirudan Police needs exactly ${RAJA_RANI_PLAYERS} players.`);
     }
 
     room.calledNumbers = [];
@@ -4491,7 +4496,7 @@ export function startGame({ socketId, roomCode }) {
 
   if (room.gameType === "raja-rani-turns") {
     if (room.players.length !== RAJA_RANI_PLAYERS) {
-      throw new Error(`Raja Rani Turns needs exactly ${RAJA_RANI_PLAYERS} players.`);
+      throw new Error(`Raja Rani needs exactly ${RAJA_RANI_PLAYERS} players.`);
     }
 
     room.calledNumbers = [];
@@ -4629,7 +4634,7 @@ export function restartGame({ socketId, roomCode }) {
     return room;
   }
 
-  if (room.gameType === "raja-rani") {
+  if (isThirudanPoliceGameType(room.gameType)) {
     room.rajaRani = createRajaRaniState("waiting");
     touch(room);
 
@@ -4853,8 +4858,8 @@ export function submitRajaRaniCardPick({ socketId, roomCode, cardId }) {
   const player = findPlayerBySocket(room, socketId);
   const state = room.rajaRani;
 
-  if (room.gameType !== "raja-rani" || !state) {
-    throw new Error("Raja Rani is not active.");
+  if (!isThirudanPoliceGameType(room.gameType) || !state) {
+    throw new Error("Thirudan Police is not active.");
   }
 
   if (!player) {
@@ -4883,8 +4888,8 @@ export function submitRajaRaniGuess({ socketId, roomCode, suspectPlayerId }) {
   const state = room.rajaRani;
   const suspectId = String(suspectPlayerId || "").trim();
 
-  if (room.gameType !== "raja-rani" || !state) {
-    throw new Error("Raja Rani is not active.");
+  if (!isThirudanPoliceGameType(room.gameType) || !state) {
+    throw new Error("Thirudan Police is not active.");
   }
 
   if (!player) {
@@ -4896,7 +4901,7 @@ export function submitRajaRaniGuess({ socketId, roomCode, suspectPlayerId }) {
   }
 
   if (state.rolesByPlayerId[player.playerId] !== "police") {
-    throw new Error("Only Police can catch the thief.");
+    throw new Error("Only Police can catch the Thirudan.");
   }
 
   if (suspectId === player.playerId) {
@@ -4922,7 +4927,7 @@ export function resolveRajaRaniReveal({ roomCode, moveId }) {
   const room = requireRoom(roomCode);
   const state = room.rajaRani;
 
-  if (room.gameType !== "raja-rani" || !state || !room.gameStarted || room.gameEnded) {
+  if (!isThirudanPoliceGameType(room.gameType) || !state || !room.gameStarted || room.gameEnded) {
     return {
       room,
       changed: false
@@ -4963,7 +4968,7 @@ export function submitRajaRaniTurnsCardPick({ socketId, roomCode, cardId }) {
   const state = room.rajaRaniTurns;
 
   if (room.gameType !== "raja-rani-turns" || !state) {
-    throw new Error("Raja Rani Turns is not active.");
+    throw new Error("Raja Rani is not active.");
   }
 
   if (!player) {
@@ -4993,7 +4998,7 @@ export function submitRajaRaniTurnsSelection({ socketId, roomCode, suspectPlayer
   const suspectId = String(suspectPlayerId || "").trim();
 
   if (room.gameType !== "raja-rani-turns" || !state) {
-    throw new Error("Raja Rani Turns is not active.");
+    throw new Error("Raja Rani is not active.");
   }
 
   if (!player) {
@@ -6490,7 +6495,7 @@ function removePlayerAtIndex(room, leavingIndex) {
     }
   }
 
-  if (room.gameType === "raja-rani") {
+  if (isThirudanPoliceGameType(room.gameType)) {
     room.rajaRani = room.rajaRani || createRajaRaniState("complete");
     delete room.rajaRani.rolesByPlayerId?.[player.playerId];
     delete room.rajaRani.scores?.[player.playerId];
