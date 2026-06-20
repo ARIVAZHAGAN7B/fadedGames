@@ -1,12 +1,9 @@
+import "./config/env.js";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
-import dotenv from "dotenv";
 import { createApp } from "./app.js";
 import { createCorsOriginChecker } from "./config/cors.js";
 import { registerSocketHandlers } from "./socket/index.js";
-
-// Load environment variables from .env file
-dotenv.config();
 
 const PORT = process.env.PORT || 4000;
 const allowOrigin = createCorsOriginChecker();

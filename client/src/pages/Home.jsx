@@ -1,5 +1,21 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, LogIn, Pencil, Plus, UserRound, Wifi, WifiOff } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  BarChart3,
+  CalendarDays,
+  Check,
+  Eye,
+  LogIn,
+  MousePointerClick,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Route,
+  UserCheck,
+  UserRound,
+  Wifi,
+  WifiOff
+} from "lucide-react";
 import bingoLogo from "../images/optimized/bingo.webp";
 import boostLogo from "../images/optimized/boost.webp";
 import fadedGamesLogo from "../images/optimized/FGlogo.webp";
@@ -13,6 +29,7 @@ import treasureHuntLogo from "../images/optimized/treasure hunt.webp";
 import wordGuessLogo from "../images/wordGuess.svg";
 import { warmImageCache } from "../utils/imageCache.js";
 import { normalizeGameType, normalizeRoomCode, setGameRouteInUrl } from "../utils/roomLink.js";
+import { fetchAnalyticsSummary } from "../utils/visitorAnalytics.js";
 
 const games = [
   {
@@ -140,6 +157,8 @@ const boostDefaultNames = [
   "Madurai"
 ];
 const PLAYER_NAME_STORAGE_KEY = "faded-games-player-name";
+const ANALYTICS_VIEWER_NAME = "fadedGames";
+const numberFormatter = new Intl.NumberFormat("en-IN");
 
 function readStoredPlayerName() {
   try {
@@ -155,6 +174,29 @@ function writeStoredPlayerName(name) {
   } catch {
     // The saved name is only a convenience; gameplay still works in the current tab.
   }
+}
+
+function formatNumber(value) {
+  return numberFormatter.format(Number(value || 0));
+}
+
+function formatUpdatedAt(value) {
+  if (!value) {
+    return "Not updated";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not updated";
+  }
+
+  return date.toLocaleString([], {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short"
+  });
 }
 
 function resizeBoostNames(names, count) {
@@ -313,6 +355,119 @@ function PlayerNameButton({ nickname, onClick }) {
   );
 }
 
+function AnalyticsMetric({ icon: Icon, label, value }) {
+  return (
+    <div className="rounded-md border border-ink/10 bg-white px-3 py-2 shadow-soft">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-xs font-extrabold uppercase text-ink/45">{label}</span>
+        <Icon className="h-4 w-4 shrink-0 text-mint" aria-hidden="true" />
+      </div>
+      <p className="text-2xl font-extrabold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function AnalyticsDashboard({ analytics, error, loading, onRefresh }) {
+  const totals = analytics?.totals || {};
+  const today = analytics?.today || {};
+  const topPaths = analytics?.topPaths || [];
+  const metrics = [
+    {
+      icon: Eye,
+      label: "Page Views",
+      value: loading && !analytics ? "--" : formatNumber(totals.pageViews)
+    },
+    {
+      icon: MousePointerClick,
+      label: "Visits",
+      value: loading && !analytics ? "--" : formatNumber(totals.visits)
+    },
+    {
+      icon: UserCheck,
+      label: "Visitors",
+      value: loading && !analytics ? "--" : formatNumber(totals.uniqueVisitors)
+    },
+    {
+      icon: CalendarDays,
+      label: "Today",
+      value: loading && !analytics ? "--" : formatNumber(today.pageViews)
+    }
+  ];
+
+  return (
+    <section className="space-y-2" aria-label="Analytics dashboard">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-ink text-white">
+            <BarChart3 className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-extrabold text-ink">Analytics Dashboard</h2>
+            <p className="text-xs font-extrabold uppercase text-ink/45">
+              Updated {formatUpdatedAt(analytics?.updatedAt)}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral disabled:opacity-50"
+          onClick={onRefresh}
+          disabled={loading}
+          title="Refresh analytics"
+          aria-label="Refresh analytics"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+        </button>
+      </div>
+
+      {error ? (
+        <div className="rounded-md border border-coral/25 bg-coral/10 px-3 py-2 text-sm font-bold text-coral">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => (
+          <AnalyticsMetric
+            key={metric.label}
+            icon={metric.icon}
+            label={metric.label}
+            value={metric.value}
+          />
+        ))}
+      </div>
+
+      <div className="rounded-md border border-ink/10 bg-white p-3 shadow-soft">
+        <div className="mb-2 flex items-center gap-2">
+          <Route className="h-4 w-4 text-mint" aria-hidden="true" />
+          <h3 className="text-sm font-extrabold text-ink">Top Paths</h3>
+        </div>
+        {topPaths.length > 0 ? (
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {topPaths.map((path) => (
+              <div
+                key={path.path}
+                className="flex items-center justify-between gap-2 rounded bg-paper px-2 py-1.5"
+              >
+                <span className="min-w-0 truncate text-xs font-extrabold text-ink/70">
+                  {path.path}
+                </span>
+                <span className="shrink-0 text-xs font-extrabold text-ink">
+                  {formatNumber(path.pageViews)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm font-bold text-ink/45">
+            {loading ? "Loading analytics..." : "No page data yet."}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function Home({
   connected,
   activeRooms = [],
@@ -343,10 +498,14 @@ export default function Home({
   const [roomCode, setRoomCode] = useState(normalizeRoomCode(initialRoomCode));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [analyticsSummary, setAnalyticsSummary] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
   const [pickingGameId, setPickingGameId] = useState("");
   const pickingGameTimerRef = useRef(null);
   const nameInputRef = useRef(null);
   const selectedGame = getGameById(selectedGameId);
+  const canViewAnalytics = nickname.trim() === ANALYTICS_VIEWER_NAME;
   const isHandCricket = selectedGame?.id === "hand-cricket";
   const isTag = selectedGame?.id === "tag";
   const isGuessNumber = selectedGame?.id === "guess-number";
@@ -367,6 +526,25 @@ export default function Home({
   const selectedGameRooms = selectedGame
     ? activeRooms.filter((activeRoom) => getPublicGameType(activeRoom.gameType) === selectedGame.id)
     : [];
+
+  const refreshAnalytics = useCallback(async () => {
+    if (!canViewAnalytics) {
+      return;
+    }
+
+    setAnalyticsLoading(true);
+    setAnalyticsError("");
+
+    try {
+      setAnalyticsSummary(await fetchAnalyticsSummary());
+    } catch (fetchError) {
+      setAnalyticsError(
+        fetchError instanceof Error ? fetchError.message : "Unable to load analytics."
+      );
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [canViewAnalytics]);
 
   const openNameModal = () => {
     setNameDraft(nickname);
@@ -472,6 +650,17 @@ export default function Home({
   }, [connected, onRefreshActiveRooms, selectedGameId]);
 
   useEffect(() => {
+    if (!canViewAnalytics) {
+      setAnalyticsSummary(null);
+      setAnalyticsError("");
+      setAnalyticsLoading(false);
+      return;
+    }
+
+    refreshAnalytics();
+  }, [canViewAnalytics, refreshAnalytics]);
+
+  useEffect(() => {
     const code = normalizeRoomCode(initialRoomCode);
     const game = normalizeGameType(initialGameType);
 
@@ -572,6 +761,14 @@ export default function Home({
       onSubmit={handleNameSubmit}
     />
   ) : null;
+  const analyticsDashboard = canViewAnalytics ? (
+    <AnalyticsDashboard
+      analytics={analyticsSummary}
+      error={analyticsError}
+      loading={analyticsLoading}
+      onRefresh={refreshAnalytics}
+    />
+  ) : null;
 
   if (!selectedGame) {
     return (
@@ -600,6 +797,8 @@ export default function Home({
               </div>
             </div>
           </header>
+
+          {analyticsDashboard}
 
           <section className="grid auto-rows-fr gap-3 sm:grid-cols-4 xl:grid-cols-8">
             {games.map((game, index) => {
@@ -686,6 +885,8 @@ export default function Home({
             </div>
           </div>
         </header>
+
+        {analyticsDashboard}
 
         <form className="grid gap-3 lg:grid-cols-[1fr_22rem]" onSubmit={handleSubmit}>
           <section className="space-y-3">

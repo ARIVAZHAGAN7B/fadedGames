@@ -1,6 +1,8 @@
 node_modules
 dist
 *.log
+server/data/visitor-analytics.json
+server/data/visitor-analytics.json.tmp
 
 # Environment variables - keep .env.example in repo, ignore actual .env files
 .env
@@ -11,4 +13,3 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .DS_Store
-

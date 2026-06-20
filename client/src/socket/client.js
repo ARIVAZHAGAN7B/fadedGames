@@ -9,7 +9,7 @@ function isLocalServerUrl(url) {
   }
 }
 
-function getServerUrl() {
+export function getServerUrl() {
   const configuredUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 
   if (typeof window === "undefined") {

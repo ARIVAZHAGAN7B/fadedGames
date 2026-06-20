@@ -5,6 +5,7 @@ import {
   ROOM_ROUTE_CHANGE_EVENT,
   setRoomCodeInUrl
 } from "./utils/roomLink.js";
+import { trackWebsiteVisit } from "./utils/visitorAnalytics.js";
 import { getBoardSize } from "./game/board.js";
 
 const Boost = lazy(() => import("./pages/Boost.jsx"));
@@ -172,6 +173,10 @@ export default function App() {
   const [activeRooms, setActiveRooms] = useState([]);
   const [needsResume, setNeedsResume] = useState(Boolean(activeSavedState));
   const saveTimerRef = useRef(null);
+
+  useEffect(() => {
+    trackWebsiteVisit();
+  }, []);
 
   const requestActiveRooms = useCallback(async () => {
     const response = await emitWithAck("list-active-rooms", {});
