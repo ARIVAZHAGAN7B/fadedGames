@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Activity,
   ArrowLeft,
   BarChart3,
   CalendarDays,
   Check,
+  Database,
   Eye,
+  Gamepad2,
   LogIn,
   MousePointerClick,
   Pencil,
   Plus,
   RefreshCw,
   Route,
+  Trophy,
   UserCheck,
   UserRound,
+  Users,
   Wifi,
   WifiOff
 } from "lucide-react";
@@ -29,7 +34,10 @@ import treasureHuntLogo from "../images/optimized/treasure hunt.webp";
 import wordGuessLogo from "../images/wordGuess.svg";
 import { warmImageCache } from "../utils/imageCache.js";
 import { normalizeGameType, normalizeRoomCode, setGameRouteInUrl } from "../utils/roomLink.js";
-import { fetchAnalyticsSummary } from "../utils/visitorAnalytics.js";
+import {
+  fetchAnalyticsSummary,
+  fetchPlayerGameStatsSummary
+} from "../utils/visitorAnalytics.js";
 
 const games = [
   {
@@ -157,7 +165,7 @@ const boostDefaultNames = [
   "Madurai"
 ];
 const PLAYER_NAME_STORAGE_KEY = "faded-games-player-name";
-const ANALYTICS_VIEWER_NAME = "fadedGames";
+const ANALYTICS_VIEWER_NAME = "fadedGame";
 const numberFormatter = new Intl.NumberFormat("en-IN");
 
 function readStoredPlayerName() {
@@ -174,6 +182,10 @@ function writeStoredPlayerName(name) {
   } catch {
     // The saved name is only a convenience; gameplay still works in the current tab.
   }
+}
+
+function canShowAnalyticsForName(name) {
+  return String(name || "").trim().toLowerCase() === ANALYTICS_VIEWER_NAME.toLowerCase();
 }
 
 function formatNumber(value) {
@@ -468,6 +480,227 @@ function AnalyticsDashboard({ analytics, error, loading, onRefresh }) {
   );
 }
 
+function GameAnalyticsDashboard({ stats, loading }) {
+  const totals = stats?.totals || {};
+  const topGames = stats?.topGames || [];
+  const players = stats?.players || [];
+  const recentPlayers = stats?.recentPlayers || [];
+  const topGame = topGames[0] || null;
+  const metrics = [
+    {
+      icon: Gamepad2,
+      label: "Games Played",
+      value: loading && !stats ? "--" : formatNumber(totals.totalGamesPlayed)
+    },
+    {
+      icon: Users,
+      label: "Players",
+      value: loading && !stats ? "--" : formatNumber(totals.players)
+    },
+    {
+      icon: Trophy,
+      label: "Top Game",
+      value: loading && !stats ? "--" : topGame?.gameName || "None"
+    },
+    {
+      icon: Database,
+      label: "Pending Sync",
+      value: loading && !stats ? "--" : formatNumber(stats?.pendingSync)
+    }
+  ];
+
+  return (
+    <section className="space-y-2" aria-label="Game analytics">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-ink text-white">
+          <Activity className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-extrabold text-ink">Gameplay Analytics</h2>
+          <p className="text-xs font-extrabold uppercase text-ink/45">
+            Updated {formatUpdatedAt(stats?.updatedAt)}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => (
+          <AnalyticsMetric
+            key={metric.label}
+            icon={metric.icon}
+            label={metric.label}
+            value={metric.value}
+          />
+        ))}
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-[0.9fr_1.4fr]">
+        <div className="rounded-md border border-ink/10 bg-white p-3 shadow-soft">
+          <div className="mb-2 flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-mint" aria-hidden="true" />
+            <h3 className="text-sm font-extrabold text-ink">Top Games</h3>
+          </div>
+          {topGames.length > 0 ? (
+            <div className="grid gap-1.5">
+              {topGames.map((game) => (
+                <div
+                  key={`${game.gameType}-${game.gameName}`}
+                  className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded bg-paper px-2 py-1.5"
+                >
+                  <span className="min-w-0 truncate text-xs font-extrabold text-ink/75">
+                    {game.gameName}
+                  </span>
+                  <span className="text-xs font-extrabold text-ink">
+                    {formatNumber(game.timesPlayed)}
+                  </span>
+                  <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-extrabold text-ink/45">
+                    {formatNumber(game.playerCount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm font-bold text-ink/45">
+              {loading ? "Loading game analytics..." : "No games tracked yet."}
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-md border border-ink/10 bg-white p-3 shadow-soft">
+          <div className="mb-2 flex items-center gap-2">
+            <Users className="h-4 w-4 text-mint" aria-hidden="true" />
+            <h3 className="text-sm font-extrabold text-ink">Player Leaderboard</h3>
+          </div>
+          {players.length > 0 ? (
+            <div className="grid gap-1.5">
+              {players.map((player, index) => {
+                const favoriteGame = player.gamesPlayed?.[0] || null;
+
+                return (
+                  <div
+                    key={player.username}
+                    className="grid grid-cols-[2rem_1fr_auto] items-center gap-2 rounded bg-paper px-2 py-1.5"
+                  >
+                    <span className="text-xs font-extrabold text-ink/45">#{index + 1}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-extrabold text-ink">
+                        {player.username}
+                      </span>
+                      <span className="block truncate text-[11px] font-bold text-ink/45">
+                        {favoriteGame
+                          ? `${favoriteGame.gameName} / ${formatNumber(favoriteGame.timesPlayed)}`
+                          : "No favorite yet"}
+                      </span>
+                    </span>
+                    <span className="rounded bg-white px-2 py-1 text-xs font-extrabold text-ink">
+                      {formatNumber(player.totalGamesPlayed)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm font-bold text-ink/45">
+              {loading ? "Loading players..." : "No players tracked yet."}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-md border border-ink/10 bg-white p-3 shadow-soft">
+        <div className="mb-2 flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-mint" aria-hidden="true" />
+          <h3 className="text-sm font-extrabold text-ink">Recent Players</h3>
+        </div>
+        {recentPlayers.length > 0 ? (
+          <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
+            {recentPlayers.map((player) => (
+              <div key={player.username} className="rounded bg-paper px-2 py-1.5">
+                <p className="truncate text-xs font-extrabold text-ink">{player.username}</p>
+                <p className="text-[11px] font-bold text-ink/45">
+                  {formatNumber(player.totalGamesPlayed)} / {formatUpdatedAt(player.updatedAt)}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm font-bold text-ink/45">
+            {loading ? "Loading recent players..." : "No recent player activity."}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AnalyticsAdminPage({
+  analytics,
+  connected,
+  error,
+  gameStats,
+  loading,
+  nameModal,
+  nickname,
+  onNameClick,
+  onRefresh
+}) {
+  return (
+    <main className="min-h-screen bg-paper px-4 py-4 sm:px-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
+        <header className="flex flex-wrap items-center justify-between gap-3 py-1">
+          <div className="flex min-w-0 items-center gap-3">
+            <img
+              src={fadedGamesLogo}
+              alt=""
+              decoding="async"
+              loading="eager"
+              className="h-10 w-10 shrink-0 rounded-md object-cover"
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl font-extrabold text-ink sm:text-3xl">
+                Faded Games Analytics
+              </h1>
+              <p className="text-xs font-extrabold uppercase text-ink/45">
+                Traffic, game starts, players, and offline sync
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <PlayerNameButton nickname={nickname} onClick={onNameClick} />
+            <button
+              type="button"
+              className="compact-button border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral disabled:opacity-50"
+              onClick={onRefresh}
+              disabled={loading}
+              title="Refresh analytics"
+              aria-label="Refresh analytics"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+            </button>
+            <div
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+                connected ? "bg-mint text-white" : "bg-coral text-white"
+              }`}
+            >
+              {connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+              {connected ? "Online" : "Offline"}
+            </div>
+          </div>
+        </header>
+
+        <AnalyticsDashboard
+          analytics={analytics}
+          error={error}
+          loading={loading}
+          onRefresh={onRefresh}
+        />
+        <GameAnalyticsDashboard stats={gameStats} loading={loading} />
+      </div>
+      {nameModal}
+    </main>
+  );
+}
+
 export default function Home({
   connected,
   activeRooms = [],
@@ -499,13 +732,14 @@ export default function Home({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
+  const [gameStatsSummary, setGameStatsSummary] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
   const [pickingGameId, setPickingGameId] = useState("");
   const pickingGameTimerRef = useRef(null);
   const nameInputRef = useRef(null);
   const selectedGame = getGameById(selectedGameId);
-  const canViewAnalytics = nickname.trim() === ANALYTICS_VIEWER_NAME;
+  const canViewAnalytics = canShowAnalyticsForName(nickname);
   const isHandCricket = selectedGame?.id === "hand-cricket";
   const isTag = selectedGame?.id === "tag";
   const isGuessNumber = selectedGame?.id === "guess-number";
@@ -535,15 +769,34 @@ export default function Home({
     setAnalyticsLoading(true);
     setAnalyticsError("");
 
-    try {
-      setAnalyticsSummary(await fetchAnalyticsSummary());
-    } catch (fetchError) {
-      setAnalyticsError(
-        fetchError instanceof Error ? fetchError.message : "Unable to load analytics."
+    const [trafficResult, gameStatsResult] = await Promise.allSettled([
+      fetchAnalyticsSummary(),
+      fetchPlayerGameStatsSummary()
+    ]);
+    const errors = [];
+
+    if (trafficResult.status === "fulfilled") {
+      setAnalyticsSummary(trafficResult.value);
+    } else {
+      errors.push(
+        trafficResult.reason instanceof Error
+          ? trafficResult.reason.message
+          : "Unable to load analytics."
       );
-    } finally {
-      setAnalyticsLoading(false);
     }
+
+    if (gameStatsResult.status === "fulfilled") {
+      setGameStatsSummary(gameStatsResult.value);
+    } else {
+      errors.push(
+        gameStatsResult.reason instanceof Error
+          ? gameStatsResult.reason.message
+          : "Unable to load game analytics."
+      );
+    }
+
+    setAnalyticsError(errors.join(" "));
+    setAnalyticsLoading(false);
   }, [canViewAnalytics]);
 
   const openNameModal = () => {
@@ -652,6 +905,7 @@ export default function Home({
   useEffect(() => {
     if (!canViewAnalytics) {
       setAnalyticsSummary(null);
+      setGameStatsSummary(null);
       setAnalyticsError("");
       setAnalyticsLoading(false);
       return;
@@ -769,6 +1023,22 @@ export default function Home({
       onRefresh={refreshAnalytics}
     />
   ) : null;
+
+  if (canViewAnalytics) {
+    return (
+      <AnalyticsAdminPage
+        analytics={analyticsSummary}
+        connected={connected}
+        error={analyticsError}
+        gameStats={gameStatsSummary}
+        loading={analyticsLoading}
+        nameModal={nameModal}
+        nickname={nickname}
+        onNameClick={openNameModal}
+        onRefresh={refreshAnalytics}
+      />
+    );
+  }
 
   if (!selectedGame) {
     return (

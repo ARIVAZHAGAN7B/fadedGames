@@ -8,6 +8,7 @@ import {
   startGame,
   updateRoomSettings
 } from "../../services/roomService.js";
+import { recordGamePlayedForRoomSafely } from "../../services/playerGameStats.js";
 
 export function registerRoomHandlers(socket, context, timers, lifecycle) {
   socket.on("list-active-rooms", (_payload, callback) => {
@@ -180,6 +181,7 @@ export function registerRoomHandlers(socket, context, timers, lifecycle) {
       });
 
       context.emitRoomEvent(room, "start-game");
+      recordGamePlayedForRoomSafely(room);
       timers.scheduleGameStart(room);
       context.emitActiveRooms();
 

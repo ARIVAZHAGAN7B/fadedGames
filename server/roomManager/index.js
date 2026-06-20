@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 const rooms = new Map();
 const CODE_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
+const MATCH_CHAT_MAX_MESSAGES = 100;
+const MATCH_CHAT_MAX_LENGTH = 280;
 const MAX_PLAYERS_LIMIT = 12;
 const HAND_CRICKET_CLASSIC_PLAYERS = 2;
 const HAND_CRICKET_DEFAULT_TEAM_SIZE = 2;
@@ -672,6 +674,20 @@ function cleanRoomName(roomName) {
   return value.slice(0, 40) || "Bingo Room";
 }
 
+function cleanChatText(text) {
+  const value = String(text || "").trim().replace(/\s+/g, " ");
+
+  if (!value) {
+    throw new Error("Enter a message.");
+  }
+
+  if (value.length > MATCH_CHAT_MAX_LENGTH) {
+    throw new Error(`Message must be ${MATCH_CHAT_MAX_LENGTH} characters or less.`);
+  }
+
+  return value;
+}
+
 function cleanRoomCode(roomCode) {
   return String(roomCode || "").trim().toUpperCase();
 }
@@ -1095,6 +1111,21 @@ function findPlayerById(room, playerId) {
 
 function getOpponent(room, playerId) {
   return room.players.find((player) => player.playerId !== playerId);
+}
+
+function serializeChatMessage(message) {
+  return {
+    id: message.id,
+    roomCode: message.roomCode,
+    playerId: message.playerId,
+    playerName: message.playerName,
+    text: message.text,
+    createdAt: message.createdAt
+  };
+}
+
+function getSerializedChatMessages(room) {
+  return (room.chatMessages || []).map(serializeChatMessage);
 }
 
 function getHandCricketTeamSize(room) {
@@ -4080,6 +4111,7 @@ export function createRoom({
     gameStarted: false,
     gameEnded: false,
     winner: null,
+    chatMessages: [],
     boardSize: null,
     boards: {},
     handCricket: type === "hand-cricket" ? createHandCricketState("waiting", cricketMode) : null,
@@ -4132,6 +4164,47 @@ export function joinRoom({ socketId, nickname, roomCode }) {
   touch(room);
 
   return { room, player };
+}
+
+export function getRoomChatMessages({ socketId, roomCode }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  return {
+    room,
+    messages: getSerializedChatMessages(room)
+  };
+}
+
+export function sendRoomChatMessage({ socketId, roomCode, text }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  const message = {
+    id: randomUUID(),
+    roomCode: room.roomCode,
+    playerId: player.playerId,
+    playerName: player.name,
+    text: cleanChatText(text),
+    createdAt: Date.now()
+  };
+
+  room.chatMessages = [...(room.chatMessages || []), message].slice(-MATCH_CHAT_MAX_MESSAGES);
+  touch(room);
+
+  return {
+    room,
+    message: serializeChatMessage(message),
+    messages: getSerializedChatMessages(room)
+  };
 }
 
 export function updateRoomSettings({

@@ -2,6 +2,7 @@ export {
   addBot,
   cleanupDisconnectedPlayer,
   createRoom,
+  getRoomChatMessages,
   joinRoom,
   listActiveRooms,
   markPlayerDisconnected,
@@ -9,6 +10,7 @@ export {
   restartGame,
   resumeSession,
   serializeRoom,
+  sendRoomChatMessage,
   setPlayerBoard,
   startGame,
   updateRoomSettings

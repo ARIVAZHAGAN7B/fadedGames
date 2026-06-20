@@ -3,6 +3,8 @@ dist
 *.log
 server/data/visitor-analytics.json
 server/data/visitor-analytics.json.tmp
+server/data/player-game-stats-queue.json
+server/data/player-game-stats-queue.json.tmp
 
 # Environment variables - keep .env.example in repo, ignore actual .env files
 .env

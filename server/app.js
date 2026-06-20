@@ -3,6 +3,7 @@ import express from "express";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getPlayerGameStatsSummary } from "./services/playerGameStats.js";
 import { getAnalyticsSummary, recordVisit } from "./services/visitorAnalytics.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +63,20 @@ export function createApp({ allowOrigin } = {}) {
       response.status(500).json({
         ok: false,
         error: "Unable to load analytics."
+      });
+    }
+  });
+
+  app.get("/analytics/game-stats", async (_request, response) => {
+    try {
+      response.json({
+        ok: true,
+        stats: await getPlayerGameStatsSummary()
+      });
+    } catch {
+      response.status(500).json({
+        ok: false,
+        error: "Unable to load game analytics."
       });
     }
   });

@@ -3,6 +3,7 @@ import { createRoomLifecycle } from "./lifecycle.js";
 import { createSocketTimers } from "./timers.js";
 import { registerBingoHandlers } from "./handlers/bingoHandlers.js";
 import { registerBoostHandlers } from "./handlers/boostHandlers.js";
+import { registerChatHandlers } from "./handlers/chatHandlers.js";
 import { registerGuessNumberHandlers } from "./handlers/guessNumberHandlers.js";
 import { registerHandCricketHandlers } from "./handlers/handCricketHandlers.js";
 import { registerRajaRaniHandlers } from "./handlers/rajaRaniHandlers.js";
@@ -14,6 +15,7 @@ import { registerWordGuessHandlers } from "./handlers/wordGuessHandlers.js";
 
 const socketHandlerRegistrars = [
   registerRoomHandlers,
+  registerChatHandlers,
   registerBingoHandlers,
   registerHandCricketHandlers,
   registerBoostHandlers,

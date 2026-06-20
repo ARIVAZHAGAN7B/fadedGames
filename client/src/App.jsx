@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import MatchChat from "./components/MatchChat.jsx";
 import { socket } from "./socket/client.js";
 import {
   readRoomRouteFromUrl,
@@ -171,8 +172,15 @@ export default function App() {
   const [room, setRoom] = useState(activeSavedState?.room || null);
   const [board, setBoard] = useState(activeSavedState?.board || []);
   const [activeRooms, setActiveRooms] = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(0);
   const [needsResume, setNeedsResume] = useState(Boolean(activeSavedState));
   const saveTimerRef = useRef(null);
+  const chatOpenRef = useRef(false);
+  const chatRoomCodeRef = useRef("");
+  const chatPlayerIdRef = useRef("");
+  const chatHistoryRoomRef = useRef("");
 
   useEffect(() => {
     trackWebsiteVisit();
@@ -187,6 +195,19 @@ export default function App() {
 
     return response;
   }, []);
+
+  useEffect(() => {
+    chatOpenRef.current = chatOpen;
+
+    if (chatOpen) {
+      setChatUnread(0);
+    }
+  }, [chatOpen]);
+
+  useEffect(() => {
+    chatRoomCodeRef.current = session.roomCode;
+    chatPlayerIdRef.current = session.playerId;
+  }, [session.playerId, session.roomCode]);
 
   useEffect(() => {
     const syncRoute = () => setRoute(readRoomRouteFromUrl());
@@ -208,6 +229,10 @@ export default function App() {
     setSession(emptySession);
     setRoom(null);
     setBoard([]);
+    setChatMessages([]);
+    setChatOpen(false);
+    setChatUnread(0);
+    chatHistoryRoomRef.current = "";
   };
 
   useEffect(() => {
@@ -271,6 +296,69 @@ export default function App() {
       socket.off("room-restarted", onRoomRestarted);
     };
   }, [requestActiveRooms]);
+
+  useEffect(() => {
+    const onMatchChatMessage = (payload) => {
+      const message = payload?.message;
+      const messageRoomCode = payload?.roomCode || message?.roomCode;
+
+      if (!message?.id || !messageRoomCode || messageRoomCode !== chatRoomCodeRef.current) {
+        return;
+      }
+
+      setChatMessages((current) => {
+        if (current.some((entry) => entry.id === message.id)) {
+          return current;
+        }
+
+        return [...current, message].slice(-100);
+      });
+
+      if (!chatOpenRef.current && message.playerId !== chatPlayerIdRef.current) {
+        setChatUnread((current) => Math.min(current + 1, 99));
+      }
+    };
+
+    socket.on("match-chat:message", onMatchChatMessage);
+
+    return () => {
+      socket.off("match-chat:message", onMatchChatMessage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!connected || !session.roomCode || !session.playerId || !room) {
+      return undefined;
+    }
+
+    if (chatHistoryRoomRef.current === session.roomCode) {
+      return undefined;
+    }
+
+    let canceled = false;
+
+    async function loadMatchChatHistory() {
+      const response = await emitWithAck("match-chat:history", {
+        roomCode: session.roomCode
+      });
+
+      if (canceled) {
+        return;
+      }
+
+      if (response.ok) {
+        setChatMessages(Array.isArray(response.messages) ? response.messages : []);
+        setChatUnread(0);
+        chatHistoryRoomRef.current = response.roomCode || session.roomCode;
+      }
+    }
+
+    loadMatchChatHistory();
+
+    return () => {
+      canceled = true;
+    };
+  }, [connected, room, session.playerId, session.roomCode]);
 
   useEffect(() => {
     if (!session.roomCode || !session.playerId || !room) {
@@ -339,6 +427,9 @@ export default function App() {
       });
       setRoom(response.room);
       setBoard(response.board?.length ? response.board : board);
+      setChatMessages([]);
+      setChatUnread(0);
+      chatHistoryRoomRef.current = "";
       setView(viewForRoom(response.room));
     }
 
@@ -360,6 +451,10 @@ export default function App() {
       });
       setRoom(response.room);
       setBoard([]);
+      setChatMessages([]);
+      setChatUnread(0);
+      setChatOpen(false);
+      chatHistoryRoomRef.current = "";
       setView("lobby");
     }
 
@@ -377,6 +472,10 @@ export default function App() {
       });
       setRoom(response.room);
       setBoard([]);
+      setChatMessages([]);
+      setChatUnread(0);
+      setChatOpen(false);
+      chatHistoryRoomRef.current = "";
       setView("lobby");
     }
 
@@ -739,6 +838,25 @@ export default function App() {
     resetLocalState();
   };
 
+  const handleChatOpenChange = (nextOpen) => {
+    setChatOpen(nextOpen);
+
+    if (nextOpen) {
+      setChatUnread(0);
+    }
+  };
+
+  const handleSendChatMessage = async (text) => {
+    if (!session.roomCode) {
+      return { ok: false, error: "Join a room first." };
+    }
+
+    return emitWithAck("match-chat:send", {
+      roomCode: session.roomCode,
+      text
+    });
+  };
+
   const handleTagInput = useCallback((input) => {
     socket.emit("tag-input", {
       roomCode: session.roomCode,
@@ -746,8 +864,25 @@ export default function App() {
     });
   }, [session.roomCode]);
 
+  const roomScreen = (node) =>
+    screen(
+      <>
+        {node}
+        <MatchChat
+          connected={connected}
+          messages={chatMessages}
+          open={chatOpen}
+          room={room}
+          session={session}
+          unreadCount={chatUnread}
+          onOpenChange={handleChatOpenChange}
+          onSendMessage={handleSendChatMessage}
+        />
+      </>
+    );
+
   if (view === "lobby" && room) {
-    return screen(
+    return roomScreen(
       <Lobby
         room={room}
         session={session}
@@ -763,7 +898,7 @@ export default function App() {
   }
 
   if (view === "result" && room) {
-    return screen(
+    return roomScreen(
       <Result
         room={room}
         session={session}
@@ -774,7 +909,7 @@ export default function App() {
   }
 
   if (view === "hand-cricket" && room) {
-    return screen(
+    return roomScreen(
       <HandCricket
         room={room}
         session={session}
@@ -790,7 +925,7 @@ export default function App() {
   }
 
   if (view === "guess-number" && room) {
-    return screen(
+    return roomScreen(
       <GuessNumber
         room={room}
         session={session}
@@ -803,7 +938,7 @@ export default function App() {
   }
 
   if (view === "word-guess" && room) {
-    return screen(
+    return roomScreen(
       <WordGuess
         room={room}
         session={session}
@@ -816,7 +951,7 @@ export default function App() {
   }
 
   if (view === "spy-word" && room) {
-    return screen(
+    return roomScreen(
       <SpyWord
         room={room}
         session={session}
@@ -830,7 +965,7 @@ export default function App() {
   }
 
   if (view === "boost" && room) {
-    return screen(
+    return roomScreen(
       <Boost
         room={room}
         session={session}
@@ -843,7 +978,7 @@ export default function App() {
   }
 
   if (view === "thirudan-police" && room) {
-    return screen(
+    return roomScreen(
       <ThirudanPolice
         room={room}
         session={session}
@@ -856,7 +991,7 @@ export default function App() {
   }
 
   if (view === "raja-rani-turns" && room) {
-    return screen(
+    return roomScreen(
       <RajaRaniTurns
         room={room}
         session={session}
@@ -873,7 +1008,7 @@ export default function App() {
     const expectedBoardCells = expectedBoardSize * expectedBoardSize;
 
     if (board.length === expectedBoardCells) {
-      return screen(
+      return roomScreen(
         <Game
           room={room}
           session={session}
@@ -887,7 +1022,7 @@ export default function App() {
   }
 
   if (view === "tag" && room) {
-    return screen(
+    return roomScreen(
       <TagGame
         room={room}
         session={session}
@@ -899,7 +1034,7 @@ export default function App() {
   }
 
   if (view === "treasure-hunt" && room) {
-    return screen(
+    return roomScreen(
       <TreasureHunt
         socket={socket}
         room={room}
