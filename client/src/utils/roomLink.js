@@ -7,6 +7,7 @@ export const ROOM_ROUTE_CHANGE_EVENT = "room-route-change";
 const supportedGameTypes = new Set([
   "bingo",
   "hand-cricket",
+  "book-cricket",
   "tag",
   "guess-number",
   "word-guess",

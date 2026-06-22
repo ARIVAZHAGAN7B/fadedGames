@@ -1,0 +1,7 @@
+{
+    "loaderUrl": "/unity/book-cricket/Build/book-cricket.loader.js",
+    "dataUrl": "/unity/book-cricket/Build/book-cricket.data.gz",
+    "frameworkUrl": "/unity/book-cricket/Build/book-cricket.framework.js.gz",
+    "codeUrl": "/unity/book-cricket/Build/book-cricket.wasm.gz",
+    "streamingAssetsUrl": "/unity/book-cricket/StreamingAssets"
+}

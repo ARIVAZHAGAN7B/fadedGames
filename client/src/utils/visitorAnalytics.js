@@ -95,17 +95,3 @@ export async function fetchAnalyticsSummary(adminToken = "") {
 
   return payload.analytics;
 }
-
-export async function fetchPlayerGameStatsSummary(adminToken = "") {
-  const endpoint = new URL("/analytics/game-stats", getServerUrl());
-  const response = await fetch(endpoint.toString(), {
-    headers: analyticsHeaders(adminToken)
-  });
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok || !payload?.ok) {
-    throw new Error(payload?.error || "Unable to load game analytics.");
-  }
-
-  return payload.stats;
-}

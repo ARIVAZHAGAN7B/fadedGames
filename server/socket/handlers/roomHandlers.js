@@ -8,7 +8,6 @@ import {
   startGame,
   updateRoomSettings
 } from "../../services/roomService.js";
-import { recordGamePlayedForRoomSafely } from "../../services/playerGameStats.js";
 
 function publicJoinedPlayer(player) {
   if (!player || typeof player !== "object") {
@@ -235,7 +234,6 @@ export function registerRoomHandlers(socket, context, timers, lifecycle) {
       });
 
       context.emitRoomEvent(room, "start-game");
-      recordGamePlayedForRoomSafely(room);
       timers.scheduleGameStart(room);
       context.emitActiveRooms();
 

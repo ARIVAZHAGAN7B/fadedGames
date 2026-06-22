@@ -1,7 +1,7 @@
 import {
   Timer
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   GamePage,
   RestartButton,
@@ -12,6 +12,8 @@ import { formatClock } from "../utils/time.js";
 
 const WORLD_WIDTH = 2400;
 const WORLD_HEIGHT = 1200;
+const TAG_UNITY_BASE_URL = "/unity/tag";
+const TAG_UNITY_MANIFEST_URL = `${TAG_UNITY_BASE_URL}/tag-build.json`;
 
 const countryBalls = [
   {
@@ -322,6 +324,68 @@ mapConfigs.grass = mapConfigs.classic;
 mapConfigs.winter = mapConfigs.tower;
 mapConfigs.desert = mapConfigs.maze;
 
+function resolveUnityTagAssetUrl(value) {
+  const url = String(value || "").trim();
+
+  if (!url) {
+    return "";
+  }
+
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith("/")) {
+    return url;
+  }
+
+  return `${TAG_UNITY_BASE_URL}/${url.replace(/^\/+/, "")}`;
+}
+
+async function fetchUnityTagManifest() {
+  try {
+    const response = await fetch(TAG_UNITY_MANIFEST_URL, { cache: "no-cache" });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const manifest = await response.json();
+
+    return {
+      loaderUrl: resolveUnityTagAssetUrl(manifest.loaderUrl),
+      dataUrl: resolveUnityTagAssetUrl(manifest.dataUrl),
+      frameworkUrl: resolveUnityTagAssetUrl(manifest.frameworkUrl),
+      codeUrl: resolveUnityTagAssetUrl(manifest.codeUrl),
+      streamingAssetsUrl: resolveUnityTagAssetUrl(manifest.streamingAssetsUrl) || `${TAG_UNITY_BASE_URL}/StreamingAssets`
+    };
+  } catch {
+    return null;
+  }
+}
+
+function loadUnityTagScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = src;
+    script.onload = () => resolve(script);
+    script.onerror = () => reject(new Error(`Unity loader was not found at ${src}.`));
+    document.body.appendChild(script);
+  });
+}
+
+function buildUnityTagPayload(room, includeMap) {
+  const tag = room.tag || {};
+  const mapId = tag.mapId || "classic";
+
+  return JSON.stringify({
+    mapId,
+    phase: tag.phase || "waiting",
+    world: tag.world || { width: WORLD_WIDTH, height: WORLD_HEIGHT },
+    map: includeMap ? mapConfigs[mapId] || mapConfigs.classic : null,
+    players: tag.players || [],
+    lastTagAt: tag.lastTagAt || 0,
+    lastTaggedPlayerId: tag.lastTaggedPlayerId || ""
+  });
+}
+
 const sharedControlCodes = {
   left: ["ArrowLeft", "KeyA"],
   right: ["ArrowRight", "KeyD"],
@@ -406,12 +470,17 @@ function createTagScene(Phaser, mapId, onReady) {
       this.roomState = null;
       this.movingPlatformObjects = [];
       this.lastTagAt = 0;
+      this.lastCameraSize = { width: 0, height: 0 };
     }
 
     create() {
       this.map = mapConfigs[mapId] || mapConfigs.classic;
       this.cameras.main.setBackgroundColor(this.map.sky);
       this.applyStaticCamera();
+      this.scale.on("resize", this.applyStaticCamera, this);
+      this.events.once("shutdown", () => {
+        this.scale.off("resize", this.applyStaticCamera, this);
+      });
       this.drawMap();
 
       if (typeof onReady === "function") {
@@ -625,7 +694,9 @@ function createTagScene(Phaser, mapId, onReady) {
       const activeIds = new Set(players.map((player) => player.playerId));
       for (const [playerId, entry] of this.playerObjects.entries()) {
         if (!activeIds.has(playerId)) {
-          Object.values(entry).forEach((object) => object.destroy());
+          [entry.shadow, entry.glow, entry.shield, entry.sprite, entry.badge].forEach((object) => {
+            object.destroy();
+          });
           this.playerObjects.delete(playerId);
         }
       }
@@ -663,7 +734,16 @@ function createTagScene(Phaser, mapId, onReady) {
 
     applyStaticCamera() {
       const camera = this.cameras.main;
-      const zoom = Math.min(this.scale.width / WORLD_WIDTH, this.scale.height / WORLD_HEIGHT) * 0.98;
+      const width = this.scale.width || 1280;
+      const height = this.scale.height || 720;
+
+      if (this.lastCameraSize.width === width && this.lastCameraSize.height === height) {
+        return;
+      }
+
+      this.lastCameraSize = { width, height };
+
+      const zoom = Math.min(width / WORLD_WIDTH, height / WORLD_HEIGHT) * 0.98;
 
       camera.setZoom(zoom);
       camera.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
@@ -697,13 +777,11 @@ function createTagScene(Phaser, mapId, onReady) {
           entry.glow.setScale(pulse);
         }
       }
-
-      this.applyStaticCamera();
     }
   };
 }
 
-function TagCanvas({ room }) {
+function PhaserTagCanvas({ room }) {
   const containerRef = useRef(null);
   const gameRef = useRef(null);
   const sceneRef = useRef(null);
@@ -734,6 +812,15 @@ function TagCanvas({ room }) {
           backgroundColor: "#66c6f2",
           width: 1280,
           height: 720,
+          fps: {
+            target: 60,
+            min: 30
+          },
+          render: {
+            antialias: true,
+            pixelArt: false,
+            powerPreference: "high-performance"
+          },
           scale: {
             mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH
@@ -775,6 +862,159 @@ function TagCanvas({ room }) {
       ) : null}
     </div>
   );
+}
+
+function UnityTagCanvas({ room, onUnavailable }) {
+  const canvasRef = useRef(null);
+  const unityRef = useRef(null);
+  const latestRoomRef = useRef(room);
+  const sentMapIdRef = useRef("");
+  const [loaded, setLoaded] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    latestRoomRef.current = room;
+  }, [room]);
+
+  const sendRoomState = (instance = unityRef.current, forceMap = false) => {
+    if (!instance?.SendMessage) {
+      return;
+    }
+
+    const currentRoom = latestRoomRef.current;
+    const mapId = currentRoom.tag?.mapId || "classic";
+    const includeMap = forceMap || sentMapIdRef.current !== mapId;
+
+    instance.SendMessage("Tag Game Renderer", "SetRoomState", buildUnityTagPayload(currentRoom, includeMap));
+    sentMapIdRef.current = mapId;
+  };
+
+  useEffect(() => {
+    let canceled = false;
+    let loaderScript = null;
+
+    async function bootUnity() {
+      setLoaded(false);
+      setProgress(0);
+
+      try {
+        const manifest = await fetchUnityTagManifest();
+
+        if (
+          !manifest?.loaderUrl ||
+          !manifest.dataUrl ||
+          !manifest.frameworkUrl ||
+          !manifest.codeUrl
+        ) {
+          throw new Error("TAG Unity WebGL build is unavailable.");
+        }
+
+        loaderScript = await loadUnityTagScript(manifest.loaderUrl);
+
+        if (canceled) {
+          return;
+        }
+
+        if (typeof window.createUnityInstance !== "function") {
+          throw new Error("Unity loader did not expose createUnityInstance.");
+        }
+
+        const instance = await window.createUnityInstance(
+          canvasRef.current,
+          {
+            dataUrl: manifest.dataUrl,
+            frameworkUrl: manifest.frameworkUrl,
+            codeUrl: manifest.codeUrl,
+            streamingAssetsUrl: manifest.streamingAssetsUrl,
+            companyName: "Faded Games",
+            productName: "TAG",
+            productVersion: "1.0"
+          },
+          (nextProgress) => {
+            if (!canceled) {
+              setProgress(nextProgress);
+            }
+          }
+        );
+
+        if (canceled) {
+          instance.Quit?.();
+          return;
+        }
+
+        unityRef.current = instance;
+        sentMapIdRef.current = "";
+        setLoaded(true);
+        sendRoomState(instance, true);
+      } catch {
+        if (!canceled && typeof onUnavailable === "function") {
+          onUnavailable();
+        }
+      }
+    }
+
+    bootUnity();
+
+    return () => {
+      canceled = true;
+
+      if (unityRef.current?.Quit) {
+        unityRef.current.Quit();
+      }
+
+      unityRef.current = null;
+
+      if (loaderScript?.parentNode) {
+        loaderScript.parentNode.removeChild(loaderScript);
+      }
+    };
+  }, [onUnavailable]);
+
+  useEffect(() => {
+    if (loaded) {
+      sendRoomState();
+    }
+  }, [loaded, room]);
+
+  return (
+    <div className="tag-canvas h-full min-h-[34rem] w-full">
+      <canvas
+        ref={canvasRef}
+        className="h-full w-full outline-none"
+        id="tag-unity-canvas"
+        tabIndex={0}
+      />
+
+      {!loaded ? (
+        <div className="absolute inset-0 grid place-items-center bg-ink text-white">
+          <div className="w-full max-w-xs px-5 text-center">
+            <div className="h-2 overflow-hidden rounded-full bg-white/15">
+              <div
+                className="h-full rounded-full bg-honey transition-all"
+                style={{ width: `${Math.round(progress * 100)}%` }}
+              />
+            </div>
+            <p className="mt-3 text-sm font-extrabold text-white/70">
+              {Math.round(progress * 100)}%
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TagCanvas({ room }) {
+  const [renderer, setRenderer] = useState("unity");
+  const handleUnityUnavailable = useCallback(() => {
+    setRenderer("phaser");
+  }, []);
+
+  if (renderer === "unity") {
+    return <UnityTagCanvas room={room} onUnavailable={handleUnityUnavailable} />;
+  }
+
+  return <PhaserTagCanvas room={room} />;
 }
 
 function getTagControlKey(event) {

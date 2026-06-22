@@ -27,7 +27,20 @@ const DISCONNECT_GRACE_MS = 60_000;
 const BOT_TURN_DELAY_MS = 900;
 const BOOST_BOT_DELAY_MS = 900;
 const TREASURE_HUNT_BOT_DELAY_MS = 900;
-const TAG_LOOP_INTERVAL_MS = 1000 / 30;
+const DEFAULT_TAG_LOOP_INTERVAL_MS = 1000 / 60;
+const MIN_TAG_LOOP_INTERVAL_MS = 8;
+
+function readTagLoopIntervalMs() {
+  const value = Number(process.env.TAG_LOOP_INTERVAL_MS);
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return DEFAULT_TAG_LOOP_INTERVAL_MS;
+  }
+
+  return Math.max(MIN_TAG_LOOP_INTERVAL_MS, value);
+}
+
+const TAG_LOOP_INTERVAL_MS = readTagLoopIntervalMs();
 
 function timerKey(roomCode, playerId) {
   return `${roomCode}:${playerId}`;

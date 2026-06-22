@@ -4,6 +4,7 @@ import { socket } from "./socket/client.js";
 import {
   readRoomRouteFromUrl,
   ROOM_ROUTE_CHANGE_EVENT,
+  setGameRouteInUrl,
   setRoomCodeInUrl
 } from "./utils/roomLink.js";
 import { trackWebsiteVisit } from "./utils/visitorAnalytics.js";
@@ -21,6 +22,7 @@ const Result = lazy(() => import("./pages/Result.jsx"));
 const SpyWord = lazy(() => import("./pages/SpyWord.jsx"));
 const TagGame = lazy(() => import("./pages/TagGame.jsx"));
 const TreasureHunt = lazy(() => import("./pages/TreasureHunt.jsx"));
+const UnityWebGLGame = lazy(() => import("./pages/UnityWebGLGame.jsx"));
 const WordGuess = lazy(() => import("./pages/WordGuess.jsx"));
 
 const STORAGE_KEY = "bingo-session-v1";
@@ -237,6 +239,34 @@ export default function App() {
     setChatUnread(0);
     chatHistoryRoomRef.current = "";
   };
+
+  const handleOpenStandaloneGame = useCallback((gameType) => {
+    if (gameType !== "book-cricket") {
+      return;
+    }
+
+    clearSavedState();
+    setNeedsResume(false);
+    setRoom(null);
+    setBoard([]);
+    setChatMessages([]);
+    setChatOpen(false);
+    setChatUnread(0);
+    chatHistoryRoomRef.current = "";
+    setView("book-cricket");
+    setGameRouteInUrl("book-cricket");
+  }, []);
+
+  const handleCloseStandaloneGame = useCallback(() => {
+    setView("home");
+    setGameRouteInUrl("", "", { replace: true });
+  }, []);
+
+  useEffect(() => {
+    if (view === "book-cricket" && route.gameType !== "book-cricket") {
+      setView("home");
+    }
+  }, [route.gameType, view]);
 
   useEffect(() => {
     let canceled = false;
@@ -900,6 +930,10 @@ export default function App() {
       </>
     );
 
+  if (view === "book-cricket") {
+    return screen(<UnityWebGLGame onBack={handleCloseStandaloneGame} />);
+  }
+
   if (view === "lobby" && room) {
     return roomScreen(
       <Lobby
@@ -1071,6 +1105,7 @@ export default function App() {
       activeRooms={activeRooms}
       onCreateRoom={handleCreateRoom}
       onJoinRoom={handleJoinRoom}
+      onOpenStandaloneGame={handleOpenStandaloneGame}
       onRefreshActiveRooms={requestActiveRooms}
       initialRoomCode={initialRoomCode}
       initialGameType={initialGameType}

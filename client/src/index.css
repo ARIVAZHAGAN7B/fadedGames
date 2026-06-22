@@ -46,6 +46,7 @@ button:disabled {
   display: flex;
   justify-content: center;
   overflow: hidden;
+  position: relative;
 }
 
 .tag-canvas canvas {

@@ -2838,7 +2838,7 @@ function respawnTagPlayer(player, map, now) {
   player.launcherCooldownUntil = now + 350;
 }
 
-function moveTagPlayer(player, map, dt, now) {
+function moveTagPlayer(player, platforms, dt, now) {
   const input = player.input || createTagInput();
   const speed = player.isIt ? TAG_CHASER_SPEED : TAG_RUN_SPEED;
   const wasGrounded = player.grounded;
@@ -2862,7 +2862,6 @@ function moveTagPlayer(player, map, dt, now) {
   player.jumpWasDown = input.jump;
   player.vy = Math.min(player.vy + TAG_GRAVITY * dt, TAG_MAX_FALL_SPEED);
 
-  const platforms = getTagPlatforms(map, now);
   const previousX = player.x;
   player.x += player.vx * dt;
 
@@ -3193,7 +3192,7 @@ function transferTag(room, nextItPlayerId, now) {
   }
 }
 
-function processTagCollisions(room, now) {
+function processTagCollisions(room, players, now) {
   const chaser = room.tag.players[room.tag.itPlayerId];
 
   if (!chaser || now < (chaser.tagCooldownUntil || 0)) {
@@ -3201,7 +3200,7 @@ function processTagCollisions(room, now) {
   }
 
   const chaserRect = tagPlayerRect(chaser);
-  const candidates = Object.values(room.tag.players)
+  const candidates = players
     .filter((runner) => runner.playerId !== chaser.playerId && now >= (runner.invulUntil || 0))
     .map((runner) => {
       const overlap = rectOverlap(chaserRect, tagPlayerRect(runner));
@@ -5840,16 +5839,18 @@ export function tickTagRoom({ roomCode, now = Date.now() }) {
   const elapsed = Math.max(0.001, Math.min(0.08, (now - lastTickAt) / 1000));
   const stepCount = Math.max(1, Math.ceil(elapsed / (1 / 60)));
   const dt = elapsed / stepCount;
+  const platforms = getTagPlatforms(map, now);
+  const players = Object.values(room.tag.players);
 
   room.tag.lastTickAt = now;
 
   for (let step = 0; step < stepCount; step += 1) {
-    for (const player of Object.values(room.tag.players)) {
-      moveTagPlayer(player, map, dt, now);
+    for (const player of players) {
+      moveTagPlayer(player, platforms, dt, now);
       applyTagSpecialObjects(player, map, now);
     }
 
-    processTagCollisions(room, now);
+    processTagCollisions(room, players, now);
   }
 
   if (room.tag.endAt && now >= room.tag.endAt) {

@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Activity,
   ArrowLeft,
   BarChart3,
   CalendarDays,
   Check,
-  Database,
   Eye,
   Gamepad2,
   LogIn,
@@ -14,7 +12,6 @@ import {
   Plus,
   RefreshCw,
   Route,
-  Trophy,
   UserCheck,
   UserRound,
   Users,
@@ -23,6 +20,7 @@ import {
 } from "lucide-react";
 import bingoLogo from "../images/optimized/bingo.webp";
 import boostLogo from "../images/optimized/boost.webp";
+import bookCricketLogo from "../images/education_design.png";
 import fadedGamesLogo from "../images/optimized/FGlogo.webp";
 import guessNumberLogo from "../images/optimized/guessNumber.webp";
 import handCricketLogo from "../images/optimized/handCricket.webp";
@@ -34,10 +32,7 @@ import treasureHuntLogo from "../images/optimized/treasure hunt.webp";
 import wordGuessLogo from "../images/wordGuess.svg";
 import { warmImageCache } from "../utils/imageCache.js";
 import { normalizeGameType, normalizeRoomCode, setGameRouteInUrl } from "../utils/roomLink.js";
-import {
-  fetchAnalyticsSummary,
-  fetchPlayerGameStatsSummary
-} from "../utils/visitorAnalytics.js";
+import { fetchAnalyticsSummary } from "../utils/visitorAnalytics.js";
 
 const games = [
   {
@@ -59,6 +54,17 @@ const games = [
     maxPlayers: 2,
     logo: handCricketLogo,
     summary: "Odd-even toss, secret number picks, and fast cricket scoring."
+  },
+  {
+    id: "book-cricket",
+    name: "Book Cricket",
+    status: "Unity WebGL",
+    available: true,
+    standalone: true,
+    defaultRoomName: "Book Cricket Match",
+    maxPlayers: 1,
+    logo: bookCricketLogo,
+    summary: "Animated page turns, wickets, innings, and a score chase."
   },
   {
     id: "tag",
@@ -501,165 +507,11 @@ function AnalyticsDashboard({ analytics, error, loading, onRefresh }) {
   );
 }
 
-function GameAnalyticsDashboard({ stats, loading }) {
-  const totals = stats?.totals || {};
-  const topGames = stats?.topGames || [];
-  const players = stats?.players || [];
-  const recentPlayers = stats?.recentPlayers || [];
-  const topGame = topGames[0] || null;
-  const metrics = [
-    {
-      icon: Gamepad2,
-      label: "Games Played",
-      value: loading && !stats ? "--" : formatNumber(totals.totalGamesPlayed)
-    },
-    {
-      icon: Users,
-      label: "Players",
-      value: loading && !stats ? "--" : formatNumber(totals.players)
-    },
-    {
-      icon: Trophy,
-      label: "Top Game",
-      value: loading && !stats ? "--" : topGame?.gameName || "None"
-    },
-    {
-      icon: Database,
-      label: "Pending Sync",
-      value: loading && !stats ? "--" : formatNumber(stats?.pendingSync)
-    }
-  ];
-
-  return (
-    <section className="space-y-2" aria-label="Game analytics">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-ink text-white">
-          <Activity className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="truncate text-lg font-extrabold text-ink">Gameplay Analytics</h2>
-          <p className="text-xs font-extrabold uppercase text-ink/45">
-            Updated {formatUpdatedAt(stats?.updatedAt)}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
-          <AnalyticsMetric
-            key={metric.label}
-            icon={metric.icon}
-            label={metric.label}
-            value={metric.value}
-          />
-        ))}
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-[0.9fr_1.4fr]">
-        <div className="rounded-md border border-ink/10 bg-white p-3 shadow-soft">
-          <div className="mb-2 flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-mint" aria-hidden="true" />
-            <h3 className="text-sm font-extrabold text-ink">Top Games</h3>
-          </div>
-          {topGames.length > 0 ? (
-            <div className="grid gap-1.5">
-              {topGames.map((game) => (
-                <div
-                  key={`${game.gameType}-${game.gameName}`}
-                  className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded bg-paper px-2 py-1.5"
-                >
-                  <span className="min-w-0 truncate text-xs font-extrabold text-ink/75">
-                    {game.gameName}
-                  </span>
-                  <span className="text-xs font-extrabold text-ink">
-                    {formatNumber(game.timesPlayed)}
-                  </span>
-                  <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-extrabold text-ink/45">
-                    {formatNumber(game.playerCount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm font-bold text-ink/45">
-              {loading ? "Loading game analytics..." : "No games tracked yet."}
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-md border border-ink/10 bg-white p-3 shadow-soft">
-          <div className="mb-2 flex items-center gap-2">
-            <Users className="h-4 w-4 text-mint" aria-hidden="true" />
-            <h3 className="text-sm font-extrabold text-ink">Player Leaderboard</h3>
-          </div>
-          {players.length > 0 ? (
-            <div className="grid gap-1.5">
-              {players.map((player, index) => {
-                const favoriteGame = player.gamesPlayed?.[0] || null;
-
-                return (
-                  <div
-                    key={player.username}
-                    className="grid grid-cols-[2rem_1fr_auto] items-center gap-2 rounded bg-paper px-2 py-1.5"
-                  >
-                    <span className="text-xs font-extrabold text-ink/45">#{index + 1}</span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-extrabold text-ink">
-                        {player.username}
-                      </span>
-                      <span className="block truncate text-[11px] font-bold text-ink/45">
-                        {favoriteGame
-                          ? `${favoriteGame.gameName} / ${formatNumber(favoriteGame.timesPlayed)}`
-                          : "No favorite yet"}
-                      </span>
-                    </span>
-                    <span className="rounded bg-white px-2 py-1 text-xs font-extrabold text-ink">
-                      {formatNumber(player.totalGamesPlayed)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm font-bold text-ink/45">
-              {loading ? "Loading players..." : "No players tracked yet."}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="rounded-md border border-ink/10 bg-white p-3 shadow-soft">
-        <div className="mb-2 flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-mint" aria-hidden="true" />
-          <h3 className="text-sm font-extrabold text-ink">Recent Players</h3>
-        </div>
-        {recentPlayers.length > 0 ? (
-          <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
-            {recentPlayers.map((player) => (
-              <div key={player.username} className="rounded bg-paper px-2 py-1.5">
-                <p className="truncate text-xs font-extrabold text-ink">{player.username}</p>
-                <p className="text-[11px] font-bold text-ink/45">
-                  {formatNumber(player.totalGamesPlayed)} / {formatUpdatedAt(player.updatedAt)}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm font-bold text-ink/45">
-            {loading ? "Loading recent players..." : "No recent player activity."}
-          </p>
-        )}
-      </div>
-    </section>
-  );
-}
-
 function AnalyticsAdminPage({
   analytics,
   analyticsToken,
   connected,
   error,
-  gameStats,
   loading,
   nameModal,
   nickname,
@@ -684,7 +536,7 @@ function AnalyticsAdminPage({
                 Faded Games Analytics
               </h1>
               <p className="text-xs font-extrabold uppercase text-ink/45">
-                Traffic, game starts, players, and offline sync
+                Traffic and page views
               </p>
             </div>
           </div>
@@ -724,7 +576,6 @@ function AnalyticsAdminPage({
           loading={loading}
           onRefresh={onRefresh}
         />
-        <GameAnalyticsDashboard stats={gameStats} loading={loading} />
       </div>
       {nameModal}
     </main>
@@ -736,6 +587,7 @@ export default function Home({
   activeRooms = [],
   onCreateRoom,
   onJoinRoom,
+  onOpenStandaloneGame,
   onRefreshActiveRooms,
   initialRoomCode = "",
   initialGameType = ""
@@ -763,7 +615,6 @@ export default function Home({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
-  const [gameStatsSummary, setGameStatsSummary] = useState(null);
   const [analyticsToken, setAnalyticsToken] = useState(readStoredAnalyticsToken);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
@@ -771,6 +622,7 @@ export default function Home({
   const pickingGameTimerRef = useRef(null);
   const nameInputRef = useRef(null);
   const selectedGame = getGameById(selectedGameId);
+  const isStandaloneGame = Boolean(selectedGame?.standalone);
   const canViewAnalytics = canShowAnalyticsForName(nickname);
   const isHandCricket = selectedGame?.id === "hand-cricket";
   const isTag = selectedGame?.id === "tag";
@@ -789,7 +641,7 @@ export default function Home({
   const validTreasureHuntPlayers =
     !isTreasureHunt ||
     (Number.isInteger(treasureHuntPlayers) && treasureHuntPlayers >= 2 && treasureHuntPlayers <= 10);
-  const selectedGameRooms = selectedGame
+  const selectedGameRooms = selectedGame && !isStandaloneGame
     ? activeRooms.filter((activeRoom) => getPublicGameType(activeRoom.gameType) === selectedGame.id)
     : [];
 
@@ -808,34 +660,13 @@ export default function Home({
     setAnalyticsLoading(true);
     setAnalyticsError("");
 
-    const [trafficResult, gameStatsResult] = await Promise.allSettled([
-      fetchAnalyticsSummary(token),
-      fetchPlayerGameStatsSummary(token)
-    ]);
-    const errors = [];
-
-    if (trafficResult.status === "fulfilled") {
-      setAnalyticsSummary(trafficResult.value);
-    } else {
-      errors.push(
-        trafficResult.reason instanceof Error
-          ? trafficResult.reason.message
-          : "Unable to load analytics."
-      );
+    try {
+      setAnalyticsSummary(await fetchAnalyticsSummary(token));
+    } catch (error) {
+      setAnalyticsError(error instanceof Error ? error.message : "Unable to load analytics.");
+    } finally {
+      setAnalyticsLoading(false);
     }
-
-    if (gameStatsResult.status === "fulfilled") {
-      setGameStatsSummary(gameStatsResult.value);
-    } else {
-      errors.push(
-        gameStatsResult.reason instanceof Error
-          ? gameStatsResult.reason.message
-          : "Unable to load game analytics."
-      );
-    }
-
-    setAnalyticsError(errors.join(" "));
-    setAnalyticsLoading(false);
   }, [analyticsToken, canViewAnalytics]);
 
   const handleAnalyticsTokenChange = (value) => {
@@ -943,7 +774,12 @@ export default function Home({
   }, [nameModalOpen]);
 
   useEffect(() => {
-    if (connected && selectedGameId && typeof onRefreshActiveRooms === "function") {
+    if (
+      connected &&
+      selectedGameId &&
+      !getGameById(selectedGameId)?.standalone &&
+      typeof onRefreshActiveRooms === "function"
+    ) {
       onRefreshActiveRooms();
     }
   }, [connected, onRefreshActiveRooms, selectedGameId]);
@@ -951,7 +787,6 @@ export default function Home({
   useEffect(() => {
     if (!canViewAnalytics) {
       setAnalyticsSummary(null);
-      setGameStatsSummary(null);
       setAnalyticsError("");
       setAnalyticsLoading(false);
       return;
@@ -986,10 +821,12 @@ export default function Home({
   const canSubmit =
     Boolean(selectedGame) &&
     nickname.trim().length > 0 &&
-    (mode === "create" ? selectedGame.available : roomCode.trim().length > 0) &&
-    (!isHandCricket || handCricketMode !== "team" || validTeamMembers) &&
-    (mode !== "create" || validTreasureHuntPlayers) &&
-    connected;
+    selectedGame.available &&
+    (isStandaloneGame ||
+      ((mode === "create" ? selectedGame.available : roomCode.trim().length > 0) &&
+        (!isHandCricket || handCricketMode !== "team" || validTeamMembers) &&
+        (mode !== "create" || validTreasureHuntPlayers) &&
+        connected));
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -1000,6 +837,11 @@ export default function Home({
     }
 
     if (!canSubmit || !selectedGame) {
+      return;
+    }
+
+    if (isStandaloneGame) {
+      onOpenStandaloneGame?.(selectedGame.id);
       return;
     }
 
@@ -1078,7 +920,6 @@ export default function Home({
         analyticsToken={analyticsToken}
         connected={connected}
         error={analyticsError}
-        gameStats={gameStatsSummary}
         loading={analyticsLoading}
         nameModal={nameModal}
         nickname={nickname}
@@ -1228,83 +1069,117 @@ export default function Home({
               </div>
             </div>
 
-            <section>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="text-base font-extrabold">Active Rooms</h3>
-                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-extrabold text-ink/55">
-                  {selectedGameRooms.length}
-                </span>
-              </div>
+            {!isStandaloneGame ? (
+              <section>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-base font-extrabold">Active Rooms</h3>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-extrabold text-ink/55">
+                    {selectedGameRooms.length}
+                  </span>
+                </div>
 
-              {selectedGameRooms.length > 0 ? (
-                <div className="grid gap-2 lg:grid-cols-2">
-                  {selectedGameRooms.map((activeRoom) => {
-                    const status = getActiveRoomStatus(activeRoom);
-                    const canUseRoom =
-                      !activeRoom.gameStarted && activeRoom.playerCount < activeRoom.maxPlayers;
-                    const selectedRoom =
-                      mode === "join" && normalizeRoomCode(roomCode) === activeRoom.roomCode;
+                {selectedGameRooms.length > 0 ? (
+                  <div className="grid gap-2 lg:grid-cols-2">
+                    {selectedGameRooms.map((activeRoom) => {
+                      const status = getActiveRoomStatus(activeRoom);
+                      const canUseRoom =
+                        !activeRoom.gameStarted && activeRoom.playerCount < activeRoom.maxPlayers;
+                      const selectedRoom =
+                        mode === "join" && normalizeRoomCode(roomCode) === activeRoom.roomCode;
 
-                    return (
-                      <div
-                        key={activeRoom.roomCode}
-                        className={`rounded-md border p-3 transition ${
-                          selectedRoom
-                            ? "border-coral bg-coral/5"
-                            : "border-ink/10 bg-white"
-                        }`}
-                      >
-                        <div className="mb-2 flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <h4 className="truncate text-sm font-extrabold">
-                              {activeRoom.roomName}
-                            </h4>
-                            <p className="text-xs font-extrabold uppercase text-ink/45">
-                              {activeRoom.roomCode} / {getActiveRoomMode(activeRoom)}
-                            </p>
+                      return (
+                        <div
+                          key={activeRoom.roomCode}
+                          className={`rounded-md border p-3 transition ${
+                            selectedRoom
+                              ? "border-coral bg-coral/5"
+                              : "border-ink/10 bg-white"
+                          }`}
+                        >
+                          <div className="mb-2 flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h4 className="truncate text-sm font-extrabold">
+                                {activeRoom.roomName}
+                              </h4>
+                              <p className="text-xs font-extrabold uppercase text-ink/45">
+                                {activeRoom.roomCode} / {getActiveRoomMode(activeRoom)}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-paper px-2 py-0.5 text-xs font-extrabold text-ink/60">
+                              {activeRoom.playerCount}/{activeRoom.maxPlayers}
+                            </span>
                           </div>
-                          <span className="shrink-0 rounded-full bg-paper px-2 py-0.5 text-xs font-extrabold text-ink/60">
-                            {activeRoom.playerCount}/{activeRoom.maxPlayers}
-                          </span>
-                        </div>
 
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${
-                              status === "Open"
-                                ? "bg-mint text-white"
-                                : "bg-ink/10 text-ink/55"
-                            }`}
-                          >
-                            {status}
-                          </span>
-                          <button
-                            type="button"
-                            className="rounded-md border border-ink/15 bg-white px-2.5 py-1 text-xs font-extrabold text-ink transition hover:border-coral hover:text-coral disabled:bg-ink/10 disabled:text-ink/35"
-                            disabled={!canUseRoom}
-                            onClick={() => {
-                              setMode("join");
-                              setRoomCode(activeRoom.roomCode);
-                              setGameRouteInUrl(selectedGame.id, activeRoom.roomCode);
-                            }}
-                          >
-                            Use Code
-                          </button>
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${
+                                status === "Open"
+                                  ? "bg-mint text-white"
+                                  : "bg-ink/10 text-ink/55"
+                              }`}
+                            >
+                              {status}
+                            </span>
+                            <button
+                              type="button"
+                              className="rounded-md border border-ink/15 bg-white px-2.5 py-1 text-xs font-extrabold text-ink transition hover:border-coral hover:text-coral disabled:bg-ink/10 disabled:text-ink/35"
+                              disabled={!canUseRoom}
+                              onClick={() => {
+                                setMode("join");
+                                setRoomCode(activeRoom.roomCode);
+                                setGameRouteInUrl(selectedGame.id, activeRoom.roomCode);
+                              }}
+                            >
+                              Use Code
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-md border border-dashed border-ink/15 bg-white px-3 py-4 text-sm font-bold text-ink/45">
-                  No active rooms for {selectedGame.name}.
-                </div>
-              )}
-            </section>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed border-ink/15 bg-white px-3 py-4 text-sm font-bold text-ink/45">
+                    No active rooms for {selectedGame.name}.
+                  </div>
+                )}
+              </section>
+            ) : null}
           </section>
 
           <section className="surface p-3">
-            <div className="mb-3 flex rounded-md border border-ink/10 bg-paper p-1">
+            {isStandaloneGame ? (
+              <>
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-ink/10 bg-white px-3 py-2">
+                  <div className="min-w-0">
+                    <span className="compact-label mb-0">Player</span>
+                    <p className="truncate text-sm font-extrabold text-ink">
+                      {nickname || "Name needed"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="compact-button shrink-0 border border-ink/15 bg-white text-ink hover:border-coral hover:text-coral"
+                    onClick={openNameModal}
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
+                    Change
+                  </button>
+                </div>
+
+                {error ? <p className="mt-3 text-xs font-bold text-coral">{error}</p> : null}
+
+                <button
+                  type="submit"
+                  className="compact-button mt-4 w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
+                  disabled={!canSubmit || submitting}
+                >
+                  <Gamepad2 className="h-5 w-5" aria-hidden="true" />
+                  Play Game
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="mb-3 flex rounded-md border border-ink/10 bg-paper p-1">
               <button
                 type="button"
                 className={`flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-extrabold ${
@@ -1625,14 +1500,16 @@ export default function Home({
 
             {error ? <p className="mt-3 text-xs font-bold text-coral">{error}</p> : null}
 
-            <button
-              type="submit"
-              className="compact-button mt-4 w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-              disabled={!canSubmit || submitting}
-            >
-              {mode === "create" ? <Plus className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
-              {submitting ? "Working" : mode === "create" ? "Create Room" : "Join Room"}
-            </button>
+                <button
+                  type="submit"
+                  className="compact-button mt-4 w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
+                  disabled={!canSubmit || submitting}
+                >
+                  {mode === "create" ? <Plus className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
+                  {submitting ? "Working" : mode === "create" ? "Create Room" : "Join Room"}
+                </button>
+              </>
+            )}
           </section>
         </form>
       </div>

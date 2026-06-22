@@ -11,8 +11,7 @@ const HTTP_RATE_LIMITS = [
     name: "analytics-admin",
     max: 10,
     windowMs: MINUTE_MS,
-    matches: (request) =>
-      request.path === "/analytics/summary" || request.path === "/analytics/game-stats"
+    matches: (request) => request.path === "/analytics/summary"
   },
   {
     name: "default",

@@ -4,6 +4,22 @@ services:
     runtime: static
     buildCommand: npm run build
     staticPublishPath: ./client/dist
+    headers:
+      - path: /unity/book-cricket/Build/*.gz
+        name: Content-Encoding
+        value: gzip
+      - path: /unity/book-cricket/Build/*.data.gz
+        name: Content-Type
+        value: application/octet-stream
+      - path: /unity/book-cricket/Build/*.framework.js.gz
+        name: Content-Type
+        value: application/javascript
+      - path: /unity/book-cricket/Build/*.wasm.gz
+        name: Content-Type
+        value: application/wasm
+      - path: /unity/book-cricket/Build/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
     routes:
       - type: rewrite
         source: /*
