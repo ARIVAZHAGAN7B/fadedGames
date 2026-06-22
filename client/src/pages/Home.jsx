@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import bingoLogo from "../images/optimized/bingo.webp";
 import boostLogo from "../images/optimized/boost.webp";
-import bookCricketLogo from "../images/education_design.png";
+import bookCricketLogo from "../images/optimized/book cricket.webp";
 import fadedGamesLogo from "../images/optimized/FGlogo.webp";
 import guessNumberLogo from "../images/optimized/guessNumber.webp";
 import handCricketLogo from "../images/optimized/handCricket.webp";
