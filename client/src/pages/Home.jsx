@@ -56,17 +56,6 @@ const games = [
     summary: "Odd-even toss, secret number picks, and fast cricket scoring."
   },
   {
-    id: "book-cricket",
-    name: "Book Cricket",
-    status: "Unity WebGL",
-    available: true,
-    standalone: true,
-    defaultRoomName: "Book Cricket Match",
-    maxPlayers: 1,
-    logo: bookCricketLogo,
-    summary: "Animated page turns, wickets, innings, and a score chase."
-  },
-  {
     id: "tag",
     name: "Tag",
     status: "Ready",
@@ -145,6 +134,17 @@ const games = [
     maxPlayers: 10,
     logo: treasureHuntLogo,
     summary: "Find 10 diamonds, dodge 25 bombs, and protect your lives."
+  },
+  {
+    id: "book-cricket",
+    name: "Book Cricket",
+    status: "Unity WebGL",
+    available: true,
+    standalone: true,
+    defaultRoomName: "Book Cricket Match",
+    maxPlayers: 1,
+    logo: bookCricketLogo,
+    summary: "Animated page turns, wickets, innings, and a score chase."
   }
 ];
 
