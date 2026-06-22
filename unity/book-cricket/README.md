@@ -20,8 +20,8 @@ Standalone Unity version of Book Cricket for the Faded Games website.
 ## Export WebGL Into The Website
 
 1. Switch platform to WebGL in `File > Build Settings`.
-2. For the first website build, use compression `Disabled`.
-3. Run `Faded Games > Build Book Cricket WebGL Into Website`.
+2. Run `Faded Games > Build Book Cricket WebGL Into Website`.
+3. The build command forces WebGL compression `Disabled` so static hosts do not need gzip response headers.
 4. The build is written to `client/public/unity/book-cricket`.
 5. Start the website and open Book Cricket from Home.
 

@@ -5,10 +5,10 @@ const BOOK_CRICKET_BASE_URL = "/unity/book-cricket";
 const BOOK_CRICKET_MANIFEST_URL = `${BOOK_CRICKET_BASE_URL}/book-cricket-build.json`;
 
 const fallbackManifest = {
-  loaderUrl: `${BOOK_CRICKET_BASE_URL}/Build/BookCricket.loader.js`,
-  dataUrl: `${BOOK_CRICKET_BASE_URL}/Build/BookCricket.data`,
-  frameworkUrl: `${BOOK_CRICKET_BASE_URL}/Build/BookCricket.framework.js`,
-  codeUrl: `${BOOK_CRICKET_BASE_URL}/Build/BookCricket.wasm`,
+  loaderUrl: `${BOOK_CRICKET_BASE_URL}/Build/book-cricket.loader.js`,
+  dataUrl: `${BOOK_CRICKET_BASE_URL}/Build/book-cricket.data`,
+  frameworkUrl: `${BOOK_CRICKET_BASE_URL}/Build/book-cricket.framework.js`,
+  codeUrl: `${BOOK_CRICKET_BASE_URL}/Build/book-cricket.wasm`,
   streamingAssetsUrl: `${BOOK_CRICKET_BASE_URL}/StreamingAssets`
 };
 
