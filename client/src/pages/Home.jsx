@@ -148,13 +148,6 @@ const games = [
   }
 ];
 
-const tagMaps = [
-  { id: "classic", label: "The Classic" },
-  { id: "tower", label: "The Tower" },
-  { id: "maze", label: "The Maze" },
-  { id: "arena", label: "The Arena" }
-];
-
 const tagRoundOptions = [60, 90, 120];
 const boostPlayerOptions = [3, 4, 5];
 const spyWordPlayerOptions = [4, 5, 6, 7, 8, 9, 10];
@@ -1277,26 +1270,6 @@ export default function Home({
                             onClick={() => setTagPlayerCount(count)}
                           >
                             {count}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="compact-label">Map</span>
-                      <div className="grid gap-2">
-                        {tagMaps.map((map) => (
-                          <button
-                            key={map.id}
-                            type="button"
-                            className={`rounded-md border px-3 py-2 text-left text-sm font-extrabold transition ${
-                              tagMapId === map.id
-                                ? "border-coral bg-coral text-white"
-                                : "border-ink/10 bg-white text-ink hover:border-mint"
-                            }`}
-                            onClick={() => setTagMapId(map.id)}
-                          >
-                            {map.label}
                           </button>
                         ))}
                       </div>

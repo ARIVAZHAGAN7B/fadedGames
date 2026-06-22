@@ -30,14 +30,15 @@ const TAG_WORLD_WIDTH = 2400;
 const TAG_WORLD_HEIGHT = 1200;
 const TAG_PLAYER_WIDTH = 36;
 const TAG_PLAYER_HEIGHT = 42;
-const TAG_GRAVITY = 1350;
-const TAG_JUMP_VELOCITY = -680;
+const TAG_GRAVITY = 1500;
+const TAG_JUMP_VELOCITY = -720;
 const TAG_BOUNCE_VELOCITY = -1040;
-const TAG_RUN_SPEED = 330;
-const TAG_CHASER_SPEED = 350;
-const TAG_ACCELERATION = 5200;
-const TAG_DECELERATION = 6200;
-const TAG_MAX_FALL_SPEED = 920;
+const TAG_RUN_SPEED = 390;
+const TAG_CHASER_SPEED = 420;
+const TAG_ACCELERATION = 12000;
+const TAG_DECELERATION = 14000;
+const TAG_MAX_FALL_SPEED = 1080;
+const TAG_PHYSICS_STEP_SECONDS = 1 / 90;
 const TAG_COUNTDOWN_MS = 3000;
 const TAG_NEW_IT_COOLDOWN_MS = 500;
 const TAG_FREED_INVUL_MS = 1200;
@@ -435,227 +436,77 @@ const TAG_BOUNDARY_PLATFORMS = [
 ];
 const TAG_MAPS = {
   classic: {
-    name: "The Classic",
+    name: "TAG Playground",
     spawnPoints: [
-      { x: 500, y: 640 },
-      { x: 1900, y: 640 },
-      { x: 900, y: 1030 },
-      { x: 1500, y: 1030 }
+      { x: 1900, y: 1131 },
+      { x: 610, y: 815 },
+      { x: 1230, y: 701 },
+      { x: 1930, y: 931 }
     ],
     platforms: [
       ...TAG_BOUNDARY_PLATFORMS,
-      { x: 360, y: 1040, w: 260, h: 24 },
-      { x: 700, y: 970, w: 260, h: 24 },
-      { x: 1040, y: 895, w: 300, h: 24, oneWay: true },
-      { x: 1360, y: 895, w: 300, h: 24, oneWay: true },
-      { x: 1700, y: 970, w: 260, h: 24 },
-      { x: 2040, y: 1040, w: 260, h: 24 },
-      { x: 650, y: 770, w: 760, h: 24, oneWay: true },
-      { x: 1750, y: 770, w: 760, h: 24, oneWay: true },
-      { x: 1200, y: 680, w: 320, h: 24 },
-      { x: 520, y: 510, w: 420, h: 24, oneWay: true },
-      { x: 1200, y: 500, w: 520, h: 24, oneWay: true },
-      { x: 1880, y: 510, w: 420, h: 24, oneWay: true },
-      { x: 770, y: 355, w: 250, h: 24 },
-      { x: 1630, y: 355, w: 250, h: 24 },
-      { x: 1200, y: 270, w: 360, h: 24 },
-      { x: 1200, y: 1015, w: 34, h: 245, wall: true },
-      { x: 515, y: 690, w: 34, h: 155, wall: true },
-      { x: 1885, y: 690, w: 34, h: 155, wall: true }
+      { x: 70, y: 1000, w: 300, h: 28 },
+      { x: 435, y: 1000, w: 410, h: 28 },
+      { x: 800, y: 1065, w: 420, h: 150, oneWay: true, slope: "down-right", thickness: 28 },
+      { x: 1340, y: 1018, w: 520, h: 28 },
+      { x: 1930, y: 966, w: 580, h: 28 },
+      { x: 2320, y: 840, w: 290, h: 28, oneWay: true },
+      { x: 665, y: 850, w: 690, h: 28, oneWay: true },
+      { x: 1230, y: 735, w: 460, h: 28, oneWay: true },
+      { x: 1700, y: 725, w: 680, h: 28, oneWay: true },
+      { x: 2050, y: 590, w: 410, h: 28, oneWay: true },
+      { x: 1460, y: 585, w: 520, h: 28, oneWay: true },
+      { x: 850, y: 620, w: 360, h: 28, oneWay: true },
+      { x: 265, y: 475, w: 420, h: 28, oneWay: true },
+      { x: 730, y: 430, w: 260, h: 28, oneWay: true },
+      { x: 1200, y: 395, w: 520, h: 28, oneWay: true },
+      { x: 1785, y: 400, w: 400, h: 28, oneWay: true },
+      { x: 2190, y: 330, w: 430, h: 28, oneWay: true },
+      { x: 2320, y: 190, w: 300, h: 28, oneWay: true },
+      { x: 150, y: 360, w: 330, h: 28, oneWay: true },
+      { x: 2035, y: 245, w: 280, h: 105, oneWay: true, slope: "down-right", thickness: 28 }
     ],
-    bouncePads: [
-      { x: 1200, y: 1138, w: 76, h: 14 },
-      { x: 320, y: 1010, w: 76, h: 14 },
-      { x: 2080, y: 1010, w: 76, h: 14 },
-      { x: 1200, y: 650, w: 76, h: 14 }
-    ],
-    teleporters: [
-      { id: "left", target: "right", x: 280, y: 718, w: 48, h: 68 },
-      { id: "right", target: "left", x: 2120, y: 718, w: 48, h: 68 }
-    ],
-    launchers: [
-      { x: 1030, y: 1134, w: 66, h: 26, vx: -640, vy: -650 },
-      { x: 1370, y: 1134, w: 66, h: 26, vx: 640, vy: -650 },
-      { x: 620, y: 740, w: 66, h: 26, vx: 720, vy: -430 },
-      { x: 1780, y: 740, w: 66, h: 26, vx: -720, vy: -430 }
-    ],
-    movingPlatforms: [
-      { x: 1200, y: 805, w: 240, h: 22, axis: "x", distance: 180, periodMs: 3000 }
-    ]
-  },
-  tower: {
-    name: "The Tower",
-    spawnPoints: [
-      { x: 450, y: 1030 },
-      { x: 1950, y: 1030 },
-      { x: 990, y: 850 },
-      { x: 1410, y: 850 }
-    ],
-    platforms: [
-      ...TAG_BOUNDARY_PLATFORMS,
-      { x: 420, y: 1050, w: 320, h: 24 },
-      { x: 1980, y: 1050, w: 320, h: 24 },
-      { x: 670, y: 920, w: 520, h: 24 },
-      { x: 1730, y: 920, w: 520, h: 24 },
-      { x: 520, y: 805, w: 250, h: 24, oneWay: true },
-      { x: 1880, y: 805, w: 250, h: 24, oneWay: true },
-      { x: 900, y: 730, w: 460, h: 24, oneWay: true },
-      { x: 1500, y: 730, w: 460, h: 24, oneWay: true },
-      { x: 760, y: 620, w: 260, h: 24, oneWay: true },
-      { x: 1640, y: 620, w: 260, h: 24, oneWay: true },
-      { x: 1110, y: 545, w: 390, h: 24, oneWay: true },
-      { x: 1290, y: 545, w: 390, h: 24, oneWay: true },
-      { x: 1000, y: 450, w: 260, h: 24, oneWay: true },
-      { x: 1400, y: 450, w: 260, h: 24, oneWay: true },
-      { x: 1200, y: 360, w: 420, h: 24, oneWay: true },
-      { x: 1200, y: 205, w: 310, h: 24 },
-      { x: 1200, y: 1010, w: 34, h: 275, wall: true },
-      { x: 1200, y: 630, w: 34, h: 150, wall: true },
-      { x: 955, y: 305, w: 34, h: 110, wall: true },
-      { x: 1445, y: 305, w: 34, h: 110, wall: true }
-    ],
-    bouncePads: [
-      { x: 370, y: 1138, w: 76, h: 14 },
-      { x: 2030, y: 1138, w: 76, h: 14 },
-      { x: 1200, y: 890, w: 76, h: 14 }
-    ],
-    teleporters: [
-      { id: "bottom", target: "top", x: 1200, y: 1120, w: 48, h: 68 },
-      { id: "top", target: "bottom", x: 1200, y: 165, w: 48, h: 68 }
-    ],
-    launchers: [
-      { x: 760, y: 890, w: 66, h: 26, vx: 700, vy: -590 },
-      { x: 1640, y: 890, w: 66, h: 26, vx: -700, vy: -590 },
-      { x: 1030, y: 520, w: 66, h: 26, vx: -520, vy: -520 },
-      { x: 1370, y: 520, w: 66, h: 26, vx: 520, vy: -520 }
-    ],
-    movingPlatforms: [
-      { x: 1200, y: 875, w: 300, h: 22, axis: "x", distance: 250, periodMs: 3200 },
-      { x: 1200, y: 635, w: 240, h: 22, axis: "y", distance: 95, periodMs: 2600 }
-    ]
-  },
-  maze: {
-    name: "The Maze",
-    spawnPoints: [
-      { x: 360, y: 1030 },
-      { x: 2040, y: 1030 },
-      { x: 610, y: 590 },
-      { x: 1790, y: 590 }
-    ],
-    platforms: [
-      ...TAG_BOUNDARY_PLATFORMS,
-      { x: 280, y: 1060, w: 260, h: 24 },
-      { x: 740, y: 1060, w: 260, h: 24 },
-      { x: 1660, y: 1060, w: 260, h: 24 },
-      { x: 2120, y: 1060, w: 260, h: 24 },
-      { x: 360, y: 940, w: 440, h: 24 },
-      { x: 940, y: 940, w: 400, h: 24 },
-      { x: 1500, y: 940, w: 400, h: 24 },
-      { x: 2040, y: 940, w: 440, h: 24 },
-      { x: 1200, y: 845, w: 250, h: 24 },
-      { x: 620, y: 760, w: 390, h: 24, oneWay: true },
-      { x: 1200, y: 760, w: 420, h: 24, oneWay: true },
-      { x: 1780, y: 760, w: 390, h: 24, oneWay: true },
-      { x: 250, y: 690, w: 230, h: 24, oneWay: true },
-      { x: 2150, y: 690, w: 230, h: 24, oneWay: true },
-      { x: 360, y: 580, w: 360, h: 24, oneWay: true },
-      { x: 870, y: 580, w: 360, h: 24, oneWay: true },
-      { x: 1530, y: 580, w: 360, h: 24, oneWay: true },
-      { x: 2040, y: 580, w: 360, h: 24, oneWay: true },
-      { x: 380, y: 480, w: 220, h: 24, oneWay: true },
-      { x: 2020, y: 480, w: 220, h: 24, oneWay: true },
-      { x: 640, y: 390, w: 360, h: 24, oneWay: true },
-      { x: 1200, y: 390, w: 420, h: 24, oneWay: true },
-      { x: 1760, y: 390, w: 360, h: 24, oneWay: true },
-      { x: 900, y: 270, w: 230, h: 24 },
-      { x: 1500, y: 270, w: 230, h: 24 },
-      { x: 1200, y: 220, w: 380, h: 24 },
-      { x: 650, y: 870, w: 34, h: 120, wall: true },
-      { x: 1750, y: 870, w: 34, h: 120, wall: true },
-      { x: 1200, y: 610, w: 34, h: 150, wall: true },
-      { x: 470, y: 310, w: 34, h: 105, wall: true },
-      { x: 1930, y: 310, w: 34, h: 105, wall: true }
-    ],
-    bouncePads: [
-      { x: 270, y: 1138, w: 76, h: 14 },
-      { x: 2130, y: 1138, w: 76, h: 14 },
-      { x: 1200, y: 735, w: 76, h: 14 },
-      { x: 520, y: 555, w: 76, h: 14 },
-      { x: 1880, y: 555, w: 76, h: 14 }
-    ],
-    teleporters: [
-      { id: "low-left", target: "high-right", x: 420, y: 900, w: 48, h: 68 },
-      { id: "high-right", target: "low-left", x: 1980, y: 535, w: 48, h: 68 }
-    ],
-    launchers: [
-      { x: 890, y: 735, w: 66, h: 26, vx: 650, vy: -540 },
-      { x: 1510, y: 735, w: 66, h: 26, vx: -650, vy: -540 },
-      { x: 700, y: 915, w: 66, h: 26, vx: 520, vy: -430 },
-      { x: 1700, y: 915, w: 66, h: 26, vx: -520, vy: -430 }
-    ],
-    movingPlatforms: [
-      { x: 1200, y: 1060, w: 330, h: 22, axis: "y", distance: 95, periodMs: 2600 },
-      { x: 1200, y: 505, w: 280, h: 22, axis: "x", distance: 210, periodMs: 3300 }
-    ]
-  },
-  arena: {
-    name: "The Arena",
-    spawnPoints: [
-      { x: 430, y: 1030 },
-      { x: 1970, y: 1030 },
-      { x: 430, y: 520 },
-      { x: 1970, y: 520 }
-    ],
-    platforms: [
-      ...TAG_BOUNDARY_PLATFORMS,
-      { x: 520, y: 1040, w: 300, h: 24 },
-      { x: 1880, y: 1040, w: 300, h: 24 },
-      { x: 360, y: 900, w: 350, h: 24 },
-      { x: 2040, y: 900, w: 350, h: 24 },
-      { x: 880, y: 910, w: 260, h: 24, oneWay: true },
-      { x: 1520, y: 910, w: 260, h: 24, oneWay: true },
-      { x: 360, y: 680, w: 350, h: 24, oneWay: true },
-      { x: 2040, y: 680, w: 350, h: 24, oneWay: true },
-      { x: 760, y: 650, w: 230, h: 24, oneWay: true },
-      { x: 1640, y: 650, w: 230, h: 24, oneWay: true },
-      { x: 360, y: 455, w: 350, h: 24, oneWay: true },
-      { x: 2040, y: 455, w: 350, h: 24, oneWay: true },
-      { x: 1200, y: 790, w: 520, h: 24 },
-      { x: 1200, y: 520, w: 360, h: 24, oneWay: true },
-      { x: 1200, y: 350, w: 260, h: 24 },
-      { x: 1200, y: 965, w: 34, h: 185, wall: true },
-      { x: 585, y: 790, w: 34, h: 150, wall: true },
-      { x: 1815, y: 790, w: 34, h: 150, wall: true },
-      { x: 980, y: 450, w: 34, h: 120, wall: true },
-      { x: 1420, y: 450, w: 34, h: 120, wall: true }
-    ],
-    bouncePads: [
-      { x: 650, y: 1138, w: 76, h: 14 },
-      { x: 1750, y: 1138, w: 76, h: 14 },
-      { x: 1200, y: 760, w: 76, h: 14 },
-      { x: 360, y: 875, w: 76, h: 14 },
-      { x: 2040, y: 875, w: 76, h: 14 }
-    ],
-    teleporters: [
-      { id: "left-wall", target: "right-wall", x: 300, y: 420, w: 48, h: 68 },
-      { id: "right-wall", target: "left-wall", x: 2100, y: 420, w: 48, h: 68 }
-    ],
-    launchers: [
-      { x: 1095, y: 1134, w: 66, h: 26, vx: -800, vy: -460 },
-      { x: 1305, y: 1134, w: 66, h: 26, vx: 800, vy: -460 },
-      { x: 760, y: 625, w: 66, h: 26, vx: 570, vy: -430 },
-      { x: 1640, y: 625, w: 66, h: 26, vx: -570, vy: -430 }
-    ],
-    movingPlatforms: [
-      { x: 1200, y: 1015, w: 420, h: 22, axis: "x", distance: 360, periodMs: 3600 },
-      { x: 1200, y: 640, w: 300, h: 22, axis: "y", distance: 105, periodMs: 2800 }
-    ]
+    bouncePads: [],
+    teleporters: [],
+    launchers: [],
+    movingPlatforms: []
   }
 };
 
-TAG_MAPS.grass = TAG_MAPS.classic;
-TAG_MAPS.winter = TAG_MAPS.tower;
-TAG_MAPS.desert = TAG_MAPS.maze;
+const TAG_SPECIAL_LAYOUTS = {
+  none: {
+    bouncePads: [],
+    teleporters: [],
+    launchers: [],
+    movingPlatforms: []
+  },
+  jump: {
+    bouncePads: [{ x: 1340, y: 996, w: 82, h: 14 }],
+    teleporters: [],
+    launchers: [],
+    movingPlatforms: []
+  },
+  teleport: {
+    bouncePads: [],
+    teleporters: [
+      { id: "low-left", target: "high-right", x: 95, y: 965, w: 48, h: 68 },
+      { id: "high-right", target: "low-left", x: 2180, y: 805, w: 48, h: 68 }
+    ],
+    launchers: [],
+    movingPlatforms: []
+  },
+  jumpTeleport: {
+    bouncePads: [{ x: 850, y: 599, w: 82, h: 14 }],
+    teleporters: [
+      { id: "low-left", target: "high-right", x: 95, y: 965, w: 48, h: 68 },
+      { id: "high-right", target: "low-left", x: 2180, y: 805, w: 48, h: 68 }
+    ],
+    launchers: [],
+    movingPlatforms: []
+  }
+};
+
+const TAG_SPECIAL_LAYOUT_SEQUENCE = ["none", "none", "jump", "none", "teleport", "jumpTeleport"];
 
 function cleanNickname(nickname) {
   const value = String(nickname || "").trim().replace(/\s+/g, " ");
@@ -757,6 +608,14 @@ function cleanTagMaxPlayers(maxPlayers) {
 function cleanTagMapId(mapId) {
   const value = String(mapId || "classic").trim().toLowerCase();
   return TAG_MAPS[value] ? value : "classic";
+}
+
+function getTagSpecialLayout(layoutId) {
+  return TAG_SPECIAL_LAYOUTS[layoutId] || TAG_SPECIAL_LAYOUTS.none;
+}
+
+function chooseTagSpecialLayoutId() {
+  return TAG_SPECIAL_LAYOUT_SEQUENCE[randomInt(TAG_SPECIAL_LAYOUT_SEQUENCE.length)];
 }
 
 function cleanTagRoundSeconds(roundSeconds) {
@@ -1363,6 +1222,7 @@ function createTagState(phase = "waiting", mapId = "classic", roundSeconds = TAG
     tagCount: 0,
     lastTagAt: null,
     lastTaggedPlayerId: null,
+    specialLayoutId: "none",
     itHistory: [],
     players: {},
     result: null
@@ -2761,6 +2621,22 @@ function rectsOverlap(first, second) {
   return Boolean(rectOverlap(first, second));
 }
 
+function getTagSlopeSurfaceY(platform, x) {
+  const left = platform.x - platform.w / 2;
+  const ratio = Math.max(0, Math.min(1, (x - left) / platform.w));
+  const highY = platform.y - platform.h / 2;
+  const lowY = platform.y + platform.h / 2;
+
+  return platform.slope === "down-left"
+    ? lowY + (highY - lowY) * ratio
+    : highY + (lowY - highY) * ratio;
+}
+
+function playerOverlapsTagSlopeX(player, platform) {
+  const halfWidth = TAG_PLAYER_WIDTH / 2;
+  return player.x + halfWidth >= platform.x - platform.w / 2 && player.x - halfWidth <= platform.x + platform.w / 2;
+}
+
 function tagPlayerRect(player) {
   return {
     x: player.x,
@@ -2770,8 +2646,17 @@ function tagPlayerRect(player) {
   };
 }
 
-function getTagMap(mapId) {
-  return TAG_MAPS[mapId] || TAG_MAPS.classic;
+function getTagMap(mapId, specialLayoutId = "none") {
+  const baseMap = TAG_MAPS[mapId] || TAG_MAPS.classic;
+  const specialLayout = getTagSpecialLayout(specialLayoutId);
+
+  return {
+    ...baseMap,
+    bouncePads: specialLayout.bouncePads || [],
+    teleporters: specialLayout.teleporters || [],
+    launchers: specialLayout.launchers || [],
+    movingPlatforms: specialLayout.movingPlatforms || []
+  };
 }
 
 function getMovingTagPlatform(platform, now) {
@@ -2838,7 +2723,7 @@ function respawnTagPlayer(player, map, now) {
   player.launcherCooldownUntil = now + 350;
 }
 
-function moveTagPlayer(player, platforms, dt, now) {
+function moveTagPlayer(player, platforms, map, dt, now) {
   const input = player.input || createTagInput();
   const speed = player.isIt ? TAG_CHASER_SPEED : TAG_RUN_SPEED;
   const wasGrounded = player.grounded;
@@ -2866,7 +2751,7 @@ function moveTagPlayer(player, platforms, dt, now) {
   player.x += player.vx * dt;
 
   for (const platform of platforms) {
-    if (platform.oneWay) {
+    if (platform.oneWay || platform.slope) {
       continue;
     }
 
@@ -2890,6 +2775,32 @@ function moveTagPlayer(player, platforms, dt, now) {
   player.grounded = false;
 
   for (const platform of platforms) {
+    if (platform.slope) {
+      if (!playerOverlapsTagSlopeX(player, platform)) {
+        continue;
+      }
+
+      const surfaceY = getTagSlopeSurfaceY(platform, player.x);
+      const previousBottom = previousY + TAG_PLAYER_HEIGHT / 2;
+      const currentBottom = player.y + TAG_PLAYER_HEIGHT / 2;
+      const droppingThrough = platform.oneWay && now < (player.dropThroughUntil || 0);
+      const landingReach = Math.max(30, Math.abs(player.vy) * dt + 12);
+
+      if (
+        !droppingThrough &&
+        player.vy >= 0 &&
+        previousBottom <= surfaceY + 22 &&
+        currentBottom >= surfaceY - landingReach &&
+        currentBottom <= surfaceY + landingReach
+      ) {
+        player.y = surfaceY - TAG_PLAYER_HEIGHT / 2;
+        player.vy = 0;
+        player.grounded = true;
+      }
+
+      continue;
+    }
+
     const overlap = rectOverlap(tagPlayerRect(player), platform);
 
     if (!overlap) {
@@ -3056,7 +2967,7 @@ function syncTagPlayers(room) {
     return;
   }
 
-  const map = getTagMap(room.tag.mapId);
+  const map = getTagMap(room.tag.mapId, room.tag.specialLayoutId);
   const activePlayerIds = new Set(room.players.map((player) => player.playerId));
 
   for (const playerId of Object.keys(room.tag.players)) {
@@ -3103,7 +3014,8 @@ function syncTagPlayers(room) {
 
 function startTagRound(room) {
   const now = Date.now();
-  const map = getTagMap(room.tag.mapId);
+  room.tag.specialLayoutId = chooseTagSpecialLayoutId();
+  const map = getTagMap(room.tag.mapId, room.tag.specialLayoutId);
   const chaserIndex = Math.floor(Math.random() * room.players.length);
   const chaser = room.players[chaserIndex];
 
@@ -3579,11 +3491,19 @@ function serializeTag(room) {
   const state = room.tag || createTagState();
   const now = Date.now();
   const itDurations = getTagDurationTotals(room, now);
+  const map = getTagMap(state.mapId, state.specialLayoutId);
 
   return {
     phase: state.phase,
     mapId: state.mapId,
     roundSeconds: state.roundSeconds,
+    specialLayoutId: state.specialLayoutId || "none",
+    specials: {
+      bouncePads: map.bouncePads || [],
+      teleporters: map.teleporters || [],
+      launchers: map.launchers || [],
+      movingPlatforms: map.movingPlatforms || []
+    },
     world: {
       width: TAG_WORLD_WIDTH,
       height: TAG_WORLD_HEIGHT
@@ -5834,10 +5754,10 @@ export function tickTagRoom({ roomCode, now = Date.now() }) {
     };
   }
 
-  const map = getTagMap(room.tag.mapId);
+  const map = getTagMap(room.tag.mapId, room.tag.specialLayoutId);
   const lastTickAt = room.tag.lastTickAt || now;
   const elapsed = Math.max(0.001, Math.min(0.08, (now - lastTickAt) / 1000));
-  const stepCount = Math.max(1, Math.ceil(elapsed / (1 / 60)));
+  const stepCount = Math.max(1, Math.ceil(elapsed / TAG_PHYSICS_STEP_SECONDS));
   const dt = elapsed / stepCount;
   const platforms = getTagPlatforms(map, now);
   const players = Object.values(room.tag.players);
@@ -5846,7 +5766,7 @@ export function tickTagRoom({ roomCode, now = Date.now() }) {
 
   for (let step = 0; step < stepCount; step += 1) {
     for (const player of players) {
-      moveTagPlayer(player, platforms, dt, now);
+      moveTagPlayer(player, platforms, map, dt, now);
       applyTagSpecialObjects(player, map, now);
     }
 

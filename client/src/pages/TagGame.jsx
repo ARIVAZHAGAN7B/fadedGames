@@ -94,235 +94,84 @@ const TAG_BOUNDARY_PLATFORMS = [
 
 const mapConfigs = {
   classic: {
-    name: "The Classic",
-    sky: 0x66c6f2,
-    haze: 0xf7f4ee,
-    ground: 0x35c46d,
-    edge: 0x17212b,
+    name: "TAG Playground",
+    sky: 0x72d1ff,
+    haze: 0xf4fbff,
+    ground: 0x63c874,
+    edge: 0x1f2933,
     pad: 0xf2bd45,
     teleporter: 0x6b52ff,
     launcher: 0xe05d44,
-    accent: 0xfff5ce,
+    accent: 0xffffff,
     platforms: [
       ...TAG_BOUNDARY_PLATFORMS,
-      { x: 360, y: 1040, w: 260, h: 24 },
-      { x: 700, y: 970, w: 260, h: 24 },
-      { x: 1040, y: 895, w: 300, h: 24, oneWay: true },
-      { x: 1360, y: 895, w: 300, h: 24, oneWay: true },
-      { x: 1700, y: 970, w: 260, h: 24 },
-      { x: 2040, y: 1040, w: 260, h: 24 },
-      { x: 650, y: 770, w: 760, h: 24, oneWay: true },
-      { x: 1750, y: 770, w: 760, h: 24, oneWay: true },
-      { x: 1200, y: 680, w: 320, h: 24 },
-      { x: 520, y: 510, w: 420, h: 24, oneWay: true },
-      { x: 1200, y: 500, w: 520, h: 24, oneWay: true },
-      { x: 1880, y: 510, w: 420, h: 24, oneWay: true },
-      { x: 770, y: 355, w: 250, h: 24 },
-      { x: 1630, y: 355, w: 250, h: 24 },
-      { x: 1200, y: 270, w: 360, h: 24 },
-      { x: 1200, y: 1015, w: 34, h: 245, wall: true },
-      { x: 515, y: 690, w: 34, h: 155, wall: true },
-      { x: 1885, y: 690, w: 34, h: 155, wall: true }
+      { x: 70, y: 1000, w: 300, h: 28 },
+      { x: 435, y: 1000, w: 410, h: 28 },
+      { x: 800, y: 1065, w: 420, h: 150, oneWay: true, slope: "down-right", thickness: 28 },
+      { x: 1340, y: 1018, w: 520, h: 28 },
+      { x: 1930, y: 966, w: 580, h: 28 },
+      { x: 2320, y: 840, w: 290, h: 28, oneWay: true },
+      { x: 665, y: 850, w: 690, h: 28, oneWay: true },
+      { x: 1230, y: 735, w: 460, h: 28, oneWay: true },
+      { x: 1700, y: 725, w: 680, h: 28, oneWay: true },
+      { x: 2050, y: 590, w: 410, h: 28, oneWay: true },
+      { x: 1460, y: 585, w: 520, h: 28, oneWay: true },
+      { x: 850, y: 620, w: 360, h: 28, oneWay: true },
+      { x: 265, y: 475, w: 420, h: 28, oneWay: true },
+      { x: 730, y: 430, w: 260, h: 28, oneWay: true },
+      { x: 1200, y: 395, w: 520, h: 28, oneWay: true },
+      { x: 1785, y: 400, w: 400, h: 28, oneWay: true },
+      { x: 2190, y: 330, w: 430, h: 28, oneWay: true },
+      { x: 2320, y: 190, w: 300, h: 28, oneWay: true },
+      { x: 150, y: 360, w: 330, h: 28, oneWay: true },
+      { x: 2035, y: 245, w: 280, h: 105, oneWay: true, slope: "down-right", thickness: 28 }
     ],
-    bouncePads: [
-      { x: 1200, y: 1138, w: 76, h: 14 },
-      { x: 320, y: 1010, w: 76, h: 14 },
-      { x: 2080, y: 1010, w: 76, h: 14 },
-      { x: 1200, y: 650, w: 76, h: 14 }
-    ],
-    teleporters: [
-      { id: "left", target: "right", x: 280, y: 718, w: 48, h: 68 },
-      { id: "right", target: "left", x: 2120, y: 718, w: 48, h: 68 }
-    ],
-    launchers: [
-      { x: 1030, y: 1134, w: 66, h: 26, vx: -640, vy: -650 },
-      { x: 1370, y: 1134, w: 66, h: 26, vx: 640, vy: -650 },
-      { x: 620, y: 740, w: 66, h: 26, vx: 720, vy: -430 },
-      { x: 1780, y: 740, w: 66, h: 26, vx: -720, vy: -430 }
-    ],
-    movingPlatforms: [
-      { x: 1200, y: 805, w: 240, h: 22, axis: "x", distance: 180, periodMs: 3000 }
-    ]
-  },
-  tower: {
-    name: "The Tower",
-    sky: 0x8bd9ff,
-    haze: 0xe9fbff,
-    ground: 0xb9eef7,
-    edge: 0x315b78,
-    pad: 0xffffff,
-    teleporter: 0x2f9f88,
-    launcher: 0xe05d44,
-    accent: 0xdff6ff,
-    platforms: [
-      ...TAG_BOUNDARY_PLATFORMS,
-      { x: 420, y: 1050, w: 320, h: 24 },
-      { x: 1980, y: 1050, w: 320, h: 24 },
-      { x: 670, y: 920, w: 520, h: 24 },
-      { x: 1730, y: 920, w: 520, h: 24 },
-      { x: 520, y: 805, w: 250, h: 24, oneWay: true },
-      { x: 1880, y: 805, w: 250, h: 24, oneWay: true },
-      { x: 900, y: 730, w: 460, h: 24, oneWay: true },
-      { x: 1500, y: 730, w: 460, h: 24, oneWay: true },
-      { x: 760, y: 620, w: 260, h: 24, oneWay: true },
-      { x: 1640, y: 620, w: 260, h: 24, oneWay: true },
-      { x: 1110, y: 545, w: 390, h: 24, oneWay: true },
-      { x: 1290, y: 545, w: 390, h: 24, oneWay: true },
-      { x: 1000, y: 450, w: 260, h: 24, oneWay: true },
-      { x: 1400, y: 450, w: 260, h: 24, oneWay: true },
-      { x: 1200, y: 360, w: 420, h: 24, oneWay: true },
-      { x: 1200, y: 205, w: 310, h: 24 },
-      { x: 1200, y: 1010, w: 34, h: 275, wall: true },
-      { x: 1200, y: 630, w: 34, h: 150, wall: true },
-      { x: 955, y: 305, w: 34, h: 110, wall: true },
-      { x: 1445, y: 305, w: 34, h: 110, wall: true }
-    ],
-    bouncePads: [
-      { x: 370, y: 1138, w: 76, h: 14 },
-      { x: 2030, y: 1138, w: 76, h: 14 },
-      { x: 1200, y: 890, w: 76, h: 14 }
-    ],
-    teleporters: [
-      { id: "bottom", target: "top", x: 1200, y: 1120, w: 48, h: 68 },
-      { id: "top", target: "bottom", x: 1200, y: 165, w: 48, h: 68 }
-    ],
-    launchers: [
-      { x: 760, y: 890, w: 66, h: 26, vx: 700, vy: -590 },
-      { x: 1640, y: 890, w: 66, h: 26, vx: -700, vy: -590 },
-      { x: 1030, y: 520, w: 66, h: 26, vx: -520, vy: -520 },
-      { x: 1370, y: 520, w: 66, h: 26, vx: 520, vy: -520 }
-    ],
-    movingPlatforms: [
-      { x: 1200, y: 875, w: 300, h: 22, axis: "x", distance: 250, periodMs: 3200 },
-      { x: 1200, y: 635, w: 240, h: 22, axis: "y", distance: 95, periodMs: 2600 }
-    ]
-  },
-  maze: {
-    name: "The Maze",
-    sky: 0xffd68a,
-    haze: 0xfff2c4,
-    ground: 0x52c789,
-    edge: 0x3c2d41,
-    pad: 0x2f9f88,
-    teleporter: 0x5b47d6,
-    launcher: 0xe05d44,
-    accent: 0xfff5ce,
-    platforms: [
-      ...TAG_BOUNDARY_PLATFORMS,
-      { x: 280, y: 1060, w: 260, h: 24 },
-      { x: 740, y: 1060, w: 260, h: 24 },
-      { x: 1660, y: 1060, w: 260, h: 24 },
-      { x: 2120, y: 1060, w: 260, h: 24 },
-      { x: 360, y: 940, w: 440, h: 24 },
-      { x: 940, y: 940, w: 400, h: 24 },
-      { x: 1500, y: 940, w: 400, h: 24 },
-      { x: 2040, y: 940, w: 440, h: 24 },
-      { x: 1200, y: 845, w: 250, h: 24 },
-      { x: 620, y: 760, w: 390, h: 24, oneWay: true },
-      { x: 1200, y: 760, w: 420, h: 24, oneWay: true },
-      { x: 1780, y: 760, w: 390, h: 24, oneWay: true },
-      { x: 250, y: 690, w: 230, h: 24, oneWay: true },
-      { x: 2150, y: 690, w: 230, h: 24, oneWay: true },
-      { x: 360, y: 580, w: 360, h: 24, oneWay: true },
-      { x: 870, y: 580, w: 360, h: 24, oneWay: true },
-      { x: 1530, y: 580, w: 360, h: 24, oneWay: true },
-      { x: 2040, y: 580, w: 360, h: 24, oneWay: true },
-      { x: 380, y: 480, w: 220, h: 24, oneWay: true },
-      { x: 2020, y: 480, w: 220, h: 24, oneWay: true },
-      { x: 640, y: 390, w: 360, h: 24, oneWay: true },
-      { x: 1200, y: 390, w: 420, h: 24, oneWay: true },
-      { x: 1760, y: 390, w: 360, h: 24, oneWay: true },
-      { x: 900, y: 270, w: 230, h: 24 },
-      { x: 1500, y: 270, w: 230, h: 24 },
-      { x: 1200, y: 220, w: 380, h: 24 },
-      { x: 650, y: 870, w: 34, h: 120, wall: true },
-      { x: 1750, y: 870, w: 34, h: 120, wall: true },
-      { x: 1200, y: 610, w: 34, h: 150, wall: true },
-      { x: 470, y: 310, w: 34, h: 105, wall: true },
-      { x: 1930, y: 310, w: 34, h: 105, wall: true }
-    ],
-    bouncePads: [
-      { x: 270, y: 1138, w: 76, h: 14 },
-      { x: 2130, y: 1138, w: 76, h: 14 },
-      { x: 1200, y: 735, w: 76, h: 14 },
-      { x: 520, y: 555, w: 76, h: 14 },
-      { x: 1880, y: 555, w: 76, h: 14 }
-    ],
-    teleporters: [
-      { id: "low-left", target: "high-right", x: 420, y: 900, w: 48, h: 68 },
-      { id: "high-right", target: "low-left", x: 1980, y: 535, w: 48, h: 68 }
-    ],
-    launchers: [
-      { x: 890, y: 735, w: 66, h: 26, vx: 650, vy: -540 },
-      { x: 1510, y: 735, w: 66, h: 26, vx: -650, vy: -540 },
-      { x: 700, y: 915, w: 66, h: 26, vx: 520, vy: -430 },
-      { x: 1700, y: 915, w: 66, h: 26, vx: -520, vy: -430 }
-    ],
-    movingPlatforms: [
-      { x: 1200, y: 1060, w: 330, h: 22, axis: "y", distance: 95, periodMs: 2600 },
-      { x: 1200, y: 505, w: 280, h: 22, axis: "x", distance: 210, periodMs: 3300 }
-    ]
-  },
-  arena: {
-    name: "The Arena",
-    sky: 0xf2f0ff,
-    haze: 0xfff7d8,
-    ground: 0x49be83,
-    edge: 0x17212b,
-    pad: 0xf2bd45,
-    teleporter: 0x6b52ff,
-    launcher: 0xe05d44,
-    accent: 0xd8f6ff,
-    platforms: [
-      ...TAG_BOUNDARY_PLATFORMS,
-      { x: 520, y: 1040, w: 300, h: 24 },
-      { x: 1880, y: 1040, w: 300, h: 24 },
-      { x: 360, y: 900, w: 350, h: 24 },
-      { x: 2040, y: 900, w: 350, h: 24 },
-      { x: 880, y: 910, w: 260, h: 24, oneWay: true },
-      { x: 1520, y: 910, w: 260, h: 24, oneWay: true },
-      { x: 360, y: 680, w: 350, h: 24, oneWay: true },
-      { x: 2040, y: 680, w: 350, h: 24, oneWay: true },
-      { x: 760, y: 650, w: 230, h: 24, oneWay: true },
-      { x: 1640, y: 650, w: 230, h: 24, oneWay: true },
-      { x: 360, y: 455, w: 350, h: 24, oneWay: true },
-      { x: 2040, y: 455, w: 350, h: 24, oneWay: true },
-      { x: 1200, y: 790, w: 520, h: 24 },
-      { x: 1200, y: 520, w: 360, h: 24, oneWay: true },
-      { x: 1200, y: 350, w: 260, h: 24 },
-      { x: 1200, y: 965, w: 34, h: 185, wall: true },
-      { x: 585, y: 790, w: 34, h: 150, wall: true },
-      { x: 1815, y: 790, w: 34, h: 150, wall: true },
-      { x: 980, y: 450, w: 34, h: 120, wall: true },
-      { x: 1420, y: 450, w: 34, h: 120, wall: true }
-    ],
-    bouncePads: [
-      { x: 650, y: 1138, w: 76, h: 14 },
-      { x: 1750, y: 1138, w: 76, h: 14 },
-      { x: 1200, y: 760, w: 76, h: 14 },
-      { x: 360, y: 875, w: 76, h: 14 },
-      { x: 2040, y: 875, w: 76, h: 14 }
-    ],
-    teleporters: [
-      { id: "left-wall", target: "right-wall", x: 300, y: 420, w: 48, h: 68 },
-      { id: "right-wall", target: "left-wall", x: 2100, y: 420, w: 48, h: 68 }
-    ],
-    launchers: [
-      { x: 1095, y: 1134, w: 66, h: 26, vx: -800, vy: -460 },
-      { x: 1305, y: 1134, w: 66, h: 26, vx: 800, vy: -460 },
-      { x: 760, y: 625, w: 66, h: 26, vx: 570, vy: -430 },
-      { x: 1640, y: 625, w: 66, h: 26, vx: -570, vy: -430 }
-    ],
-    movingPlatforms: [
-      { x: 1200, y: 1015, w: 420, h: 22, axis: "x", distance: 360, periodMs: 3600 },
-      { x: 1200, y: 640, w: 300, h: 22, axis: "y", distance: 105, periodMs: 2800 }
+    bouncePads: [],
+    teleporters: [],
+    launchers: [],
+    movingPlatforms: [],
+    decorations: [
+      { type: "flower", x: 100, y: 986, color: 0xffcf5f },
+      { type: "flower", x: 535, y: 986, color: 0xff3b83 },
+      { type: "tree", x: 360, y: 836, scale: 1.05 },
+      { type: "shrub", x: 760, y: 836, scale: 0.95 },
+      { type: "flower", x: 1275, y: 721, color: 0xffcf5f },
+      { type: "tree", x: 1920, y: 711, scale: 0.78 },
+      { type: "crate", x: 2260, y: 938, scale: 0.9 },
+      { type: "crate", x: 2310, y: 938, scale: 0.9 },
+      { type: "shrub", x: 1990, y: 952, scale: 0.85 },
+      { type: "flower", x: 2050, y: 576, color: 0xff3b83 },
+      { type: "flower", x: 875, y: 606, color: 0xffcf5f },
+      { type: "tree", x: 520, y: 461, scale: 0.86 },
+      { type: "flower", x: 1295, y: 381, color: 0xff3b83 },
+      { type: "shrub", x: 2255, y: 316, scale: 0.8 },
+      { type: "flower", x: 2295, y: 176, color: 0xff3b83 },
+      { type: "flower", x: 1860, y: 1152, color: 0xff3b83 },
+      { type: "tree", x: 205, y: 1152, scale: 1.18 }
     ]
   }
 };
 
 mapConfigs.grass = mapConfigs.classic;
+mapConfigs.tower = mapConfigs.classic;
+mapConfigs.maze = mapConfigs.classic;
+mapConfigs.arena = mapConfigs.classic;
 mapConfigs.winter = mapConfigs.tower;
 mapConfigs.desert = mapConfigs.maze;
+
+function getActiveTagMap(roomOrTag, mapId = roomOrTag?.tag?.mapId || roomOrTag?.mapId || "classic") {
+  const tag = roomOrTag?.tag || roomOrTag || {};
+  const baseMap = mapConfigs[mapId] || mapConfigs.classic;
+  const specials = tag.specials || {};
+
+  return {
+    ...baseMap,
+    bouncePads: specials.bouncePads || baseMap.bouncePads || [],
+    teleporters: specials.teleporters || baseMap.teleporters || [],
+    launchers: specials.launchers || baseMap.launchers || [],
+    movingPlatforms: specials.movingPlatforms || baseMap.movingPlatforms || []
+  };
+}
 
 function resolveUnityTagAssetUrl(value) {
   const url = String(value || "").trim();
@@ -377,9 +226,10 @@ function buildUnityTagPayload(room, includeMap) {
 
   return JSON.stringify({
     mapId,
+    specialLayoutId: tag.specialLayoutId || "none",
     phase: tag.phase || "waiting",
     world: tag.world || { width: WORLD_WIDTH, height: WORLD_HEIGHT },
-    map: includeMap ? mapConfigs[mapId] || mapConfigs.classic : null,
+    map: includeMap ? getActiveTagMap(room, mapId) : null,
     players: tag.players || [],
     lastTagAt: tag.lastTagAt || 0,
     lastTaggedPlayerId: tag.lastTaggedPlayerId || ""
@@ -462,7 +312,7 @@ function movingPlatformPosition(platform, time) {
   };
 }
 
-function createTagScene(Phaser, mapId, onReady) {
+function createTagScene(Phaser, initialMap, onReady) {
   return class TagRenderScene extends Phaser.Scene {
     constructor() {
       super("tag-render-scene");
@@ -474,7 +324,7 @@ function createTagScene(Phaser, mapId, onReady) {
     }
 
     create() {
-      this.map = mapConfigs[mapId] || mapConfigs.classic;
+      this.map = initialMap || mapConfigs.classic;
       this.cameras.main.setBackgroundColor(this.map.sky);
       this.applyStaticCamera();
       this.scale.on("resize", this.applyStaticCamera, this);
@@ -491,56 +341,185 @@ function createTagScene(Phaser, mapId, onReady) {
     drawMap() {
       const graphics = this.add.graphics();
 
-      graphics.fillStyle(this.map.haze, 0.34);
-      graphics.fillEllipse(520, 820, 760, 240);
-      graphics.fillEllipse(1710, 820, 860, 285);
-      graphics.fillStyle(this.map.accent, 0.44);
-      graphics.fillRect(0, 0, 280, WORLD_HEIGHT);
-      graphics.fillRect(WORLD_WIDTH - 280, 0, 280, WORLD_HEIGHT);
-      graphics.fillStyle(0xffffff, 0.2);
-
-      for (let x = 160; x < WORLD_WIDTH; x += 420) {
-        graphics.fillCircle(x, 145 + (x % 3) * 24, 42);
-      }
+      this.drawBackdrop(graphics);
 
       this.map.platforms.forEach((platform) => this.drawPlatform(platform));
       this.map.movingPlatforms.forEach((platform) => this.drawMovingPlatform(platform));
       this.map.bouncePads.forEach((pad) => this.drawBouncePad(pad));
       this.map.teleporters.forEach((teleporter) => this.drawTeleporter(teleporter));
       this.map.launchers.forEach((launcher) => this.drawLauncher(launcher));
+      (this.map.decorations || []).forEach((decoration) => this.drawDecoration(decoration));
+    }
+
+    drawBackdrop(graphics) {
+      graphics.fillStyle(this.map.haze, 0.26);
+      graphics.fillEllipse(420, 875, 760, 260);
+      graphics.fillEllipse(1480, 875, 940, 300);
+      graphics.fillEllipse(2260, 875, 580, 220);
+
+      graphics.fillStyle(0x2b70d9, 0.22);
+      graphics.fillRect(0, 760, WORLD_WIDTH, 84);
+      graphics.fillRect(440, 675, 620, 42);
+      graphics.fillRect(1510, 678, 690, 42);
+
+      for (const pillar of [
+        { x: 140, y: 780, w: 110, h: 350 },
+        { x: 640, y: 742, w: 180, h: 410 },
+        { x: 1260, y: 735, w: 210, h: 430 },
+        { x: 1980, y: 745, w: 180, h: 420 },
+        { x: 2320, y: 785, w: 120, h: 365 }
+      ]) {
+        graphics.fillRect(pillar.x - pillar.w / 2, pillar.y, pillar.w, pillar.h);
+      }
+
+      graphics.fillStyle(0x2876dc, 0.18);
+      graphics.fillRect(0, 930, WORLD_WIDTH, 60);
+      graphics.fillStyle(0xffffff, 0.14);
+      graphics.fillRect(1210, 150, 90, 18);
+      graphics.fillRect(1305, 150, 120, 18);
+      graphics.fillRect(120, 230, 145, 18);
+      graphics.fillRect(1890, 250, 160, 18);
     }
 
     drawPlatform(platform) {
       const isWall = Boolean(platform.wall);
-      const fill = isWall ? 0x22303a : this.map.edge;
-      const face = isWall ? 0x334654 : this.map.ground;
-      const body = this.add.rectangle(platform.x, platform.y, platform.w, platform.h, fill);
-      const faceHeight = Math.min(12, Math.max(4, platform.h * 0.45));
-      const faceY = platform.y - platform.h / 2 + faceHeight / 2;
-      const faceTop = this.add.rectangle(platform.x, faceY, platform.w, faceHeight, face, 0.95);
-      const seams = this.add.graphics().setDepth(isWall ? 6 : 4);
       const startX = platform.x - platform.w / 2;
       const endX = platform.x + platform.w / 2;
       const startY = platform.y - platform.h / 2;
-      const endY = platform.y + platform.h / 2;
 
-      body.setDepth(isWall ? 5 : 2);
-      faceTop.setDepth(isWall ? 7 : 3);
-      seams.lineStyle(2, 0xffffff, isWall ? 0.13 : 0.16);
-
-      for (let y = startY + 10; y < endY; y += 18) {
-        seams.lineBetween(startX + 4, y, endX - 4, y);
+      if (isWall && platform.y < 100) {
+        return;
       }
 
-      for (let x = startX + 28; x < endX; x += 56) {
-        const offset = Math.floor((x - startX) / 56) % 2 ? 0 : 9;
-        seams.lineBetween(x, startY + 5 + offset, x, endY - 5);
+      if (isWall && (platform.x < 80 || platform.x > WORLD_WIDTH - 80)) {
+        return;
       }
 
-      if (platform.oneWay && !isWall) {
-        const hint = this.add.rectangle(platform.x, platform.y + 7, platform.w - 16, 3, 0xffffff, 0.34);
-        hint.setDepth(4);
+      if (platform.slope) {
+        this.drawSlopedPlatform(platform);
+        return;
       }
+
+      const depth = isWall ? 2 : 5;
+      const body = this.add.rectangle(platform.x, platform.y, platform.w, platform.h, 0xff3b83).setDepth(depth);
+      const grass = this.add.rectangle(platform.x, startY + 5, platform.w, 10, this.map.ground).setDepth(depth + 2);
+      const highlight = this.add.rectangle(platform.x, startY + 1, platform.w, 2, 0xc2f27c, 0.9).setDepth(depth + 3);
+      this.add.rectangle(platform.x, platform.y + platform.h / 2 - 4, platform.w, 7, 0xf51e72, 0.85).setDepth(depth + 1);
+      const trim = this.add.graphics().setDepth(depth + 4);
+
+      trim.fillStyle(0x23d251, 0.95);
+
+      for (let x = startX + 8; x < endX; x += 18) {
+        trim.fillTriangle(x, startY + 9, x + 10, startY + 9, x + 5, startY + 14);
+      }
+
+      if (isWall) {
+        body.setAlpha(0.96);
+        grass.setAlpha(0.96);
+        highlight.setAlpha(0.75);
+      }
+    }
+
+    drawSlopedPlatform(platform) {
+      const left = platform.x - platform.w / 2;
+      const right = platform.x + platform.w / 2;
+      const topLeftY = platform.slope === "down-right" ? platform.y - platform.h / 2 : platform.y + platform.h / 2;
+      const topRightY = platform.slope === "down-right" ? platform.y + platform.h / 2 : platform.y - platform.h / 2;
+      const thickness = platform.thickness || 28;
+      const graphics = this.add.graphics().setDepth(5);
+
+      graphics.fillStyle(0xff3b83, 1);
+      graphics.fillPoints(
+        [
+          { x: left, y: topLeftY + 9 },
+          { x: right, y: topRightY + 9 },
+          { x: right, y: topRightY + thickness },
+          { x: left, y: topLeftY + thickness }
+        ],
+        true
+      );
+      graphics.fillStyle(this.map.ground, 1);
+      graphics.fillPoints(
+        [
+          { x: left, y: topLeftY },
+          { x: right, y: topRightY },
+          { x: right, y: topRightY + 10 },
+          { x: left, y: topLeftY + 10 }
+        ],
+        true
+      );
+      graphics.lineStyle(2, 0xc2f27c, 0.9);
+      graphics.lineBetween(left, topLeftY + 1, right, topRightY + 1);
+    }
+
+    drawDecoration(decoration) {
+      if (decoration.type === "flower") {
+        this.drawFlower(decoration);
+      } else if (decoration.type === "tree") {
+        this.drawTree(decoration);
+      } else if (decoration.type === "shrub") {
+        this.drawShrub(decoration);
+      } else if (decoration.type === "crate") {
+        this.drawCrate(decoration);
+      }
+    }
+
+    drawFlower({ x, y, color = 0xff3b83, scale = 1 }) {
+      const graphics = this.add.graphics().setDepth(13);
+      const stemHeight = 42 * scale;
+      const centerY = y - stemHeight - 9 * scale;
+
+      graphics.fillStyle(0x3c1d34, 1);
+      graphics.fillRect(x - 4 * scale, y - stemHeight, 8 * scale, stemHeight);
+      graphics.fillStyle(color, 1);
+      graphics.fillCircle(x - 13 * scale, centerY, 12 * scale);
+      graphics.fillCircle(x + 13 * scale, centerY, 12 * scale);
+      graphics.fillCircle(x, centerY - 13 * scale, 12 * scale);
+      graphics.fillCircle(x, centerY + 13 * scale, 12 * scale);
+      graphics.fillStyle(0xffffff, 1);
+      graphics.fillCircle(x, centerY, 11 * scale);
+    }
+
+    drawTree({ x, y, scale = 1 }) {
+      const graphics = this.add.graphics().setDepth(12);
+      const trunkWidth = 44 * scale;
+      const trunkHeight = 126 * scale;
+      const trunkTop = y - trunkHeight;
+
+      graphics.fillStyle(0xd31169, 1);
+      graphics.fillRect(x - trunkWidth / 2, trunkTop, trunkWidth, trunkHeight);
+      graphics.fillStyle(0xb90861, 0.72);
+      graphics.fillRect(x - 6 * scale, trunkTop + 18 * scale, 10 * scale, trunkHeight - 32 * scale);
+      graphics.fillStyle(0x04dd63, 1);
+      graphics.fillRect(x - 76 * scale, trunkTop - 72 * scale, 152 * scale, 84 * scale);
+      graphics.fillCircle(x - 48 * scale, trunkTop - 30 * scale, 42 * scale);
+      graphics.fillCircle(x + 48 * scale, trunkTop - 30 * scale, 42 * scale);
+      graphics.fillCircle(x, trunkTop - 68 * scale, 47 * scale);
+      graphics.fillCircle(x + 75 * scale, trunkTop - 16 * scale, 22 * scale);
+      graphics.fillCircle(x - 75 * scale, trunkTop - 16 * scale, 22 * scale);
+    }
+
+    drawShrub({ x, y, scale = 1 }) {
+      const graphics = this.add.graphics().setDepth(12);
+
+      graphics.fillStyle(0x18df70, 1);
+      graphics.fillCircle(x - 30 * scale, y - 18 * scale, 27 * scale);
+      graphics.fillCircle(x, y - 30 * scale, 38 * scale);
+      graphics.fillCircle(x + 34 * scale, y - 17 * scale, 28 * scale);
+      graphics.fillRect(x - 62 * scale, y - 25 * scale, 124 * scale, 25 * scale);
+    }
+
+    drawCrate({ x, y, scale = 1 }) {
+      const graphics = this.add.graphics().setDepth(12);
+      const size = 48 * scale;
+      const left = x - size / 2;
+      const top = y - size;
+
+      graphics.fillStyle(0xffa044, 1);
+      graphics.fillRect(left, top, size, size);
+      graphics.lineStyle(6 * scale, 0xf18a25, 1);
+      graphics.strokeRect(left + 3 * scale, top + 3 * scale, size - 6 * scale, size - 6 * scale);
+      graphics.lineBetween(left + 10 * scale, top + 10 * scale, left + size - 10 * scale, top + size - 10 * scale);
     }
 
     drawMovingPlatform(platform) {
@@ -620,7 +599,7 @@ function createTagScene(Phaser, mapId, onReady) {
       entry.glow.setPosition(x, y);
       entry.shield.setPosition(x, y);
       entry.sprite.setPosition(x, y);
-      entry.badge.setPosition(x, y - 54);
+      entry.marker.setPosition(x, y - 58);
     }
 
     updateFromRoom(room) {
@@ -641,24 +620,21 @@ function createTagScene(Phaser, mapId, onReady) {
           const shield = this.add.ellipse(player.x, player.y, 64, 70, 0xffffff, 0.2).setDepth(20);
           shield.setStrokeStyle(4, 0xffffff, 0.8);
           const sprite = this.add.sprite(player.x, player.y, textureKey).setDepth(21);
-          const badge = this.add
-            .text(player.x, player.y - 52, "IT", {
-              color: "#17212b",
-              fontFamily: "Manrope, Arial",
-              fontSize: "14px",
-              fontStyle: "900",
-              backgroundColor: "#f2bd45",
-              padding: { x: 7, y: 3 }
-            })
-            .setOrigin(0.5)
-            .setDepth(25);
+          const marker = this.add.container(player.x, player.y - 58).setDepth(25);
+          const markerPoint = this.add.triangle(0, 10, -8, -2, 8, -2, 0, 17, 0xf2bd45, 1);
+          markerPoint.setStrokeStyle(3, 0x17212b, 1);
+          const markerHead = this.add.circle(0, -7, 13, 0xf2bd45, 1);
+          markerHead.setStrokeStyle(3, 0x17212b, 1);
+          const markerDot = this.add.circle(0, -7, 4.5, 0xffffff, 0.95);
+          marker.add([markerPoint, markerHead, markerDot]);
+          marker.setVisible(player.isIt);
 
           entry = {
             shadow,
             glow,
             shield,
             sprite,
-            badge,
+            marker,
             x: player.x,
             y: player.y,
             targetX: player.x,
@@ -686,7 +662,7 @@ function createTagScene(Phaser, mapId, onReady) {
           entry.sprite.setTint(0xffffff);
         }
 
-        entry.badge.setVisible(entry.isIt);
+        entry.marker.setVisible(entry.isIt);
         entry.glow.setVisible(entry.isIt);
         entry.shield.setVisible(!entry.isIt && entry.invulMs > 0);
       });
@@ -694,7 +670,7 @@ function createTagScene(Phaser, mapId, onReady) {
       const activeIds = new Set(players.map((player) => player.playerId));
       for (const [playerId, entry] of this.playerObjects.entries()) {
         if (!activeIds.has(playerId)) {
-          [entry.shadow, entry.glow, entry.shield, entry.sprite, entry.badge].forEach((object) => {
+          [entry.shadow, entry.glow, entry.shield, entry.sprite, entry.marker].forEach((object) => {
             object.destroy();
           });
           this.playerObjects.delete(playerId);
@@ -775,6 +751,9 @@ function createTagScene(Phaser, mapId, onReady) {
         if (entry.glow.visible) {
           const pulse = 1 + Math.sin(time / 140) * 0.08;
           entry.glow.setScale(pulse);
+          entry.marker.setScale(1 + Math.sin(time / 130) * 0.06);
+        } else {
+          entry.marker.setScale(1);
         }
       }
     }
@@ -787,6 +766,8 @@ function PhaserTagCanvas({ room }) {
   const sceneRef = useRef(null);
   const [mountError, setMountError] = useState("");
   const mapId = room.tag?.mapId || "classic";
+  const specialLayoutId = room.tag?.specialLayoutId || "none";
+  const activeMap = getActiveTagMap(room, mapId);
 
   useEffect(() => {
     let canceled = false;
@@ -801,7 +782,7 @@ function PhaserTagCanvas({ room }) {
           return;
         }
 
-        const Scene = createTagScene(Phaser, mapId, (scene) => {
+        const Scene = createTagScene(Phaser, activeMap, (scene) => {
           sceneRef.current = scene;
           scene.updateFromRoom(room);
         });
@@ -845,7 +826,7 @@ function PhaserTagCanvas({ room }) {
         gameRef.current = null;
       }
     };
-  }, [mapId]);
+  }, [mapId, specialLayoutId]);
 
   useEffect(() => {
     if (sceneRef.current) {
@@ -868,7 +849,7 @@ function UnityTagCanvas({ room, onUnavailable }) {
   const canvasRef = useRef(null);
   const unityRef = useRef(null);
   const latestRoomRef = useRef(room);
-  const sentMapIdRef = useRef("");
+  const sentMapKeyRef = useRef("");
   const [loaded, setLoaded] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -883,10 +864,11 @@ function UnityTagCanvas({ room, onUnavailable }) {
 
     const currentRoom = latestRoomRef.current;
     const mapId = currentRoom.tag?.mapId || "classic";
-    const includeMap = forceMap || sentMapIdRef.current !== mapId;
+    const mapKey = `${mapId}:${currentRoom.tag?.specialLayoutId || "none"}`;
+    const includeMap = forceMap || sentMapKeyRef.current !== mapKey;
 
     instance.SendMessage("Tag Game Renderer", "SetRoomState", buildUnityTagPayload(currentRoom, includeMap));
-    sentMapIdRef.current = mapId;
+    sentMapKeyRef.current = mapKey;
   };
 
   useEffect(() => {
@@ -943,7 +925,7 @@ function UnityTagCanvas({ room, onUnavailable }) {
         }
 
         unityRef.current = instance;
-        sentMapIdRef.current = "";
+        sentMapKeyRef.current = "";
         setLoaded(true);
         sendRoomState(instance, true);
       } catch {
@@ -1005,7 +987,7 @@ function UnityTagCanvas({ room, onUnavailable }) {
 }
 
 function TagCanvas({ room }) {
-  const [renderer, setRenderer] = useState("unity");
+  const [renderer, setRenderer] = useState("phaser");
   const handleUnityUnavailable = useCallback(() => {
     setRenderer("phaser");
   }, []);

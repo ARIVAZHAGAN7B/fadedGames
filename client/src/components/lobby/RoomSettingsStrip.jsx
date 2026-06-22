@@ -35,7 +35,7 @@ export default function RoomSettingsStrip({ room, canStart, isHost, onAddBot, on
   const settingBadges = [
     isBoost ? `${room.maxPlayers} players` : null,
     isBoost ? `${room.maxPlayers} card set` : null,
-    isTag ? `${tagMaps[room.tag?.mapId] || "The Classic"}` : null,
+    isTag ? `${tagMaps[room.tag?.mapId] || "TAG Playground"}` : null,
     isTag ? `${room.tag?.roundSeconds || 60}s round` : null,
     isGuessNumber ? "1-100" : null,
     isWordGuess ? "5 letters" : null,

@@ -188,7 +188,7 @@ function TagSetup({ room }) {
       <div className="grid gap-2 sm:grid-cols-3">
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <p className="text-xs font-extrabold uppercase text-ink/45">Map</p>
-          <p className="text-xl font-extrabold">{tagMaps[room.tag?.mapId] || "Grass"}</p>
+          <p className="text-xl font-extrabold">{tagMaps[room.tag?.mapId] || "TAG Playground"}</p>
         </div>
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <p className="text-xs font-extrabold uppercase text-ink/45">Round</p>
@@ -712,26 +712,6 @@ export default function Lobby({
 
                     {isTag ? (
                       <>
-                        <div>
-                          <span className="compact-label">Map</span>
-                          <div className="grid gap-2">
-                            {Object.entries(tagMaps).map(([mapId, label]) => (
-                              <button
-                                key={mapId}
-                                type="button"
-                                className={`rounded-md border px-3 py-2 text-left text-sm font-extrabold transition ${
-                                  tagMapId === mapId
-                                    ? "border-coral bg-coral text-white"
-                                    : "border-ink/10 bg-paper text-ink hover:border-mint"
-                                }`}
-                                onClick={() => setTagMapId(mapId)}
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
                         <div>
                           <span className="compact-label">Round</span>
                           <div className="grid grid-cols-3 gap-2">

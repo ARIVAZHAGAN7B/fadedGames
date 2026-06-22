@@ -1,4 +1,4 @@
-import { submitTagInput } from "../../services/games/tagService.js";
+import { submitTagInput, tickTagRoom } from "../../services/games/tagService.js";
 
 export function registerTagHandlers(socket, context) {
   socket.on("tag-input", (payload, callback) => {
@@ -8,10 +8,16 @@ export function registerTagHandlers(socket, context) {
         roomCode: payload?.roomCode || socket.data.roomCode,
         input: payload?.input
       });
+      const result = tickTagRoom({ roomCode: room.roomCode });
+      const updatedRoom = result.room;
+
+      if (!context.emitGameEndedIfNeeded(updatedRoom)) {
+        context.emitRoomUpdate(updatedRoom);
+      }
 
       if (typeof callback === "function") {
         context.callbackSuccess(callback, {
-          room: context.serializeRoomForSocket(room, socket)
+          room: context.serializeRoomForSocket(updatedRoom, socket)
         });
       }
     } catch (error) {

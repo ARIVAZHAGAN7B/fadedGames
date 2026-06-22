@@ -24,10 +24,10 @@ public sealed class TagGameRenderer : MonoBehaviour
     private readonly List<GameObject> mapObjects = new List<GameObject>();
     private readonly List<MovingPlatformView> movingPlatforms = new List<MovingPlatformView>();
     private readonly Dictionary<string, PlayerView> playerViews = new Dictionary<string, PlayerView>();
+    private readonly Dictionary<int, Sprite> countryBallSprites = new Dictionary<int, Sprite>();
     private readonly List<string> playersToRemove = new List<string>();
 
     private Camera sceneCamera;
-    private Font labelFont;
     private Sprite squareSprite;
     private Sprite circleSprite;
     private string currentMapId = string.Empty;
@@ -41,7 +41,6 @@ public sealed class TagGameRenderer : MonoBehaviour
     {
         Application.targetFrameRate = 60;
         QualitySettings.vSyncCount = 0;
-        labelFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
         CreateSprites();
         EnsureCamera();
     }
@@ -240,11 +239,9 @@ public sealed class TagGameRenderer : MonoBehaviour
 
             view.target = ToWorld(player.x, player.y, 0f);
             view.velocityX = player.vx;
-            view.isIt = player.isIt;
             view.invulnerable = !player.isIt && player.invulMs > 0;
-            view.flash = player.flash;
-            view.body.color = player.flash ? White : view.baseColor;
-            view.badgeRoot.SetActive(player.isIt);
+            view.body.color = White;
+            view.markerRoot.SetActive(player.isIt);
             view.glow.gameObject.SetActive(player.isIt);
             view.shield.gameObject.SetActive(view.invulnerable);
             view.body.transform.localScale = Vector3.one * (player.isIt ? 0.72f : player.grounded ? 0.64f : 0.67f);
@@ -284,28 +281,33 @@ public sealed class TagGameRenderer : MonoBehaviour
         SpriteRenderer shield = CreateChildSprite(root.transform, "Shield", circleSprite, new Color(1f, 1f, 1f, 0.2f), 20);
         shield.transform.localScale = new Vector3(0.74f, 0.8f, 1f);
 
-        SpriteRenderer body = CreateChildSprite(root.transform, "Body", circleSprite, accent, 21);
+        SpriteRenderer body = CreateChildSprite(root.transform, "Body", GetCountryBallSprite(index), White, 21);
         body.transform.localScale = Vector3.one * 0.64f;
 
-        GameObject badgeRoot = new GameObject("IT Badge");
-        badgeRoot.transform.SetParent(root.transform, false);
-        badgeRoot.transform.localPosition = new Vector3(0f, 0.58f, 0f);
+        GameObject markerRoot = new GameObject("Location Marker");
+        markerRoot.transform.SetParent(root.transform, false);
+        markerRoot.transform.localPosition = new Vector3(0f, 0.62f, 0f);
 
-        SpriteRenderer badgeBack = CreateChildSprite(badgeRoot.transform, "Badge Back", squareSprite, ColorFromInt(0xf2bd45), 24);
-        badgeBack.transform.localScale = new Vector3(0.34f, 0.18f, 1f);
+        SpriteRenderer markerPointBack = CreateChildSprite(markerRoot.transform, "Marker Point Back", squareSprite, Ink, 24);
+        markerPointBack.transform.localPosition = new Vector3(0f, -0.08f, 0f);
+        markerPointBack.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        markerPointBack.transform.localScale = new Vector3(0.17f, 0.17f, 1f);
 
-        TextMesh badge = badgeRoot.AddComponent<TextMesh>();
-        badge.text = "IT";
-        badge.anchor = TextAnchor.MiddleCenter;
-        badge.alignment = TextAlignment.Center;
-        badge.characterSize = 0.085f;
-        badge.fontSize = 72;
-        badge.fontStyle = FontStyle.Bold;
-        badge.color = Ink;
-        badge.font = labelFont;
-        badge.GetComponent<MeshRenderer>().sortingOrder = 25;
+        SpriteRenderer markerPoint = CreateChildSprite(markerRoot.transform, "Marker Point", squareSprite, ColorFromInt(0xf2bd45), 25);
+        markerPoint.transform.localPosition = new Vector3(0f, -0.08f, 0f);
+        markerPoint.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        markerPoint.transform.localScale = new Vector3(0.12f, 0.12f, 1f);
 
-        badgeRoot.SetActive(player.isIt);
+        SpriteRenderer markerBack = CreateChildSprite(markerRoot.transform, "Marker Back", circleSprite, Ink, 26);
+        markerBack.transform.localScale = new Vector3(0.32f, 0.32f, 1f);
+
+        SpriteRenderer markerHead = CreateChildSprite(markerRoot.transform, "Marker Head", circleSprite, ColorFromInt(0xf2bd45), 27);
+        markerHead.transform.localScale = new Vector3(0.25f, 0.25f, 1f);
+
+        SpriteRenderer markerDot = CreateChildSprite(markerRoot.transform, "Marker Dot", circleSprite, White, 28);
+        markerDot.transform.localScale = new Vector3(0.085f, 0.085f, 1f);
+
+        markerRoot.SetActive(player.isIt);
         glow.gameObject.SetActive(player.isIt);
         shield.gameObject.SetActive(!player.isIt && player.invulMs > 0);
 
@@ -316,11 +318,9 @@ public sealed class TagGameRenderer : MonoBehaviour
             glow = glow,
             shield = shield,
             body = body,
-            badgeRoot = badgeRoot,
+            markerRoot = markerRoot,
             target = root.transform.position,
-            baseColor = accent,
             velocityX = player.vx,
-            isIt = player.isIt
         };
     }
 
@@ -328,6 +328,7 @@ public sealed class TagGameRenderer : MonoBehaviour
     {
         float blend = 1f - Mathf.Exp(-18f * Time.deltaTime);
         float pulse = 1f + Mathf.Sin(Time.time * 7.14f) * 0.08f;
+        float markerPulse = 1f + Mathf.Sin(Time.time * 7.7f) * 0.06f;
 
         foreach (PlayerView view in playerViews.Values)
         {
@@ -348,6 +349,11 @@ public sealed class TagGameRenderer : MonoBehaviour
             if (view.glow.gameObject.activeSelf)
             {
                 view.glow.transform.localScale = new Vector3(0.78f * pulse, 0.86f * pulse, 1f);
+                view.markerRoot.transform.localScale = Vector3.one * markerPulse;
+            }
+            else
+            {
+                view.markerRoot.transform.localScale = Vector3.one;
             }
         }
     }
@@ -482,6 +488,126 @@ public sealed class TagGameRenderer : MonoBehaviour
 
         circle.Apply();
         circleSprite = Sprite.Create(circle, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+    }
+
+    private Sprite GetCountryBallSprite(int index)
+    {
+        int key = Mathf.Abs(index) % PlayerColors.Length;
+
+        if (!countryBallSprites.TryGetValue(key, out Sprite sprite))
+        {
+            sprite = CreateCountryBallSprite(key);
+            countryBallSprites[key] = sprite;
+        }
+
+        return sprite;
+    }
+
+    private Sprite CreateCountryBallSprite(int index)
+    {
+        const int size = 64;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.46f;
+
+        for (int y = 0; y < size; y += 1)
+        {
+            for (int x = 0; x < size; x += 1)
+            {
+                Vector2 point = new Vector2(x, y);
+                float distance = Vector2.Distance(point, center);
+
+                if (distance > radius + 1f)
+                {
+                    texture.SetPixel(x, y, Color.clear);
+                    continue;
+                }
+
+                Color color = GetCountryBallPixel(index, x, y, size);
+                color = ShadeCountryBallPixel(color, x, y, center, radius, distance);
+                color.a = Mathf.Clamp01(radius - distance + 1f);
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+    }
+
+    private Color GetCountryBallPixel(int index, int x, int y, int size)
+    {
+        float half = (size - 1) * 0.5f;
+        float dx = x - half;
+        float dy = y - half;
+        float distance = Mathf.Sqrt(dx * dx + dy * dy);
+
+        if (index == 0)
+        {
+            if (distance < 5f)
+            {
+                return ColorFromInt(0x1a4f9f);
+            }
+
+            if (y >= (size * 2) / 3)
+            {
+                return ColorFromInt(0xff9933);
+            }
+
+            if (y >= size / 3)
+            {
+                return ColorFromInt(0xf8f8f2);
+            }
+
+            return ColorFromInt(0x138808);
+        }
+
+        if (index == 1)
+        {
+            return distance < 14f ? ColorFromInt(0xbc002d) : ColorFromInt(0xf8f8f2);
+        }
+
+        if (index == 2)
+        {
+            float diamond = Mathf.Abs(dx) / 22f + Mathf.Abs(dy) / 16f;
+
+            if (distance < 10f)
+            {
+                return ColorFromInt(0x002776);
+            }
+
+            return diamond < 1f ? ColorFromInt(0xffdf00) : ColorFromInt(0x009b3a);
+        }
+
+        if (x < size / 3)
+        {
+            return ColorFromInt(0x0055a4);
+        }
+
+        if (x < (size * 2) / 3)
+        {
+            return ColorFromInt(0xf8f8f2);
+        }
+
+        return ColorFromInt(0xef4135);
+    }
+
+    private Color ShadeCountryBallPixel(Color color, int x, int y, Vector2 center, float radius, float distance)
+    {
+        float nx = (x - center.x) / radius;
+        float ny = (y - center.y) / radius;
+        float highlightDistance = Vector2.Distance(new Vector2(nx + 0.36f, ny - 0.42f), Vector2.zero);
+        float highlight = Mathf.Clamp01(1f - highlightDistance * 1.8f) * 0.22f;
+        float shade = Mathf.Clamp01((distance / radius) * 0.16f + nx * 0.1f - ny * 0.08f);
+
+        color = Color.Lerp(color, White, highlight);
+        color = Color.Lerp(color, Ink, shade * 0.32f);
+
+        if (radius - distance < 2.2f)
+        {
+            color = Color.Lerp(color, Ink, 0.42f);
+        }
+
+        return color;
     }
 
     private void EnsureCamera()
@@ -634,12 +760,9 @@ public sealed class TagGameRenderer : MonoBehaviour
         public SpriteRenderer glow;
         public SpriteRenderer shield;
         public SpriteRenderer body;
-        public GameObject badgeRoot;
+        public GameObject markerRoot;
         public Vector3 target;
-        public Color baseColor;
         public float velocityX;
-        public bool isIt;
         public bool invulnerable;
-        public bool flash;
     }
 }

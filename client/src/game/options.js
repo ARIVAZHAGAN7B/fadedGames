@@ -1,8 +1,5 @@
 export const tagMaps = {
-  classic: "The Classic",
-  tower: "The Tower",
-  maze: "The Maze",
-  arena: "The Arena"
+  classic: "TAG Playground"
 };
 
 export const tagRoundOptions = [60, 90, 120];
