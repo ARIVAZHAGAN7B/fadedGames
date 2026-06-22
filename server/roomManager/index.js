@@ -892,6 +892,26 @@ function createWordGuessWordPacks(players) {
   );
 }
 
+function createWordGuessReplacementPack(state, playerId) {
+  const currentPack = new Set(state.wordPacks?.[playerId] || []);
+  const blockedWords = new Set(
+    Object.entries(state.wordPacks || {})
+      .filter(([entryPlayerId]) => entryPlayerId !== playerId)
+      .flatMap(([, words]) => words || [])
+  );
+  const freshWords = WORD_GUESS_WORD_BANK.filter(
+    (word) => !blockedWords.has(word) && !currentPack.has(word)
+  );
+  const fallbackWords = WORD_GUESS_WORD_BANK.filter((word) => !blockedWords.has(word));
+  const source = freshWords.length >= WORD_GUESS_WORDS_PER_PLAYER ? freshWords : fallbackWords;
+
+  if (source.length < WORD_GUESS_WORDS_PER_PLAYER) {
+    throw new Error("Not enough word cards to shuffle.");
+  }
+
+  return shuffleWords(source).slice(0, WORD_GUESS_WORDS_PER_PLAYER);
+}
+
 function scoreWordGuess(guess, target) {
   const result = Array.from({ length: WORD_GUESS_WORD_LENGTH }, () => "absent");
   const remaining = {};
@@ -5434,6 +5454,34 @@ export function setWordGuessSecret({ socketId, roomCode, word }) {
     state.lockDeadlineAt = now + WORD_GUESS_LOCK_REVEAL_MS;
   }
 
+  touch(room);
+
+  return room;
+}
+
+export function shuffleWordGuessWords({ socketId, roomCode }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.wordGuess;
+
+  if (room.gameType !== "word-guess" || !state) {
+    throw new Error("Word Guess is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "selecting") {
+    throw new Error("Words can only be shuffled while selecting.");
+  }
+
+  if (state.selectedWords[player.playerId] !== undefined) {
+    throw new Error("Your word is already locked.");
+  }
+
+  state.wordPacks[player.playerId] = createWordGuessReplacementPack(state, player.playerId);
+  state.moveId = (state.moveId || 0) + 1;
   touch(room);
 
   return room;

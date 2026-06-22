@@ -687,6 +687,18 @@ export default function App() {
     return response;
   };
 
+  const handleWordGuessShuffleWords = async () => {
+    const response = await emitWithAck("word-guess-shuffle-words", {
+      roomCode: session.roomCode
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+    }
+
+    return response;
+  };
+
   const handleWordGuessSubmitGuess = async (word) => {
     const response = await emitWithAck("word-guess-submit-guess", {
       roomCode: session.roomCode,
@@ -950,6 +962,7 @@ export default function App() {
         room={room}
         session={session}
         onSetSecret={handleWordGuessSetSecret}
+        onShuffleWords={handleWordGuessShuffleWords}
         onSubmitGuess={handleWordGuessSubmitGuess}
         onRestartGame={handleRestartGame}
         onLeaveRoom={handleLeaveRoom}

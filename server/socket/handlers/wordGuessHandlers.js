@@ -1,5 +1,6 @@
 import {
   setWordGuessSecret,
+  shuffleWordGuessWords,
   submitWordGuessGuess
 } from "../../services/games/wordGuessService.js";
 
@@ -13,6 +14,22 @@ export function registerWordGuessHandlers(socket, context, timers) {
       });
       context.emitRoomUpdate(room);
       timers.scheduleWordGuessTimer(room);
+
+      context.callbackSuccess(callback, {
+        room: context.serializeRoomForSocket(room, socket)
+      });
+    } catch (error) {
+      context.callbackError(socket, callback, error);
+    }
+  });
+
+  socket.on("word-guess-shuffle-words", (payload, callback) => {
+    try {
+      const room = shuffleWordGuessWords({
+        socketId: socket.id,
+        roomCode: payload?.roomCode || socket.data.roomCode
+      });
+      context.emitRoomUpdate(room);
 
       context.callbackSuccess(callback, {
         room: context.serializeRoomForSocket(room, socket)

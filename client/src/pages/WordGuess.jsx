@@ -6,6 +6,7 @@ import {
   Eye,
   KeyRound,
   Lock,
+  Shuffle,
   Trophy
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -359,6 +360,7 @@ export default function WordGuess({
   room,
   session,
   onSetSecret,
+  onShuffleWords,
   onSubmitGuess,
   onRestartGame,
   onLeaveRoom
@@ -367,6 +369,7 @@ export default function WordGuess({
   const [confirmWord, setConfirmWord] = useState("");
   const [guessWord, setGuessWord] = useState("");
   const [status, setStatus] = useState("");
+  const [isShuffling, setIsShuffling] = useState(false);
   const [highContrast, setHighContrast] = useState(false);
   const isHost = room.host === session.playerId;
   const state = room.wordGuess || {};
@@ -387,6 +390,12 @@ export default function WordGuess({
     setGuessWord("");
     setStatus("");
   }, [state.round]);
+
+  useEffect(() => {
+    if (selectedWord && !wordOptions.includes(selectedWord)) {
+      setSelectedWord("");
+    }
+  }, [selectedWord, wordOptions]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -430,6 +439,27 @@ export default function WordGuess({
     }
 
     setConfirmWord("");
+  };
+
+  const shuffleWords = async () => {
+    if (isShuffling) {
+      return;
+    }
+
+    setStatus("");
+    setConfirmWord("");
+    setSelectedWord("");
+    setIsShuffling(true);
+
+    try {
+      const result = await onShuffleWords();
+
+      if (!result.ok) {
+        setStatus(result.error);
+      }
+    } finally {
+      setIsShuffling(false);
+    }
   };
 
   const submitGuess = async () => {
@@ -546,15 +576,26 @@ export default function WordGuess({
                       ))}
                     </div>
 
-                    <button
-                      type="button"
-                      className="compact-button mt-4 w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
-                      disabled={!selectedWord}
-                      onClick={() => setConfirmWord(selectedWord)}
-                    >
-                      <KeyRound className="h-5 w-5" aria-hidden="true" />
-                      Lock In Your Word
-                    </button>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-[auto_1fr]">
+                      <button
+                        type="button"
+                        className="compact-button border border-ink/15 bg-white text-ink hover:border-mint disabled:bg-ink/10 disabled:text-ink/35"
+                        disabled={isShuffling}
+                        onClick={shuffleWords}
+                      >
+                        <Shuffle className="h-5 w-5" aria-hidden="true" />
+                        {isShuffling ? "Shuffling" : "Shuffle"}
+                      </button>
+                      <button
+                        type="button"
+                        className="compact-button w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
+                        disabled={!selectedWord || isShuffling}
+                        onClick={() => setConfirmWord(selectedWord)}
+                      >
+                        <KeyRound className="h-5 w-5" aria-hidden="true" />
+                        Lock In Your Word
+                      </button>
+                    </div>
                   </>
                 )}
               </section>

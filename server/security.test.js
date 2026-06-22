@@ -19,6 +19,7 @@ const [
     listActiveRooms,
     resumeSession,
     serializeRoom,
+    shuffleWordGuessWords,
     startGame,
     updateRoomSettings
   },
@@ -194,6 +195,8 @@ try {
     roomCode: wordRoom.room.roomCode
   });
   const wordHostView = serializeRoom(wordRoom.room, wordRoom.player.playerId);
+  const wordHostFirstPack = [...wordRoom.room.wordGuess.wordPacks[wordRoom.player.playerId]];
+  const wordGuestPack = [...wordRoom.room.wordGuess.wordPacks[wordGuest.player.playerId]];
   assert.deepEqual(
     Object.keys(wordHostView.wordGuess.wordPacks),
     [wordRoom.player.playerId],
@@ -203,6 +206,28 @@ try {
     wordHostView.wordGuess.wordPacks[wordGuest.player.playerId],
     undefined,
     "Word Guess does not leak the opponent's word pack"
+  );
+  shuffleWordGuessWords({
+    socketId: "word-host",
+    roomCode: wordRoom.room.roomCode
+  });
+  const wordHostSecondPack = wordRoom.room.wordGuess.wordPacks[wordRoom.player.playerId];
+  const wordHostShuffleView = serializeRoom(wordRoom.room, wordRoom.player.playerId);
+  assert.equal(wordHostSecondPack.length, 10, "Word Guess reshuffle deals 10 words");
+  assert.equal(
+    wordHostSecondPack.some((word) => wordHostFirstPack.includes(word)),
+    false,
+    "Word Guess reshuffle deals another 10 words"
+  );
+  assert.equal(
+    wordHostSecondPack.some((word) => wordGuestPack.includes(word)),
+    false,
+    "Word Guess reshuffle does not overlap the opponent's current pack"
+  );
+  assert.equal(
+    wordHostShuffleView.wordGuess.wordPacks[wordGuest.player.playerId],
+    undefined,
+    "Word Guess reshuffle still does not leak the opponent's word pack"
   );
 
   await recordVisit({
