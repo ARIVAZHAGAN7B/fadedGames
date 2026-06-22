@@ -107,6 +107,15 @@ function getUsernameKey(username) {
   return username.toLowerCase();
 }
 
+function cleanIdentityKey(identityKey, username) {
+  const clean = String(identityKey || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9:_-]/g, "")
+    .slice(0, 128);
+
+  return clean || `legacy:${getUsernameKey(username)}`;
+}
+
 function getGameName(gameType) {
   const cleanType = cleanGameType(gameType);
   return GAME_NAMES[cleanType] || cleanType || "Unknown Game";
@@ -167,6 +176,7 @@ function normalizeQueuedEntry(entry) {
   return {
     eventId: String(entry?.eventId || randomUUID()),
     username,
+    identityKey: cleanIdentityKey(entry?.identityKey, username),
     gameType: cleanGameType(entry?.gameType),
     recordedAt: Number.isFinite(recordedAt.getTime())
       ? recordedAt.toISOString()
@@ -193,9 +203,15 @@ function createGameEntries(room, now = new Date()) {
         return null;
       }
 
+      const identityKey = cleanIdentityKey(
+        player.sessionTokenHash || player.playerId,
+        username
+      );
+
       return {
-        eventId: `game-played:${roomCode}:${gameType}:${startKey}:${player.playerId || username}`,
+        eventId: `game-played:${roomCode}:${gameType}:${startKey}:${identityKey}`,
         username,
+        identityKey,
         gameType,
         recordedAt
       };
@@ -242,7 +258,9 @@ async function incrementPlayerGame(entry) {
     username: cleanName
   });
   const collection = await getStatsCollection();
-  const usernameKey = getUsernameKey(cleanName);
+  const displayUsernameKey = getUsernameKey(cleanName);
+  const identityKey = cleanIdentityKey(normalizedEntry.identityKey, cleanName);
+  const usernameKey = `${displayUsernameKey}:${identityKey}`;
   const gameName = getGameName(normalizedEntry.gameType);
   const timestamp = normalizedEntry.recordedAt;
   const alreadyRecorded = {
@@ -313,6 +331,8 @@ async function incrementPlayerGame(entry) {
         $set: {
           username: cleanName,
           usernameKey,
+          displayUsernameKey,
+          identityKey,
           createdAt: { $ifNull: ["$createdAt", timestamp] },
           updatedAt: { $cond: [alreadyRecorded, "$updatedAt", timestamp] },
           totalGamesPlayed: {

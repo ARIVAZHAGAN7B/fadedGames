@@ -1,10 +1,12 @@
 import { countCompletedLines, validateBoard, getBoardSize } from "../gameEngine/index.js";
 import { chooseBotNumber, createBotName, generateBotBoard } from "../botPlayer/index.js";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 
 const rooms = new Map();
 const CODE_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
+const SESSION_TOKEN_BYTES = 32;
+const MAX_ACTIVE_ROOMS = Math.max(1, Number(process.env.MAX_ACTIVE_ROOMS || 300));
 const MATCH_CHAT_MAX_MESSAGES = 100;
 const MATCH_CHAT_MAX_LENGTH = 280;
 const MAX_PLAYERS_LIMIT = 12;
@@ -51,7 +53,7 @@ const WORD_GUESS_PLAYERS = 2;
 const WORD_GUESS_WORD_LENGTH = 5;
 const WORD_GUESS_WORDS_PER_PLAYER = 10;
 const WORD_GUESS_MAX_ATTEMPTS = 6;
-const WORD_GUESS_GUESS_MS = 30000;
+const WORD_GUESS_GUESS_MS = 60000;
 const WORD_GUESS_LOCK_REVEAL_MS = 5000;
 const SPY_WORD_MIN_PLAYERS = 4;
 const SPY_WORD_MAX_PLAYERS = 10;
@@ -688,6 +690,10 @@ function cleanChatText(text) {
   return value;
 }
 
+function cleanDiscoverable(value) {
+  return value === true;
+}
+
 function cleanRoomCode(roomCode) {
   return String(roomCode || "").trim().toUpperCase();
 }
@@ -1056,7 +1062,7 @@ function generateRoomCode() {
 
   do {
     code = Array.from({ length: CODE_LENGTH }, () => {
-      const index = Math.floor(Math.random() * CODE_CHARACTERS.length);
+      const index = randomInt(CODE_CHARACTERS.length);
       return CODE_CHARACTERS[index];
     }).join("");
   } while (rooms.has(code));
@@ -1066,6 +1072,25 @@ function generateRoomCode() {
 
 function touch(room) {
   room.updatedAt = Date.now();
+}
+
+function createSessionToken() {
+  return randomBytes(SESSION_TOKEN_BYTES).toString("base64url");
+}
+
+function hashSessionToken(token) {
+  return createHash("sha256").update(String(token || "")).digest("hex");
+}
+
+function verifySessionToken(token, expectedHash) {
+  if (!token || !expectedHash) {
+    return false;
+  }
+
+  const actual = Buffer.from(hashSessionToken(token), "hex");
+  const expected = Buffer.from(String(expectedHash), "hex");
+
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 function requireRoom(roomCode) {
@@ -1080,14 +1105,24 @@ function requireRoom(roomCode) {
 }
 
 function createPlayer(socketId, name) {
-  return {
+  const sessionToken = createSessionToken();
+  const player = {
     playerId: randomUUID(),
+    sessionTokenHash: hashSessionToken(sessionToken),
     socketId,
     name,
     isBot: false,
     connected: true,
     lastSeen: Date.now()
   };
+
+  Object.defineProperty(player, "sessionToken", {
+    configurable: true,
+    enumerable: false,
+    value: sessionToken
+  });
+
+  return player;
 }
 
 function createBotPlayer(name) {
@@ -1099,6 +1134,16 @@ function createBotPlayer(name) {
     connected: true,
     lastSeen: Date.now()
   };
+}
+
+function consumeSessionToken(player) {
+  const sessionToken = player?.sessionToken || null;
+
+  if (player && Object.prototype.hasOwnProperty.call(player, "sessionToken")) {
+    delete player.sessionToken;
+  }
+
+  return sessionToken;
 }
 
 function findPlayerBySocket(room, socketId) {
@@ -2294,7 +2339,6 @@ function finishBoostGame(room, player, categoryId, resultType) {
   room.winner = player
     ? {
         playerId: player.playerId,
-        socketId: player.socketId,
         name: player.name,
         category: category.id,
         categoryLabel: category.label,
@@ -2466,7 +2510,6 @@ function finishWordGuessRound(room, winner, resultType = "winner") {
     state.matchWins[winner.playerId] = (state.matchWins[winner.playerId] || 0) + 1;
     room.winner = {
       playerId: winner.playerId,
-      socketId: winner.socketId,
       name: winner.name,
       attempts: state.round,
       word: state.selectedWords[getOpponent(room, winner.playerId)?.playerId]
@@ -3584,7 +3627,7 @@ function serializeGuessNumber(room) {
   };
 }
 
-function serializeWordGuess(room) {
+function serializeWordGuess(room, viewerPlayerId = null) {
   if (room.gameType !== "word-guess") {
     return null;
   }
@@ -3592,6 +3635,10 @@ function serializeWordGuess(room) {
   const state = room.wordGuess || createWordGuessState();
   const playersById = Object.fromEntries(room.players.map((player) => [player.playerId, player]));
   const readyPlayerIds = Object.keys(state.selectedWords || {}).filter((playerId) => playersById[playerId]);
+  const viewerWordPack =
+    viewerPlayerId && Array.isArray(state.wordPacks?.[viewerPlayerId])
+      ? [...state.wordPacks[viewerPlayerId]]
+      : [];
   const revealedSecrets = room.gameEnded
     ? room.players.map((player) => ({
         playerId: player.playerId,
@@ -3607,7 +3654,7 @@ function serializeWordGuess(room) {
     maxAttempts: state.maxAttempts || WORD_GUESS_MAX_ATTEMPTS,
     guessDurationMs: state.guessDurationMs || WORD_GUESS_GUESS_MS,
     lockRevealDurationMs: state.lockRevealDurationMs || WORD_GUESS_LOCK_REVEAL_MS,
-    wordPacks: state.wordPacks || {},
+    wordPacks: viewerPlayerId ? { [viewerPlayerId]: viewerWordPack } : {},
     matchWins: state.matchWins || {},
     readyPlayerIds,
     guesses: [...(state.guesses || [])],
@@ -3959,7 +4006,6 @@ function serializeRajaRaniTurns(room, viewerPlayerId = null) {
 function publicPlayer(player, room) {
   return {
     playerId: player.playerId,
-    socketId: player.socketId,
     name: player.name,
     isBot: Boolean(player.isBot),
     connected: player.connected,
@@ -3975,6 +4021,22 @@ function publicPlayer(player, room) {
         }
       : {})
   };
+}
+
+function publicSessionPlayer(player, room, sessionToken = null) {
+  return {
+    ...publicPlayer(player, room),
+    ...(sessionToken ? { sessionToken } : {})
+  };
+}
+
+function publicWinner(winner) {
+  if (!winner) {
+    return null;
+  }
+
+  const { socketId, ...safeWinner } = winner;
+  return safeWinner;
 }
 
 function serializeTreasureHunt(room) {
@@ -4002,7 +4064,7 @@ function serializeTreasureHunt(room) {
     turnStartedAt: state.turnStartedAt || null,
     turnDeadlineAt: state.turnDeadlineAt || null,
     turnTimeMs: state.turnTimeMs || TREASURE_HUNT_TURN_MS,
-    winner: state.winner || null,
+    winner: publicWinner(state.winner),
     finalStats: state.finalStats || [],
     startedAt: state.startedAt || null,
     endedAt: state.endedAt || null
@@ -4018,6 +4080,7 @@ export function serializeRoom(room, viewerPlayerId = null) {
   return {
     roomCode: room.roomCode,
     gameType: room.gameType,
+    discoverable: Boolean(room.discoverable),
     handCricketMode: room.handCricketMode,
     handCricketTeamSize: room.handCricketTeamSize,
     roomName: room.roomName,
@@ -4031,11 +4094,11 @@ export function serializeRoom(room, viewerPlayerId = null) {
     currentPlayerName: hideCurrentPlayer ? null : currentPlayer?.name || null,
     gameStarted: room.gameStarted,
     gameEnded: room.gameEnded,
-    winner: room.winner,
+    winner: publicWinner(room.winner),
     handCricket: serializeHandCricket(room),
     tag: serializeTag(room),
     guessNumber: serializeGuessNumber(room),
-    wordGuess: serializeWordGuess(room),
+    wordGuess: serializeWordGuess(room, viewerPlayerId),
     spyWord: serializeSpyWord(room, viewerPlayerId),
     boost: serializeBoost(room, viewerPlayerId),
     treasureHunt: serializeTreasureHunt(room),
@@ -4048,6 +4111,7 @@ function serializeActiveRoom(room) {
   return {
     roomCode: room.roomCode,
     gameType: room.gameType,
+    discoverable: Boolean(room.discoverable),
     handCricketMode: room.handCricketMode,
     handCricketTeamSize: room.handCricketTeamSize,
     tagMapId: room.tag?.mapId || null,
@@ -4064,7 +4128,7 @@ function serializeActiveRoom(room) {
 
 export function listActiveRooms() {
   return [...rooms.values()]
-    .filter((room) => !room.gameEnded)
+    .filter((room) => !room.gameEnded && room.discoverable)
     .sort((first, second) => second.updatedAt - first.updatedAt)
     .map(serializeActiveRoom);
 }
@@ -4075,6 +4139,7 @@ export function createRoom({
   roomName,
   maxPlayers,
   gameType,
+  discoverable,
   handCricketMode,
   handCricketTeamSize,
   tagMapId,
@@ -4082,6 +4147,10 @@ export function createRoom({
   spyWordDifficulty,
   boostCategoryLabels
 }) {
+  if (rooms.size >= MAX_ACTIVE_ROOMS) {
+    throw new Error("Server is busy. Try creating a room again shortly.");
+  }
+
   const name = cleanNickname(nickname);
   const code = generateRoomCode();
   const player = createPlayer(socketId, name);
@@ -4100,6 +4169,7 @@ export function createRoom({
   const room = {
     roomCode: code,
     gameType: type,
+    discoverable: cleanDiscoverable(discoverable),
     handCricketMode: cricketMode,
     handCricketTeamSize: cricketTeamSize,
     roomName: cleanRoomName(roomName),
@@ -4133,7 +4203,10 @@ export function createRoom({
     assignPlayerToHandCricketTeam(room, player.playerId, "red");
   }
 
-  return { room, player };
+  return {
+    room,
+    player: publicSessionPlayer(player, room, consumeSessionToken(player))
+  };
 }
 
 export function joinRoom({ socketId, nickname, roomCode }) {
@@ -4163,7 +4236,10 @@ export function joinRoom({ socketId, nickname, roomCode }) {
 
   touch(room);
 
-  return { room, player };
+  return {
+    room,
+    player: publicSessionPlayer(player, room, consumeSessionToken(player))
+  };
 }
 
 export function getRoomChatMessages({ socketId, roomCode }) {
@@ -4216,7 +4292,8 @@ export function updateRoomSettings({
   tagMapId,
   tagRoundSeconds,
   spyWordDifficulty,
-  boostCategoryLabels
+  boostCategoryLabels,
+  discoverable
 }) {
   const room = requireRoom(roomCode);
   const player = findPlayerBySocket(room, socketId);
@@ -4293,6 +4370,8 @@ export function updateRoomSettings({
   }
 
   room.roomName = cleanRoomName(roomName);
+  room.discoverable =
+    typeof discoverable === "boolean" ? cleanDiscoverable(discoverable) : Boolean(room.discoverable);
   room.maxPlayers = nextMaxPlayers;
   touch(room);
 
@@ -4358,13 +4437,54 @@ export function addBot({ socketId, roomCode }) {
   };
 }
 
-export function resumeSession({ socketId, roomCode, playerId }) {
+function removeSocketFromOtherRooms(socketId, targetRoomCode, targetPlayerId) {
+  if (!socketId) {
+    return [];
+  }
+
+  const cleanTargetRoomCode = cleanRoomCode(targetRoomCode);
+  const removedRooms = [];
+
+  for (const room of [...rooms.values()]) {
+    let playerIndex = room.players.findIndex(
+      (entry) =>
+        entry.socketId === socketId &&
+        !(room.roomCode === cleanTargetRoomCode && entry.playerId === targetPlayerId)
+    );
+
+    while (playerIndex !== -1) {
+      const result = removePlayerAtIndex(room, playerIndex);
+      removedRooms.push(result);
+
+      if (result.deleted) {
+        break;
+      }
+
+      playerIndex = room.players.findIndex(
+        (entry) =>
+          entry.socketId === socketId &&
+          !(room.roomCode === cleanTargetRoomCode && entry.playerId === targetPlayerId)
+      );
+    }
+  }
+
+  return removedRooms;
+}
+
+export function resumeSession({ socketId, roomCode, playerId, sessionToken }) {
   const room = requireRoom(roomCode);
   const player = findPlayerById(room, playerId);
 
   if (!player) {
     throw new Error("Saved session was not found.");
   }
+
+  if (!verifySessionToken(sessionToken, player.sessionTokenHash)) {
+    throw new Error("Saved session is no longer valid.");
+  }
+
+  const previousSocketId = player.socketId || null;
+  const leftRooms = removeSocketFromOtherRooms(socketId, room.roomCode, player.playerId);
 
   player.socketId = socketId;
   player.connected = true;
@@ -4373,8 +4493,10 @@ export function resumeSession({ socketId, roomCode, playerId }) {
 
   return {
     room,
-    player,
-    board: room.boards[player.playerId] || []
+    player: publicSessionPlayer(player, room),
+    board: room.boards[player.playerId] || [],
+    previousSocketId,
+    leftRooms
   };
 }
 
@@ -5260,7 +5382,6 @@ export function submitGuessNumberGuess({ socketId, roomCode, number }) {
     room.gameEnded = true;
     room.winner = {
       playerId: player.playerId,
-      socketId,
       name: player.name,
       guess: value,
       attempts: state.guesses.filter((entry) => entry.playerId === player.playerId).length
@@ -6391,7 +6512,6 @@ export function claimBingo({ socketId, roomCode }) {
   room.gameEnded = true;
   room.winner = {
     playerId: player.playerId,
-    socketId,
     name: player.name,
     completedLines
   };

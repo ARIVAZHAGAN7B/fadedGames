@@ -166,6 +166,7 @@ const boostDefaultNames = [
 ];
 const PLAYER_NAME_STORAGE_KEY = "faded-games-player-name";
 const ANALYTICS_VIEWER_NAME = "fadedGame";
+const ANALYTICS_TOKEN_STORAGE_KEY = "faded-games-analytics-admin-token";
 const numberFormatter = new Intl.NumberFormat("en-IN");
 
 function readStoredPlayerName() {
@@ -181,6 +182,26 @@ function writeStoredPlayerName(name) {
     window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, name);
   } catch {
     // The saved name is only a convenience; gameplay still works in the current tab.
+  }
+}
+
+function readStoredAnalyticsToken() {
+  try {
+    return String(window.sessionStorage.getItem(ANALYTICS_TOKEN_STORAGE_KEY) || "");
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredAnalyticsToken(token) {
+  try {
+    if (token) {
+      window.sessionStorage.setItem(ANALYTICS_TOKEN_STORAGE_KEY, token);
+    } else {
+      window.sessionStorage.removeItem(ANALYTICS_TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // Analytics access remains available for this render even if session storage fails.
   }
 }
 
@@ -635,12 +656,14 @@ function GameAnalyticsDashboard({ stats, loading }) {
 
 function AnalyticsAdminPage({
   analytics,
+  analyticsToken,
   connected,
   error,
   gameStats,
   loading,
   nameModal,
   nickname,
+  onAnalyticsTokenChange,
   onNameClick,
   onRefresh
 }) {
@@ -666,6 +689,13 @@ function AnalyticsAdminPage({
             </div>
           </div>
           <div className="flex items-center justify-end gap-2">
+            <input
+              className="compact-input w-40 bg-white"
+              type="password"
+              value={analyticsToken}
+              placeholder="Admin token"
+              onChange={(event) => onAnalyticsTokenChange(event.target.value)}
+            />
             <PlayerNameButton nickname={nickname} onClick={onNameClick} />
             <button
               type="button"
@@ -720,6 +750,7 @@ export default function Home({
   const [handCricketMode, setHandCricketMode] = useState("classic");
   const [handCricketTeamMembers, setHandCricketTeamMembers] = useState(2);
   const [roomName, setRoomName] = useState(initialSelectedGame?.defaultRoomName || "Friends Game");
+  const [discoverable, setDiscoverable] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(initialSelectedGame?.maxPlayers || 4);
   const [tagPlayerCount, setTagPlayerCount] = useState(2);
   const [tagMapId, setTagMapId] = useState("classic");
@@ -733,6 +764,7 @@ export default function Home({
   const [submitting, setSubmitting] = useState(false);
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
   const [gameStatsSummary, setGameStatsSummary] = useState(null);
+  const [analyticsToken, setAnalyticsToken] = useState(readStoredAnalyticsToken);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
   const [pickingGameId, setPickingGameId] = useState("");
@@ -766,12 +798,19 @@ export default function Home({
       return;
     }
 
+    const token = analyticsToken.trim();
+
+    if (!token) {
+      setAnalyticsError("Enter analytics admin token.");
+      return;
+    }
+
     setAnalyticsLoading(true);
     setAnalyticsError("");
 
     const [trafficResult, gameStatsResult] = await Promise.allSettled([
-      fetchAnalyticsSummary(),
-      fetchPlayerGameStatsSummary()
+      fetchAnalyticsSummary(token),
+      fetchPlayerGameStatsSummary(token)
     ]);
     const errors = [];
 
@@ -797,7 +836,13 @@ export default function Home({
 
     setAnalyticsError(errors.join(" "));
     setAnalyticsLoading(false);
-  }, [canViewAnalytics]);
+  }, [analyticsToken, canViewAnalytics]);
+
+  const handleAnalyticsTokenChange = (value) => {
+    setAnalyticsToken(value);
+    writeStoredAnalyticsToken(value);
+    setAnalyticsError("");
+  };
 
   const openNameModal = () => {
     setNameDraft(nickname);
@@ -839,6 +884,7 @@ export default function Home({
 
     setSelectedGameId(game.id);
     setRoomName(game.defaultRoomName);
+    setDiscoverable(false);
     setMaxPlayers(game.maxPlayers);
     setHandCricketMode("classic");
     setHandCricketTeamMembers(2);
@@ -968,6 +1014,7 @@ export default function Home({
         ? await onCreateRoom({
             ...payload,
             roomName,
+            discoverable,
             maxPlayers: isHandCricket
               ? handCricketPlayers
               : isTag
@@ -1016,8 +1063,8 @@ export default function Home({
     />
   ) : null;
   const analyticsDashboard = canViewAnalytics ? (
-    <AnalyticsDashboard
-      analytics={analyticsSummary}
+      <AnalyticsDashboard
+        analytics={analyticsSummary}
       error={analyticsError}
       loading={analyticsLoading}
       onRefresh={refreshAnalytics}
@@ -1028,12 +1075,14 @@ export default function Home({
     return (
       <AnalyticsAdminPage
         analytics={analyticsSummary}
+        analyticsToken={analyticsToken}
         connected={connected}
         error={analyticsError}
         gameStats={gameStatsSummary}
         loading={analyticsLoading}
         nameModal={nameModal}
         nickname={nickname}
+        onAnalyticsTokenChange={handleAnalyticsTokenChange}
         onNameClick={openNameModal}
         onRefresh={refreshAnalytics}
       />
@@ -1502,6 +1551,15 @@ export default function Home({
                       onChange={(event) => setRoomName(event.target.value)}
                       maxLength={40}
                     />
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md border border-ink/10 bg-white px-3 py-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-mint"
+                      checked={discoverable}
+                      onChange={(event) => setDiscoverable(event.target.checked)}
+                    />
+                    <span className="text-xs font-extrabold text-ink">Public</span>
                   </label>
                   {isHandCricket ? (
                     handCricketMode === "team" ? (

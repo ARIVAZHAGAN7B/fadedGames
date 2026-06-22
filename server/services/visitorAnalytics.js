@@ -23,8 +23,19 @@ const MONGODB_SERVER_SELECTION_TIMEOUT_MS = Number(
 );
 const MAX_VISITOR_ID_LENGTH = 128;
 const MAX_PATH_LENGTH = 200;
+const MAX_STORED_VISITORS = Math.max(100, Number(process.env.MAX_ANALYTICS_VISITORS || 5000));
+const MAX_STORED_PATHS = Math.max(100, Number(process.env.MAX_ANALYTICS_PATHS || 1000));
 const TOP_PATH_LIMIT = 10;
 const TOTALS_DOCUMENT_ID = "analytics:totals";
+const SENSITIVE_PATH_PARAMS = [
+  "room",
+  "roomCode",
+  "code",
+  "token",
+  "session",
+  "sessionToken",
+  "analyticsToken"
+];
 
 let analyticsCache = null;
 let mongoClientPromise = null;
@@ -120,7 +131,18 @@ function hashValue(value) {
 
 function cleanPathname(pathname) {
   const clean = String(pathname || "/").trim() || "/";
-  return clean.slice(0, MAX_PATH_LENGTH);
+
+  try {
+    const url = new URL(clean, "https://local.invalid");
+
+    for (const key of SENSITIVE_PATH_PARAMS) {
+      url.searchParams.delete(key);
+    }
+
+    return `${url.pathname}${url.search}`.slice(0, MAX_PATH_LENGTH);
+  } catch {
+    return clean.slice(0, MAX_PATH_LENGTH);
+  }
 }
 
 function getDateKey(now) {
@@ -165,6 +187,52 @@ function summarizeTopPaths(paths) {
     }))
     .sort((first, second) => second.pageViews - first.pageViews)
     .slice(0, TOP_PATH_LIMIT);
+}
+
+function pruneStoredVisitors(store) {
+  const visitorEntries = Object.entries(store.visitors || {});
+
+  if (visitorEntries.length <= MAX_STORED_VISITORS) {
+    return;
+  }
+
+  const deleteCount = visitorEntries.length - MAX_STORED_VISITORS;
+  const oldestVisitors = visitorEntries
+    .sort(
+      (first, second) =>
+        Date.parse(first[1]?.lastSeenAt || first[1]?.firstSeenAt || "") -
+        Date.parse(second[1]?.lastSeenAt || second[1]?.firstSeenAt || "")
+    )
+    .slice(0, deleteCount);
+
+  for (const [visitorHash] of oldestVisitors) {
+    delete store.visitors[visitorHash];
+  }
+}
+
+function pruneStoredPaths(store) {
+  const pathEntries = Object.entries(store.paths || {});
+
+  if (pathEntries.length <= MAX_STORED_PATHS) {
+    return;
+  }
+
+  const deleteCount = pathEntries.length - MAX_STORED_PATHS;
+  const leastUsedPaths = pathEntries
+    .sort(
+      (first, second) =>
+        normalizeCounter(first[1]?.pageViews) - normalizeCounter(second[1]?.pageViews)
+    )
+    .slice(0, deleteCount);
+
+  for (const [pathname] of leastUsedPaths) {
+    delete store.paths[pathname];
+  }
+}
+
+function pruneFileStore(store) {
+  pruneStoredVisitors(store);
+  pruneStoredPaths(store);
 }
 
 function hasMongoConfig() {
@@ -296,6 +364,7 @@ function recordVisitToFile({ visitorId, pathname = "/", now = new Date() } = {})
   visitor.lastSeenAt = timestamp;
   store.visitors[visitorHash] = visitor;
   store.updatedAt = timestamp;
+  pruneFileStore(store);
 
   writeStore(store);
 

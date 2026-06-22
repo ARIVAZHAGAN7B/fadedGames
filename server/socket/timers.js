@@ -33,6 +33,15 @@ function timerKey(roomCode, playerId) {
   return `${roomCode}:${playerId}`;
 }
 
+function publicWinner(winner) {
+  if (!winner || typeof winner !== "object") {
+    return winner;
+  }
+
+  const { socketId, ...safeWinner } = winner;
+  return safeWinner;
+}
+
 export function createSocketTimers(context) {
   const disconnectTimers = new Map();
   const botTurnTimers = new Map();
@@ -532,7 +541,7 @@ export function createSocketTimers(context) {
 
           if (result.room.gameEnded) {
             context.io.to(roomCode).emit("game-ended", {
-              winner: result.room.winner,
+              winner: publicWinner(result.room.winner),
               room: roomState
             });
             context.emitActiveRooms();

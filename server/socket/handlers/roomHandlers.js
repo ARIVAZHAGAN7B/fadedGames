@@ -10,6 +10,15 @@ import {
 } from "../../services/roomService.js";
 import { recordGamePlayedForRoomSafely } from "../../services/playerGameStats.js";
 
+function publicJoinedPlayer(player) {
+  if (!player || typeof player !== "object") {
+    return player;
+  }
+
+  const { sessionToken, sessionTokenHash, socketId, ...safePlayer } = player;
+  return safePlayer;
+}
+
 export function registerRoomHandlers(socket, context, timers, lifecycle) {
   socket.on("list-active-rooms", (_payload, callback) => {
     context.callbackSuccess(callback, {
@@ -27,6 +36,7 @@ export function registerRoomHandlers(socket, context, timers, lifecycle) {
         roomName: payload?.roomName,
         maxPlayers: payload?.maxPlayers,
         gameType: payload?.gameType,
+        discoverable: payload?.discoverable,
         handCricketMode: payload?.handCricketMode,
         handCricketTeamSize: payload?.handCricketTeamSize,
         tagMapId: payload?.tagMapId,
@@ -65,7 +75,7 @@ export function registerRoomHandlers(socket, context, timers, lifecycle) {
       socket.join(room.roomCode);
 
       context.emitRoomEvent(room, "player-joined", {
-        player
+        player: publicJoinedPlayer(player)
       });
       context.emitRoomUpdate(room);
 
@@ -82,11 +92,54 @@ export function registerRoomHandlers(socket, context, timers, lifecycle) {
 
   socket.on("resume-session", (payload, callback) => {
     try {
-      const { room, player, board } = resumeSession({
+      const {
+        room,
+        player,
+        board,
+        previousSocketId,
+        leftRooms = []
+      } = resumeSession({
         socketId: socket.id,
         roomCode: payload?.roomCode,
-        playerId: payload?.playerId
+        playerId: payload?.playerId,
+        sessionToken: payload?.sessionToken
       });
+
+      for (const leftRoom of leftRooms) {
+        const leftRoomCode = leftRoom.roomCode || leftRoom.room?.roomCode;
+
+        if (!leftRoomCode) {
+          continue;
+        }
+
+        socket.leave(leftRoomCode);
+        timers.cancelDisconnectCleanup(leftRoomCode, leftRoom.player?.playerId);
+
+        if (leftRoom.deleted) {
+          timers.cancelGameTimers(leftRoomCode);
+          continue;
+        }
+
+        context.emitRoomEvent(leftRoom.room, "player-left", {
+          player: publicJoinedPlayer(leftRoom.player)
+        });
+        context.emitRoomUpdate(leftRoom.room);
+        timers.scheduleBotTurn(leftRoom.room);
+        timers.scheduleTimeoutDrivenGames(leftRoom.room);
+      }
+
+      if (previousSocketId && previousSocketId !== socket.id) {
+        const previousSocket = context.io.sockets.sockets.get(previousSocketId);
+
+        if (previousSocket) {
+          previousSocket.leave(room.roomCode);
+          previousSocket.data.roomCode = null;
+          previousSocket.data.playerId = null;
+          previousSocket.emit("session-replaced", {
+            roomCode: room.roomCode
+          });
+        }
+      }
 
       socket.data.roomCode = room.roomCode;
       socket.data.playerId = player.playerId;
@@ -117,13 +170,13 @@ export function registerRoomHandlers(socket, context, timers, lifecycle) {
         roomCode: payload?.roomCode || socket.data.roomCode
       });
       context.emitRoomEvent(room, "player-joined", {
-        player
+        player: publicJoinedPlayer(player)
       });
       context.emitRoomUpdate(room);
       context.emitActiveRooms();
 
       context.callbackSuccess(callback, {
-        player,
+        player: publicJoinedPlayer(player),
         room: context.serializeRoomForSocket(room, socket)
       });
     } catch (error) {
@@ -160,7 +213,8 @@ export function registerRoomHandlers(socket, context, timers, lifecycle) {
         tagMapId: payload?.tagMapId,
         tagRoundSeconds: payload?.tagRoundSeconds,
         spyWordDifficulty: payload?.spyWordDifficulty,
-        boostCategoryLabels: payload?.boostCategoryLabels
+        boostCategoryLabels: payload?.boostCategoryLabels,
+        discoverable: payload?.discoverable
       });
 
       context.emitRoomUpdate(room);

@@ -3,6 +3,15 @@ import {
   submitBoostSelection
 } from "../../services/games/boostService.js";
 
+function publicWinner(winner) {
+  if (!winner || typeof winner !== "object") {
+    return winner;
+  }
+
+  const { socketId, ...safeWinner } = winner;
+  return safeWinner;
+}
+
 export function registerBoostHandlers(socket, context, timers) {
   socket.on("boost-select-card", (payload, callback) => {
     try {
@@ -38,7 +47,7 @@ export function registerBoostHandlers(socket, context, timers) {
 
       if (result.valid) {
         context.emitRoomEvent(result.room, "game-ended", {
-          winner: result.winner
+          winner: publicWinner(result.winner)
         });
         timers.cancelBoostRound(result.room.roomCode);
         timers.cancelBoostBotTurn(result.room.roomCode);
@@ -51,7 +60,7 @@ export function registerBoostHandlers(socket, context, timers) {
         cooldownMs: result.cooldownMs,
         room: context.serializeRoomForSocket(result.room, socket),
         valid: result.valid,
-        winner: result.winner
+        winner: publicWinner(result.winner)
       });
     } catch (error) {
       context.callbackError(socket, callback, error);

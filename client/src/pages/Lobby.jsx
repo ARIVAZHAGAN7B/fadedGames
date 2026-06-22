@@ -498,6 +498,7 @@ export default function Lobby({
 }) {
   const [status, setStatus] = useState("");
   const [roomName, setRoomName] = useState(room.roomName);
+  const [discoverable, setDiscoverable] = useState(Boolean(room.discoverable));
   const [maxPlayers, setMaxPlayers] = useState(room.maxPlayers);
   const [teamMembers, setTeamMembers] = useState(room.handCricketTeamSize || 2);
   const [tagMapId, setTagMapId] = useState(room.tag?.mapId || "classic");
@@ -551,6 +552,7 @@ export default function Lobby({
 
   useEffect(() => {
     setRoomName(room.roomName);
+    setDiscoverable(Boolean(room.discoverable));
     setMaxPlayers(room.maxPlayers);
     setTeamMembers(room.handCricketTeamSize || 2);
     setTagMapId(room.tag?.mapId || "classic");
@@ -559,7 +561,7 @@ export default function Lobby({
     setBoostCategoryNames(
       resizeBoostNames((room.boost?.categories || []).map((category) => category.label), room.maxPlayers)
     );
-  }, [room.boost?.categories, room.handCricketTeamSize, room.maxPlayers, room.roomName, room.spyWord?.difficulty, room.tag?.mapId, room.tag?.roundSeconds]);
+  }, [room.boost?.categories, room.discoverable, room.handCricketTeamSize, room.maxPlayers, room.roomName, room.spyWord?.difficulty, room.tag?.mapId, room.tag?.roundSeconds]);
 
   const handleStart = async () => {
     const result = await onStartGame();
@@ -575,6 +577,7 @@ export default function Lobby({
 
     const result = await onUpdateRoomSettings({
       roomName,
+      discoverable,
       maxPlayers: Number(maxPlayers),
       handCricketTeamSize: isTeamHandCricket ? Number(teamMembers) : undefined,
       tagMapId: isTag ? tagMapId : undefined,
@@ -670,6 +673,15 @@ export default function Lobby({
                     onChange={(event) => setRoomName(event.target.value)}
                     maxLength={40}
                   />
+                </label>
+                <label className="mb-3 flex items-center gap-2 rounded-md border border-ink/10 bg-paper px-3 py-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-mint"
+                    checked={discoverable}
+                    onChange={(event) => setDiscoverable(event.target.checked)}
+                  />
+                  <span className="text-xs font-extrabold text-ink">Public</span>
                 </label>
 
                 {isBingo ? (

@@ -3,6 +3,15 @@ import {
   claimBingo
 } from "../../services/games/bingoService.js";
 
+function publicWinner(winner) {
+  if (!winner || typeof winner !== "object") {
+    return winner;
+  }
+
+  const { socketId, ...safeWinner } = winner;
+  return safeWinner;
+}
+
 export function registerBingoHandlers(socket, context, timers) {
   socket.on("call-number", (payload, callback) => {
     try {
@@ -51,7 +60,7 @@ export function registerBingoHandlers(socket, context, timers) {
 
       context.callbackSuccess(callback, {
         completedLines: result.completedLines,
-        winner: result.winner,
+        winner: publicWinner(result.winner),
         room: roomState,
         valid: true
       });

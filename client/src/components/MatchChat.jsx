@@ -65,7 +65,13 @@ export default function MatchChat({
   }
 
   return (
-    <div className="fixed bottom-3 right-3 z-50 w-[calc(100vw-1.5rem)] max-w-sm sm:bottom-5 sm:right-5 sm:w-96">
+    <div
+      className={
+        open
+          ? "fixed bottom-3 right-3 z-50 w-[calc(100vw-1.5rem)] max-w-sm sm:bottom-5 sm:right-5 sm:w-96"
+          : "fixed bottom-3 left-3 z-50 w-auto sm:bottom-5 sm:left-5"
+      }
+    >
       {open ? (
         <section className="surface flex h-[min(72vh,32rem)] flex-col overflow-hidden border-ink/15 shadow-[0_18px_48px_rgba(23,33,43,0.18)]">
           <header className="flex items-center justify-between gap-3 border-b border-ink/10 bg-white px-4 py-3">

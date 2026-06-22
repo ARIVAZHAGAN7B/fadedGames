@@ -185,3 +185,5 @@ npm run start
 Set `VITE_SERVER_URL` in the client environment to the deployed backend URL.
 
 Set `CLIENT_ORIGIN` on the server to the deployed frontend URL. Multiple origins can be comma-separated.
+
+Set `ANALYTICS_ADMIN_TOKEN` on the server to a long random value before enabling the analytics dashboard.

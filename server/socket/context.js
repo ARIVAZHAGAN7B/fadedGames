@@ -20,6 +20,29 @@ export function callbackError(socket, callback, error) {
   }
 }
 
+function sanitizePublicObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const {
+    sessionToken,
+    sessionTokenHash,
+    socketId,
+    ...safeValue
+  } = value;
+
+  return safeValue;
+}
+
+function sanitizeEventPayload(payload = {}) {
+  return {
+    ...payload,
+    ...(payload.player ? { player: sanitizePublicObject(payload.player) } : {}),
+    ...(payload.winner ? { winner: sanitizePublicObject(payload.winner) } : {})
+  };
+}
+
 export function createSocketContext(io) {
   let activeRoomsCache = [];
   let activeRoomsDirty = true;
@@ -39,13 +62,15 @@ export function createSocketContext(io) {
   }
 
   function emitRoomEvent(room, event, payload = {}) {
+    const safePayload = sanitizeEventPayload(payload);
+
     for (const player of room.players) {
       if (!player.socketId) {
         continue;
       }
 
       io.to(player.socketId).emit(event, {
-        ...payload,
+        ...safePayload,
         room: serializeRoom(room, player.playerId)
       });
     }

@@ -12,6 +12,7 @@ import { registerSpyWordHandlers } from "./handlers/spyWordHandlers.js";
 import { registerTagHandlers } from "./handlers/tagHandlers.js";
 import { registerTreasureHuntHandlers } from "./handlers/treasureHuntHandlers.js";
 import { registerWordGuessHandlers } from "./handlers/wordGuessHandlers.js";
+import { createSocketRateLimiter } from "../security/rateLimit.js";
 
 const socketHandlerRegistrars = [
   registerRoomHandlers,
@@ -29,10 +30,12 @@ const socketHandlerRegistrars = [
 
 export function registerSocketHandlers(io) {
   const context = createSocketContext(io);
+  const rateLimitSocket = createSocketRateLimiter();
   const timers = createSocketTimers(context);
   const lifecycle = createRoomLifecycle(context, timers);
 
   io.on("connection", (socket) => {
+    rateLimitSocket(socket, context);
     context.sendInitialActiveRooms(socket);
 
     for (const registerHandlers of socketHandlerRegistrars) {

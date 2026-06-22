@@ -31,7 +31,19 @@ function readVisitorId() {
 }
 
 function getCurrentPath() {
-  return `${window.location.pathname}${window.location.search}`;
+  const url = new URL(window.location.href);
+
+  [
+    "room",
+    "roomCode",
+    "code",
+    "token",
+    "session",
+    "sessionToken",
+    "analyticsToken"
+  ].forEach((key) => url.searchParams.delete(key));
+
+  return `${url.pathname}${url.search}`;
 }
 
 export function trackWebsiteVisit() {
@@ -62,9 +74,19 @@ export function trackWebsiteVisit() {
   });
 }
 
-export async function fetchAnalyticsSummary() {
+function analyticsHeaders(adminToken) {
+  return adminToken
+    ? {
+        Authorization: `Bearer ${adminToken}`
+      }
+    : {};
+}
+
+export async function fetchAnalyticsSummary(adminToken = "") {
   const endpoint = new URL("/analytics/summary", getServerUrl());
-  const response = await fetch(endpoint.toString());
+  const response = await fetch(endpoint.toString(), {
+    headers: analyticsHeaders(adminToken)
+  });
   const payload = await response.json().catch(() => null);
 
   if (!response.ok || !payload?.ok) {
@@ -74,9 +96,11 @@ export async function fetchAnalyticsSummary() {
   return payload.analytics;
 }
 
-export async function fetchPlayerGameStatsSummary() {
+export async function fetchPlayerGameStatsSummary(adminToken = "") {
   const endpoint = new URL("/analytics/game-stats", getServerUrl());
-  const response = await fetch(endpoint.toString());
+  const response = await fetch(endpoint.toString(), {
+    headers: analyticsHeaders(adminToken)
+  });
   const payload = await response.json().catch(() => null);
 
   if (!response.ok || !payload?.ok) {

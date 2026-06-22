@@ -29,12 +29,13 @@ const SAVED_STATE_WRITE_DELAY_MS = 500;
 const emptySession = {
   nickname: "",
   playerId: "",
+  sessionToken: "",
   roomCode: ""
 };
 
 function readSavedState() {
   try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
+    const saved = window.sessionStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : null;
   } catch {
     return null;
@@ -43,9 +44,9 @@ function readSavedState() {
 
 function writeSavedState(state) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Local storage can fail in private browsing; the game still works for the current tab.
+    // Session storage can fail in private browsing; the game still works for the current tab.
   }
 }
 
@@ -57,6 +58,7 @@ function getPersistableRoom(room) {
   return {
     roomCode: room.roomCode,
     gameType: room.gameType,
+    discoverable: Boolean(room.discoverable),
     roomName: room.roomName,
     host: room.host,
     maxPlayers: room.maxPlayers,
@@ -76,7 +78,7 @@ function getPersistableRoom(room) {
 
 function clearSavedState() {
   try {
-    window.localStorage.removeItem(STORAGE_KEY);
+    window.sessionStorage.removeItem(STORAGE_KEY);
   } catch {
     // Ignore storage cleanup failures.
   }
@@ -162,6 +164,7 @@ export default function App() {
   const initialGameType = route.gameType;
   const canResumeSavedState =
     savedState?.session?.playerId &&
+    savedState?.session?.sessionToken &&
     savedState?.session?.roomCode &&
     (!initialRoomCode || savedState.session.roomCode === initialRoomCode) &&
     (!initialGameType || savedState.room?.gameType === initialGameType);
@@ -397,7 +400,7 @@ export default function App() {
   }, [board, room, session, view]);
 
   useEffect(() => {
-    if (!connected || !needsResume || !session.roomCode || !session.playerId) {
+    if (!connected || !needsResume || !session.roomCode || !session.playerId || !session.sessionToken) {
       return;
     }
 
@@ -406,7 +409,8 @@ export default function App() {
     async function resumeSavedSession() {
       const response = await emitWithAck("resume-session", {
         roomCode: session.roomCode,
-        playerId: session.playerId
+        playerId: session.playerId,
+        sessionToken: session.sessionToken
       });
 
       if (canceled) {
@@ -423,6 +427,7 @@ export default function App() {
       setSession({
         nickname: response.player.name,
         playerId: response.player.playerId,
+        sessionToken: session.sessionToken || response.player.sessionToken || "",
         roomCode: response.roomCode
       });
       setRoom(response.room);
@@ -438,7 +443,7 @@ export default function App() {
     return () => {
       canceled = true;
     };
-  }, [board, connected, needsResume, session.playerId, session.roomCode]);
+  }, [board, connected, needsResume, session.playerId, session.roomCode, session.sessionToken]);
 
   const handleCreateRoom = async (payload) => {
     const response = await emitWithAck("create-room", payload);
@@ -447,6 +452,7 @@ export default function App() {
       setSession({
         nickname: payload.nickname,
         playerId: response.player.playerId,
+        sessionToken: response.player.sessionToken || "",
         roomCode: response.roomCode
       });
       setRoom(response.room);
@@ -468,6 +474,7 @@ export default function App() {
       setSession({
         nickname: payload.nickname,
         playerId: response.player.playerId,
+        sessionToken: response.player.sessionToken || "",
         roomCode: response.roomCode
       });
       setRoom(response.room);
