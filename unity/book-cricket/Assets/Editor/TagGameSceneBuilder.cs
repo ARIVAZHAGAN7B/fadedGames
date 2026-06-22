@@ -34,6 +34,7 @@ public static class TagGameSceneBuilder
 
         PlayerSettings.companyName = "Faded Games";
         PlayerSettings.productName = "TAG";
+        ConfigureWebGLForStaticHosting();
         BuildPipeline.BuildPlayer(options);
         WriteBuildManifest(outputPath);
         AssetDatabase.Refresh();
@@ -76,9 +77,9 @@ public static class TagGameSceneBuilder
         WebGLManifest manifest = new WebGLManifest
         {
             loaderUrl = ToWebsiteUrl(outputPath, FindFile(buildPath, "*.loader.js")),
-            dataUrl = ToWebsiteUrl(outputPath, FindFile(buildPath, "*.data*")),
-            frameworkUrl = ToWebsiteUrl(outputPath, FindFile(buildPath, "*.framework.js*")),
-            codeUrl = ToWebsiteUrl(outputPath, FindFile(buildPath, "*.wasm*")),
+            dataUrl = ToWebsiteUrl(outputPath, FindPreferredFile(buildPath, "*.data", "*.data*")),
+            frameworkUrl = ToWebsiteUrl(outputPath, FindPreferredFile(buildPath, "*.framework.js", "*.framework.js*")),
+            codeUrl = ToWebsiteUrl(outputPath, FindPreferredFile(buildPath, "*.wasm", "*.wasm*")),
             streamingAssetsUrl = "/unity/tag/StreamingAssets"
         };
 
@@ -91,6 +92,18 @@ public static class TagGameSceneBuilder
     private static string FindFile(string folder, string pattern)
     {
         return Directory.GetFiles(folder, pattern).OrderBy(path => path).FirstOrDefault() ?? string.Empty;
+    }
+
+    private static string FindPreferredFile(string folder, string preferredPattern, string fallbackPattern)
+    {
+        string preferredFile = FindFile(folder, preferredPattern);
+        return string.IsNullOrWhiteSpace(preferredFile) ? FindFile(folder, fallbackPattern) : preferredFile;
+    }
+
+    private static void ConfigureWebGLForStaticHosting()
+    {
+        PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+        PlayerSettings.WebGL.decompressionFallback = false;
     }
 
     private static string ToWebsiteUrl(string outputPath, string filePath)
