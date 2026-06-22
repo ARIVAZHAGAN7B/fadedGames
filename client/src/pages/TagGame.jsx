@@ -1,4 +1,8 @@
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Timer
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -14,6 +18,20 @@ const WORLD_WIDTH = 2400;
 const WORLD_HEIGHT = 1200;
 const TAG_UNITY_BASE_URL = "/unity/tag";
 const TAG_UNITY_MANIFEST_URL = `${TAG_UNITY_BASE_URL}/tag-build.json`;
+const TAG_GAMEPAD_POLL_MS = 50;
+const TAG_EMPTY_INPUT = Object.freeze({
+  left: false,
+  right: false,
+  down: false,
+  jump: false
+});
+
+const TAG_TOUCH_CONTROLS = [
+  { id: "left", label: "Move left", Icon: ArrowLeft },
+  { id: "down", label: "Drop", Icon: ArrowDown },
+  { id: "right", label: "Move right", Icon: ArrowRight },
+  { id: "jump", label: "Jump", Icon: ArrowUp }
+];
 
 const countryBalls = [
   {
@@ -384,8 +402,8 @@ function createTagScene(Phaser, initialMap, onReady) {
     drawPlatform(platform) {
       const isWall = Boolean(platform.wall);
       const startX = platform.x - platform.w / 2;
-      const endX = platform.x + platform.w / 2;
       const startY = platform.y - platform.h / 2;
+      const bottomY = platform.y + platform.h / 2;
 
       if (isWall && platform.y < 100) {
         return;
@@ -401,23 +419,23 @@ function createTagScene(Phaser, initialMap, onReady) {
       }
 
       const depth = isWall ? 2 : 5;
-      const body = this.add.rectangle(platform.x, platform.y, platform.w, platform.h, 0xff3b83).setDepth(depth);
-      const grass = this.add.rectangle(platform.x, startY + 5, platform.w, 10, this.map.ground).setDepth(depth + 2);
-      const highlight = this.add.rectangle(platform.x, startY + 1, platform.w, 2, 0xc2f27c, 0.9).setDepth(depth + 3);
-      this.add.rectangle(platform.x, platform.y + platform.h / 2 - 4, platform.w, 7, 0xf51e72, 0.85).setDepth(depth + 1);
-      const trim = this.add.graphics().setDepth(depth + 4);
+      const graphics = this.add.graphics().setDepth(depth);
+      const capHeight = Math.min(12, Math.max(8, platform.h * 0.45));
+      const lowerLipHeight = Math.min(8, Math.max(4, platform.h * 0.28));
+      const bodyTop = startY + capHeight;
+      const bodyHeight = Math.max(2, platform.h - capHeight);
+      const alpha = isWall ? 0.96 : 1;
 
-      trim.fillStyle(0x23d251, 0.95);
-
-      for (let x = startX + 8; x < endX; x += 18) {
-        trim.fillTriangle(x, startY + 9, x + 10, startY + 9, x + 5, startY + 14);
-      }
-
-      if (isWall) {
-        body.setAlpha(0.96);
-        grass.setAlpha(0.96);
-        highlight.setAlpha(0.75);
-      }
+      graphics.fillStyle(0xff3b83, alpha);
+      graphics.fillRect(startX, bodyTop, platform.w, bodyHeight);
+      graphics.fillStyle(0xf51e72, alpha * 0.88);
+      graphics.fillRect(startX, bottomY - lowerLipHeight, platform.w, lowerLipHeight);
+      graphics.fillStyle(this.map.ground, alpha);
+      graphics.fillRect(startX, startY, platform.w, capHeight);
+      graphics.fillStyle(0xc2f27c, alpha * 0.86);
+      graphics.fillRect(startX, startY, platform.w, 2);
+      graphics.fillStyle(0x158d49, alpha * 0.16);
+      graphics.fillRect(startX, startY + capHeight - 2, platform.w, 2);
     }
 
     drawSlopedPlatform(platform) {
@@ -835,7 +853,7 @@ function PhaserTagCanvas({ room }) {
   }, [room]);
 
   return (
-    <div ref={containerRef} className="tag-canvas h-full min-h-[34rem] w-full">
+    <div ref={containerRef} className="tag-canvas tag-stage-size w-full">
       {mountError ? (
         <div className="rounded-md bg-white px-4 py-3 text-sm font-extrabold text-coral">
           {mountError}
@@ -959,7 +977,7 @@ function UnityTagCanvas({ room, onUnavailable }) {
   }, [loaded, room]);
 
   return (
-    <div className="tag-canvas h-full min-h-[34rem] w-full">
+    <div className="tag-canvas tag-stage-size w-full">
       <canvas
         ref={canvasRef}
         className="h-full w-full outline-none"
@@ -1015,7 +1033,17 @@ function hasAnyKey(keys, codes) {
   return codes.some((code) => keys.has(code));
 }
 
-function getInputFromKeys(keys, gamepadInput) {
+function shouldIgnoreTagKeyboardEvent(event) {
+  const target = event.target;
+
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(target.closest("button, input, textarea, select, a, [contenteditable='true']"));
+}
+
+function getInputFromKeys(keys, gamepadInput, virtualInput = TAG_EMPTY_INPUT) {
   const keyboardInput = {
     left: hasAnyKey(keys, sharedControlCodes.left),
     right: hasAnyKey(keys, sharedControlCodes.right),
@@ -1024,10 +1052,10 @@ function getInputFromKeys(keys, gamepadInput) {
   };
 
   return {
-    left: keyboardInput.left || Boolean(gamepadInput?.left),
-    right: keyboardInput.right || Boolean(gamepadInput?.right),
-    down: keyboardInput.down || Boolean(gamepadInput?.down),
-    jump: keyboardInput.jump || Boolean(gamepadInput?.jump)
+    left: keyboardInput.left || Boolean(virtualInput.left) || Boolean(gamepadInput?.left),
+    right: keyboardInput.right || Boolean(virtualInput.right) || Boolean(gamepadInput?.right),
+    down: keyboardInput.down || Boolean(virtualInput.down) || Boolean(gamepadInput?.down),
+    jump: keyboardInput.jump || Boolean(virtualInput.jump) || Boolean(gamepadInput?.jump)
   };
 }
 
@@ -1100,10 +1128,110 @@ function playTone(audioRef, frequency, durationMs, type = "sine", gainValue = 0.
   }
 }
 
+function TagControlButton({
+  active,
+  children,
+  className = "",
+  control,
+  label,
+  onPressChange
+}) {
+  const startPress = (event) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    onPressChange(control, true);
+  };
+
+  const endPress = (event) => {
+    event.preventDefault();
+
+    try {
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // Some browsers release capture before cancel/up handlers fire.
+    }
+
+    onPressChange(control, false);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === " " || event.key === "Enter") {
+      event.preventDefault();
+      onPressChange(control, true);
+    }
+  };
+
+  const handleKeyUp = (event) => {
+    if (event.key === " " || event.key === "Enter") {
+      event.preventDefault();
+      onPressChange(control, false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className={`tag-touch-control pointer-events-auto flex h-14 w-14 items-center justify-center rounded-md border border-white/35 text-ink shadow-soft transition ${
+        active ? "scale-95 bg-honey" : "bg-white/90"
+      } ${className}`.trim()}
+      aria-label={label}
+      title={label}
+      data-tag-control={control}
+      draggable={false}
+      onContextMenu={(event) => event.preventDefault()}
+      onKeyDown={handleKeyDown}
+      onKeyUp={handleKeyUp}
+      onPointerCancel={endPress}
+      onPointerDown={startPress}
+      onPointerUp={endPress}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TagTouchControls({ activeControls, onPressChange }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 z-30 flex items-end justify-between px-3 sm:hidden">
+      <div className="flex gap-2 rounded-md bg-ink/28 p-1.5 backdrop-blur">
+        {TAG_TOUCH_CONTROLS.slice(0, 3).map(({ id, label, Icon }) => (
+          <TagControlButton
+            key={id}
+            active={activeControls.has(id)}
+            control={id}
+            label={label}
+            onPressChange={onPressChange}
+          >
+            <Icon className="h-6 w-6" aria-hidden="true" />
+          </TagControlButton>
+        ))}
+      </div>
+
+      {TAG_TOUCH_CONTROLS.slice(3).map(({ id, label, Icon }) => (
+        <TagControlButton
+          key={id}
+          active={activeControls.has(id)}
+          className="h-16 w-16 bg-honey text-ink"
+          control={id}
+          label={label}
+          onPressChange={onPressChange}
+        >
+          <Icon className="h-7 w-7" aria-hidden="true" />
+        </TagControlButton>
+      ))}
+    </div>
+  );
+}
+
 export default function TagGame({ room, session, onTagInput, onRestartGame, onLeaveRoom }) {
   const [status, setStatus] = useState("");
+  const [activeVirtualControls, setActiveVirtualControls] = useState(() => new Set());
   const pressedKeys = useRef(new Set());
-  const lastInput = useRef({ left: false, right: false, down: false, jump: false });
+  const virtualInput = useRef({ ...TAG_EMPTY_INPUT });
+  const lastInput = useRef({ ...TAG_EMPTY_INPUT });
+  const onTagInputRef = useRef(onTagInput);
   const audioRef = useRef(null);
   const lastCountdownCue = useRef("");
   const lastTagCount = useRef(0);
@@ -1119,16 +1247,76 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
   const mapName = (mapConfigs[tag.mapId] || mapConfigs.classic).name;
 
   useEffect(() => {
+    onTagInputRef.current = onTagInput;
+  }, [onTagInput]);
+
+  const sendInput = useCallback((gamepadInput = readGamepadInput(meIndex)) => {
+    const input = getInputFromKeys(pressedKeys.current, gamepadInput, virtualInput.current);
+
+    if (!sameInput(input, lastInput.current)) {
+      lastInput.current = input;
+      onTagInputRef.current(input);
+    }
+  }, [meIndex]);
+
+  const releaseAllInput = useCallback((updateUi = true) => {
+    pressedKeys.current.clear();
+    virtualInput.current = { ...TAG_EMPTY_INPUT };
+
+    if (updateUi) {
+      setActiveVirtualControls(new Set());
+    }
+
+    if (!sameInput(TAG_EMPTY_INPUT, lastInput.current)) {
+      lastInput.current = { ...TAG_EMPTY_INPUT };
+      onTagInputRef.current({ ...TAG_EMPTY_INPUT });
+    }
+  }, []);
+
+  const setVirtualControl = useCallback((control, active) => {
+    if (!Object.prototype.hasOwnProperty.call(TAG_EMPTY_INPUT, control)) {
+      return;
+    }
+
+    if (virtualInput.current[control] === active) {
+      return;
+    }
+
+    virtualInput.current = {
+      ...virtualInput.current,
+      [control]: active
+    };
+
+    setActiveVirtualControls((current) => {
+      const next = new Set(current);
+
+      if (active) {
+        next.add(control);
+      } else {
+        next.delete(control);
+      }
+
+      return next;
+    });
+    sendInput();
+  }, [sendInput]);
+
+  useEffect(() => {
     const sendInput = () => {
-      const input = getInputFromKeys(pressedKeys.current, readGamepadInput(meIndex));
+      const gamepadInput = readGamepadInput(meIndex);
+      const input = getInputFromKeys(pressedKeys.current, gamepadInput, virtualInput.current);
 
       if (!sameInput(input, lastInput.current)) {
         lastInput.current = input;
-        onTagInput(input);
+        onTagInputRef.current(input);
       }
     };
 
     const handleKeyDown = (event) => {
+      if (shouldIgnoreTagKeyboardEvent(event)) {
+        return;
+      }
+
       const key = getTagControlKey(event);
 
       if (key) {
@@ -1141,6 +1329,14 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
     const handleKeyUp = (event) => {
       const key = getTagControlKey(event);
 
+      if (!key) {
+        return;
+      }
+
+      if (shouldIgnoreTagKeyboardEvent(event) && !pressedKeys.current.has(key)) {
+        return;
+      }
+
       if (pressedKeys.current.has(key)) {
         event.preventDefault();
         pressedKeys.current.delete(key);
@@ -1148,25 +1344,28 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
       }
     };
 
-    let animationFrame = 0;
-    const pollInput = () => {
-      sendInput();
-      animationFrame = window.requestAnimationFrame(pollInput);
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        releaseAllInput();
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
-    animationFrame = window.requestAnimationFrame(pollInput);
+    window.addEventListener("blur", releaseAllInput);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const gamepadTimer = window.setInterval(sendInput, TAG_GAMEPAD_POLL_MS);
+    sendInput();
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
-      window.cancelAnimationFrame(animationFrame);
-      pressedKeys.current.clear();
-      lastInput.current = { left: false, right: false, down: false, jump: false };
-      onTagInput({ left: false, right: false, down: false, jump: false });
+      window.removeEventListener("blur", releaseAllInput);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(gamepadTimer);
+      releaseAllInput(false);
     };
-  }, [meIndex, onTagInput]);
+  }, [meIndex, releaseAllInput]);
 
   useEffect(() => {
     if (countdownLabel && countdownLabel !== lastCountdownCue.current) {
@@ -1233,32 +1432,34 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
         }
       />
 
-        <StatusMessage status={status} />
+      <StatusMessage status={status} />
 
-        <section className="surface overflow-hidden bg-ink p-2">
-          <div className={`relative overflow-hidden rounded-md bg-ink ${tension ? "tag-tension-frame" : ""}`}>
-            <TagCanvas room={room} />
+      <section className="overflow-hidden rounded-md border border-ink/10 bg-ink p-2 shadow-soft">
+        <div className={`relative overflow-hidden rounded-md bg-ink ${tension ? "tag-tension-frame" : ""}`}>
+          <TagCanvas room={room} />
 
-            {countdownLabel ? (
-              <div className="absolute inset-0 grid place-items-center bg-ink/20">
-                <div className="tag-countdown-pop text-8xl font-extrabold text-white drop-shadow-lg sm:text-9xl">
-                  {countdownLabel}
-                </div>
+          {countdownLabel ? (
+            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-ink/20">
+              <div className="tag-countdown-pop text-8xl font-extrabold text-white drop-shadow-lg sm:text-9xl">
+                {countdownLabel}
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {result ? (
-              <div className="absolute inset-0 grid place-items-center bg-ink/72 px-4 text-center text-white">
-                <div className="result-card max-w-lg rounded-md border border-white/20 bg-ink/80 p-5 shadow-soft">
-                  <p className="text-xs font-extrabold uppercase text-white/60">Round Over</p>
-                  <h2 className="mt-1 text-3xl font-extrabold">
-                    {result.loser?.name || "Someone"} was IT
-                  </h2>
-                </div>
+          {result ? (
+            <div className="pointer-events-none absolute inset-0 grid place-items-center bg-ink/72 px-4 text-center text-white">
+              <div className="result-card max-w-lg rounded-md border border-white/20 bg-ink/80 p-5 shadow-soft">
+                <p className="text-xs font-extrabold uppercase text-white/60">Round Over</p>
+                <h2 className="mt-1 text-3xl font-extrabold">
+                  {result.loser?.name || "Someone"} was IT
+                </h2>
               </div>
-            ) : null}
-          </div>
-        </section>
+            </div>
+          ) : null}
+
+          <TagTouchControls activeControls={activeVirtualControls} onPressChange={setVirtualControl} />
+        </div>
+      </section>
     </GamePage>
   );
 }
