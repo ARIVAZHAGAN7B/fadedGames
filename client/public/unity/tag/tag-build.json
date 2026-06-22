@@ -1,0 +1,7 @@
+{
+    "loaderUrl": "/unity/tag/Build/tag.loader.js",
+    "dataUrl": "/unity/tag/Build/tag.data.gz",
+    "frameworkUrl": "/unity/tag/Build/tag.framework.js.gz",
+    "codeUrl": "/unity/tag/Build/tag.wasm.gz",
+    "streamingAssetsUrl": "/unity/tag/StreamingAssets"
+}
