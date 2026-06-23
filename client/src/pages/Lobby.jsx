@@ -10,6 +10,7 @@ import {
   spyWordDifficulties,
   spyWordMaxPlayers,
   spyWordMinPlayers,
+  spyWordTotalRounds,
   tagMaps,
   tagRoundOptions
 } from "../game/options.js";
@@ -305,7 +306,7 @@ function SpyWordSetup({ room }) {
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <MessageSquare className="mb-2 h-5 w-5 text-honey" aria-hidden="true" />
           <p className="text-xs font-extrabold uppercase text-ink/45">Rounds</p>
-          <p className="text-xl font-extrabold">5</p>
+          <p className="text-xl font-extrabold">{spyWordTotalRounds}</p>
         </div>
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <KeyRound className="mb-2 h-5 w-5 text-ink" aria-hidden="true" />

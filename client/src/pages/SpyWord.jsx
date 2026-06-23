@@ -16,6 +16,7 @@ import {
   RoomHeader,
   StatusMessage
 } from "../components/game/GameLayout.jsx";
+import { spyWordTotalRounds } from "../game/options.js";
 
 function cleanClue(value) {
   return String(value || "")
@@ -29,7 +30,7 @@ function cleanGuess(value) {
     .slice(0, 32);
 }
 
-function getCluesByRound(clues = [], totalRounds = 5) {
+function getCluesByRound(clues = [], totalRounds = spyWordTotalRounds) {
   return Array.from({ length: totalRounds }, (_entry, index) => {
     const round = index + 1;
 
@@ -83,7 +84,7 @@ function SecretPanel({ state }) {
 }
 
 function ClueBoard({ state }) {
-  const rounds = getCluesByRound(state.clues || [], state.totalRounds || 5);
+  const rounds = getCluesByRound(state.clues || [], state.totalRounds || spyWordTotalRounds);
 
   return (
     <section className="surface p-4">
@@ -97,7 +98,7 @@ function ClueBoard({ state }) {
         </span>
       </div>
 
-      <div className="grid gap-2 lg:grid-cols-5">
+      <div className="grid gap-2 md:grid-cols-3">
         {rounds.map((round) => (
           <div key={round.round} className="rounded-md border border-ink/10 bg-paper p-2">
             <p className="mb-2 text-xs font-extrabold uppercase text-ink/45">
@@ -269,7 +270,7 @@ export default function SpyWord({
   const canVote = state.phase === "voting" && !myVote && !room.gameEnded;
   const canSpyGuess = state.phase === "spy-guess" && isSpy && !room.gameEnded;
   const groupedClues = useMemo(
-    () => getCluesByRound(state.clues || [], state.totalRounds || 5),
+    () => getCluesByRound(state.clues || [], state.totalRounds || spyWordTotalRounds),
     [state.clues, state.totalRounds]
   );
   const currentRoundClues = groupedClues.find((entry) => entry.round === state.round)?.clues || [];
@@ -359,7 +360,7 @@ export default function SpyWord({
                 <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs font-extrabold uppercase text-ink/50">
-                      Round {Math.min(state.round || 1, state.totalRounds || 5)} / {state.totalRounds || 5}
+                      Round {Math.min(state.round || 1, state.totalRounds || spyWordTotalRounds)} / {state.totalRounds || spyWordTotalRounds}
                     </p>
                     <h2 className="text-2xl font-extrabold">{phaseTitle(state, room)}</h2>
                   </div>

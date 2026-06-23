@@ -30,7 +30,7 @@ import thirudanPoliceLogo from "../images/optimized/thirudan police.webp";
 import spyWordLogo from "../images/optimized/spy word.webp";
 import treasureHuntLogo from "../images/optimized/treasure hunt.webp";
 import wordGuessLogo from "../images/wordGuess.svg";
-import { guessNumberMaxOptions } from "../game/options.js";
+import { guessNumberMaxOptions, spyWordTotalRounds } from "../game/options.js";
 import { warmImageCache } from "../utils/imageCache.js";
 import { normalizeGameType, normalizeRoomCode, setGameRouteInUrl } from "../utils/roomLink.js";
 import { fetchAnalyticsSummary } from "../utils/visitorAnalytics.js";
@@ -281,7 +281,7 @@ function getActiveRoomMode(room) {
   }
 
   if (room.gameType === "spy-word") {
-    return `${room.spyWordDifficulty || "easy"} / 5 rounds`;
+    return `${room.spyWordDifficulty || "easy"} / ${spyWordTotalRounds} rounds`;
   }
 
   if (room.gameType === "boost") {

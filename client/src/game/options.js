@@ -14,6 +14,7 @@ export const spyWordDifficulties = [
 
 export const spyWordMinPlayers = 3;
 export const spyWordMaxPlayers = 10;
+export const spyWordTotalRounds = 3;
 
 export const boostDefaultNames = [
   "Perambalur",

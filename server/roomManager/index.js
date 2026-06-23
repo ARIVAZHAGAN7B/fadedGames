@@ -59,7 +59,7 @@ const WORD_GUESS_GUESS_MS = 60000;
 const WORD_GUESS_LOCK_REVEAL_MS = 5000;
 const SPY_WORD_MIN_PLAYERS = 3;
 const SPY_WORD_MAX_PLAYERS = 10;
-const SPY_WORD_TOTAL_ROUNDS = 5;
+const SPY_WORD_TOTAL_ROUNDS = 3;
 const SPY_WORD_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
 const SPY_WORD_DETECTIVE_WORDS = {
   easy: [
