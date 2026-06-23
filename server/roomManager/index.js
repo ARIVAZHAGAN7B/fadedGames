@@ -2585,6 +2585,11 @@ function getSpyWordVoteTally(room) {
   return Object.values(tally);
 }
 
+function getSpyWordEligibleVoters(room) {
+  const state = room.spyWord;
+  return room.players.filter((player) => player.playerId !== state.spyPlayerId);
+}
+
 function finishSpyWordMatch(room, winnerSide, resultType, extra = {}) {
   const state = room.spyWord || createSpyWordState("result");
   const spyPlayer =
@@ -2630,7 +2635,8 @@ function resolveSpyWordVotes(room) {
   const state = room.spyWord;
   const tally = getSpyWordVoteTally(room);
   const spyVotes = tally.find((entry) => entry.playerId === state.spyPlayerId)?.count || 0;
-  const majority = Math.floor(room.players.length / 2) + 1;
+  const eligibleVoters = getSpyWordEligibleVoters(room);
+  const majority = Math.floor(eligibleVoters.length / 2) + 1;
   const topCount = Math.max(0, ...tally.map((entry) => entry.count));
   const topVoted = tally.filter((entry) => entry.count === topCount && topCount > 0);
   const tied = topVoted.length !== 1;
@@ -2638,19 +2644,18 @@ function resolveSpyWordVotes(room) {
 
   state.result = {
     type: caughtSpy ? "caught" : tied ? "tie" : "escaped",
-    winnerSide: caughtSpy ? null : "spy",
+    winnerSide: caughtSpy ? "detectives" : "spy",
     caughtSpy,
     majority,
     tied,
     topPlayerIds: topVoted.map((entry) => entry.playerId),
     voteTally: tally,
-    detectiveWord: caughtSpy ? null : state.detectiveWord,
-    spyWord: caughtSpy ? null : state.spyWord
+    detectiveWord: state.detectiveWord,
+    spyWord: state.spyWord
   };
 
   if (caughtSpy) {
-    state.phase = "spy-guess";
-    state.moveId = (state.moveId || 0) + 1;
+    finishSpyWordMatch(room, "detectives", state.result.type, state.result);
     return;
   }
 
@@ -3700,6 +3705,7 @@ function serializeSpyWord(room, viewerPlayerId = null) {
     ? room.players[state.currentTurnIndex] || null
     : null;
   const votes = state.votes || {};
+  const eligibleVoterCount = getSpyWordEligibleVoters(room).length;
   const readyVoterIds = Object.keys(votes).filter((playerId) =>
     room.players.some((player) => player.playerId === playerId)
   );
@@ -3733,6 +3739,7 @@ function serializeSpyWord(room, viewerPlayerId = null) {
       role: revealed ? clue.role : null
     })),
     readyVoterIds,
+    eligibleVoterCount,
     myVote: viewerPlayerId ? votes[viewerPlayerId] || null : null,
     votes: revealed
       ? Object.entries(votes).map(([voterId, suspectId]) => {
@@ -3750,11 +3757,11 @@ function serializeSpyWord(room, viewerPlayerId = null) {
     voteTally: (state.result?.voteTally || getSpyWordVoteTally(room)).map((entry) => ({
       playerId: entry.playerId,
       name: entry.name,
-      count: revealed || state.phase === "spy-guess" ? entry.count : 0,
+      count: revealed ? entry.count : 0,
       voterIds: revealed ? entry.voterIds || [] : votersByTarget[entry.playerId] || []
     })),
-    spyGuess: revealed || state.phase === "spy-guess" ? state.spyGuess : null,
-    result: revealed || state.phase === "spy-guess" ? state.result : null,
+    spyGuess: revealed ? state.spyGuess : null,
+    result: revealed ? state.result : null,
     moveId: state.moveId || 0,
     startedAt: state.startedAt,
     endedAt: state.endedAt
@@ -5727,6 +5734,10 @@ export function submitSpyWordVote({ socketId, roomCode, suspectPlayerId }) {
     throw new Error("Voting is not active.");
   }
 
+  if (player.playerId === state.spyPlayerId) {
+    throw new Error("The spy cannot vote.");
+  }
+
   if (state.votes[player.playerId]) {
     throw new Error("Your vote is already locked.");
   }
@@ -5743,7 +5754,7 @@ export function submitSpyWordVote({ socketId, roomCode, suspectPlayerId }) {
 
   state.votes[player.playerId] = suspectId;
 
-  if (room.players.every((entry) => state.votes[entry.playerId])) {
+  if (getSpyWordEligibleVoters(room).every((entry) => state.votes[entry.playerId])) {
     resolveSpyWordVotes(room);
   }
 

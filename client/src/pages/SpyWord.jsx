@@ -1,6 +1,5 @@
 import {
   CheckCircle2,
-  KeyRound,
   MessageSquare,
   Send,
   Shield,
@@ -22,12 +21,6 @@ function cleanClue(value) {
   return String(value || "")
     .replace(/[^A-Za-z-]/g, "")
     .slice(0, 24);
-}
-
-function cleanGuess(value) {
-  return String(value || "")
-    .replace(/[^A-Za-z -]/g, "")
-    .slice(0, 32);
 }
 
 function getCluesByRound(clues = [], totalRounds = spyWordTotalRounds) {
@@ -54,10 +47,6 @@ function phaseTitle(state, room) {
 
   if (state.phase === "voting") {
     return "Vote for a player";
-  }
-
-  if (state.phase === "spy-guess") {
-    return "Final guess";
   }
 
   return "Spy Word";
@@ -173,15 +162,16 @@ function PlayerPanel({ room, state, session }) {
 }
 
 function VotePanel({ room, state }) {
-  const showCounts = state.phase === "spy-guess" || state.phase === "result";
+  const showCounts = state.phase === "result";
   const tally = state.voteTally || [];
+  const eligibleVoterCount = state.eligibleVoterCount ?? Math.max(0, room.players.length - 1);
 
   return (
     <section className="surface p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="text-base font-extrabold">Votes</h2>
         <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-extrabold text-ink/60">
-          {(state.readyVoterIds || []).length}/{room.players.length}
+          {(state.readyVoterIds || []).length}/{eligibleVoterCount}
         </span>
       </div>
       <div className="space-y-2">
@@ -254,21 +244,19 @@ export default function SpyWord({
   session,
   onSubmitClue,
   onVote,
-  onSubmitSpyGuess,
   onRestartGame,
   onLeaveRoom
 }) {
   const [clue, setClue] = useState("");
   const [selectedSuspectId, setSelectedSuspectId] = useState("");
-  const [spyGuess, setSpyGuess] = useState("");
   const [status, setStatus] = useState("");
   const isHost = room.host === session.playerId;
   const state = room.spyWord || {};
   const isSpy = state.viewerRole === "spy";
+  const eligibleVoterCount = state.eligibleVoterCount ?? Math.max(0, room.players.length - 1);
   const myVote = state.myVote || "";
   const canClue = state.phase === "clue" && state.activePlayerId === session.playerId && !room.gameEnded;
-  const canVote = state.phase === "voting" && !myVote && !room.gameEnded;
-  const canSpyGuess = state.phase === "spy-guess" && isSpy && !room.gameEnded;
+  const canVote = state.phase === "voting" && !myVote && !isSpy && !room.gameEnded;
   const groupedClues = useMemo(
     () => getCluesByRound(state.clues || [], state.totalRounds || spyWordTotalRounds),
     [state.clues, state.totalRounds]
@@ -311,25 +299,6 @@ export default function SpyWord({
     if (!result.ok) {
       setStatus(result.error);
     }
-  };
-
-  const handleSpyGuess = async (skip = false) => {
-    const value = skip ? "" : cleanGuess(spyGuess);
-
-    if (!skip && !value) {
-      setStatus("Enter a word guess.");
-      return;
-    }
-
-    setStatus("");
-    const result = await onSubmitSpyGuess(value);
-
-    if (!result.ok) {
-      setStatus(result.error);
-      return;
-    }
-
-    setSpyGuess("");
   };
 
   const handleRestart = async () => {
@@ -426,11 +395,16 @@ export default function SpyWord({
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <h3 className="text-base font-extrabold">{myVote ? "Vote locked" : "Choose Player"}</h3>
                         <span className="rounded-full bg-honey px-2.5 py-1 text-xs font-extrabold text-ink">
-                          {(state.readyVoterIds || []).length}/{room.players.length}
+                          {(state.readyVoterIds || []).length}/{eligibleVoterCount}
                         </span>
                       </div>
 
-                      {myVote ? (
+                      {isSpy ? (
+                        <div className="grid place-items-center rounded-md bg-white p-5 text-center">
+                          <Shield className="mx-auto mb-2 h-9 w-9 text-coral" aria-hidden="true" />
+                          <p className="text-xl font-extrabold text-ink">Detectives are voting</p>
+                        </div>
+                      ) : myVote ? (
                         <div className="rounded-md border border-mint/30 bg-white p-4 text-center">
                           <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-mint" aria-hidden="true" />
                           <p className="text-lg font-extrabold text-ink">Submitted</p>
@@ -465,49 +439,6 @@ export default function SpyWord({
                             Vote
                           </button>
                         </>
-                      )}
-                    </div>
-                  ) : null}
-
-                  {state.phase === "spy-guess" ? (
-                    <div className="rounded-md border border-ink/10 bg-paper p-3">
-                      {canSpyGuess ? (
-                        <>
-                          <div className="mb-3 flex items-center gap-2">
-                            <KeyRound className="h-4 w-4 text-coral" aria-hidden="true" />
-                            <h3 className="text-base font-extrabold">Guess the shared word</h3>
-                          </div>
-                          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                            <input
-                              className="compact-input bg-white text-center text-2xl font-extrabold"
-                              value={spyGuess}
-                              onChange={(event) => setSpyGuess(cleanGuess(event.target.value))}
-                              maxLength={32}
-                              autoFocus
-                            />
-                            <button
-                              type="button"
-                              className="compact-button bg-coral px-5 text-white hover:bg-coral/90 disabled:bg-ink/20"
-                              onClick={() => handleSpyGuess(false)}
-                              disabled={!spyGuess}
-                            >
-                              <Send className="h-5 w-5" aria-hidden="true" />
-                              Guess
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            className="compact-button mt-2 w-full border border-ink/15 bg-white text-ink hover:border-mint hover:text-mint"
-                            onClick={() => handleSpyGuess(true)}
-                          >
-                            Skip
-                          </button>
-                        </>
-                      ) : (
-                        <div className="grid place-items-center rounded-md bg-white p-5 text-center">
-                          <Shield className="mx-auto mb-2 h-9 w-9 text-coral" aria-hidden="true" />
-                          <p className="text-xl font-extrabold text-ink">Final guess in progress</p>
-                        </div>
                       )}
                     </div>
                   ) : null}
