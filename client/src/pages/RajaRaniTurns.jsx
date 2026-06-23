@@ -5,6 +5,7 @@ import {
   EyeOff,
   Gem,
   KeyRound,
+  Play,
   Repeat2,
   Shield,
   Trophy,
@@ -166,7 +167,7 @@ function ActionLog({ actions = [], revealed = false }) {
             </p>
             {revealed && action.actorRoleBefore ? (
               <p className="mt-1 truncate text-[11px] font-bold text-ink/45">
-                {action.actorRoleBefore.label} → {action.targetRole?.label || "-"}
+                {action.actorRoleBefore.label} -&gt; {action.targetRole?.label || "-"}
               </p>
             ) : null}
           </div>
@@ -180,12 +181,14 @@ export default function RajaRaniTurns({
   room,
   session,
   onPickCard,
+  onStartPlay,
   onSelect,
   onRestartGame,
   onLeaveRoom
 }) {
   const [selectedSuspectId, setSelectedSuspectId] = useState("");
   const [status, setStatus] = useState("");
+  const [startingPlay, setStartingPlay] = useState(false);
   const isHost = room.host === session.playerId;
   const state = room.rajaRaniTurns || {};
   const now = useNow({ enabled: !room.gameEnded && ["turn", "reveal"].includes(state.phase) });
@@ -208,6 +211,7 @@ export default function RajaRaniTurns({
 
   useEffect(() => {
     setSelectedSuspectId("");
+    setStartingPlay(false);
   }, [state.moveId]);
 
   const handleSelect = async () => {
@@ -220,6 +224,21 @@ export default function RajaRaniTurns({
 
     if (!result.ok) {
       setStatus(result.error);
+    }
+  };
+
+  const handleStartPlay = async () => {
+    if (!isHost || startingPlay) {
+      return;
+    }
+
+    setStartingPlay(true);
+    setStatus("");
+    const result = await onStartPlay();
+
+    if (!result.ok) {
+      setStatus(result.error);
+      setStartingPlay(false);
     }
   };
 
@@ -257,6 +276,8 @@ export default function RajaRaniTurns({
                       ? "Match Result"
                       : state.phase === "card-pick"
                         ? "Choose Cards"
+                      : state.phase === "ready"
+                        ? "Ready to Start"
                       : state.phase === "reveal"
                         ? "Round Reveal"
                         : isMyTurn
@@ -325,6 +346,71 @@ export default function RajaRaniTurns({
                     session={session}
                     onPickCard={onPickCard}
                   />
+                </div>
+              ) : state.phase === "ready" ? (
+                <div className="grid gap-3 lg:grid-cols-[18rem_1fr]">
+                  <div className="space-y-3">
+                    <RoleCard player={myPlayer} title="Your Role" />
+                    {showTarget ? (
+                      <div className="rounded-md border border-ink/10 bg-paper p-3">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Repeat2 className="h-4 w-4 text-mint" aria-hidden="true" />
+                          <p className="text-sm font-extrabold">Target</p>
+                        </div>
+                        <div className={`rounded-md border p-3 ${roleToneClasses[myTargetRole.tone] || roleToneClasses.paper}`}>
+                          <RoleArtwork role={myTargetRole} compact />
+                          <p className="text-base font-extrabold leading-tight">{myTargetRole.label}</p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-md border border-ink/10 bg-paper p-4">
+                    <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs font-extrabold uppercase text-mint">Cards Picked</p>
+                        <h3 className="text-xl font-extrabold text-ink">
+                          {isHost ? "Start the Turns" : "Waiting for Host"}
+                        </h3>
+                      </div>
+                      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-xs font-extrabold text-white">
+                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        Locked
+                      </span>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-5">
+                      {players.map((player) => (
+                        <div
+                          key={player.playerId}
+                          className={`rounded-md border px-3 py-2 text-sm font-extrabold ${
+                            player.playerId === session.playerId
+                              ? "border-coral bg-coral/10 text-coral"
+                              : "border-ink/10 bg-white text-ink"
+                          }`}
+                        >
+                          <p className="truncate">{player.name}</p>
+                          <p className="mt-1 text-[11px] font-bold text-ink/45">Card locked</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {isHost ? (
+                      <button
+                        type="button"
+                        className="compact-button mt-4 w-full bg-coral text-white hover:bg-coral/90 disabled:bg-ink/20"
+                        onClick={handleStartPlay}
+                        disabled={startingPlay}
+                      >
+                        <Play className="h-5 w-5" aria-hidden="true" />
+                        {startingPlay ? "Starting" : "Start Turns"}
+                      </button>
+                    ) : (
+                      <div className="mt-4 grid min-h-12 place-items-center rounded-md border border-ink/10 bg-white px-3 py-2 text-center text-sm font-extrabold text-ink/55">
+                        {room.players.find((player) => player.playerId === room.host)?.name || "Host"} will start
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : state.phase === "reveal" ? (
                 <div className="space-y-3">

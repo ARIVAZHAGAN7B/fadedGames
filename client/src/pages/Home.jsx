@@ -94,7 +94,7 @@ const games = [
     defaultRoomName: "Spy Word Table",
     maxPlayers: 6,
     logo: spyWordLogo,
-    summary: "One spy gets a related word while detectives trade careful clues."
+    summary: "One spy gets a different word while detectives trade careful clues."
   },
   {
     id: "thirudan-police",

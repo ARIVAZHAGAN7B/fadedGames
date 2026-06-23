@@ -61,36 +61,68 @@ const SPY_WORD_MIN_PLAYERS = 3;
 const SPY_WORD_MAX_PLAYERS = 10;
 const SPY_WORD_TOTAL_ROUNDS = 5;
 const SPY_WORD_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
-const SPY_WORD_PAIRS = {
+const SPY_WORD_DETECTIVE_WORDS = {
   easy: [
-    { detective: "APPLE", spy: "FRUIT" },
-    { detective: "DOCTOR", spy: "HOSPITAL" },
-    { detective: "BEACH", spy: "OCEAN" },
-    { detective: "CAT", spy: "DOG" },
-    { detective: "DOCTOR", spy: "NURSE" },
-    { detective: "SCHOOL", spy: "TEACHER" },
-    { detective: "RAIN", spy: "UMBRELLA" },
-    { detective: "CAR", spy: "ROAD" }
+    "APPLE",
+    "DOCTOR",
+    "BEACH",
+    "CAT",
+    "SCHOOL",
+    "RAIN",
+    "CAR",
+    "TABLE"
   ],
   medium: [
-    { detective: "PIZZA", spy: "BURGER" },
-    { detective: "CRICKET", spy: "FOOTBALL" },
-    { detective: "TIGER", spy: "LION" },
-    { detective: "TRAIN", spy: "BUS" },
-    { detective: "PIANO", spy: "GUITAR" },
-    { detective: "MANGO", spy: "BANANA" },
-    { detective: "RIVER", spy: "LAKE" },
-    { detective: "MOVIE", spy: "THEATER" }
+    "PIZZA",
+    "CRICKET",
+    "TIGER",
+    "TRAIN",
+    "PIANO",
+    "MANGO",
+    "RIVER",
+    "MOVIE"
   ],
   hard: [
-    { detective: "KEYBOARD", spy: "MOUSE" },
-    { detective: "COFFEE", spy: "TEA" },
-    { detective: "SUN", spy: "MOON" },
-    { detective: "LOCK", spy: "KEY" },
-    { detective: "CLOCK", spy: "TIME" },
-    { detective: "CANDLE", spy: "SHADOW" },
-    { detective: "MAP", spy: "COMPASS" },
-    { detective: "MIRROR", spy: "GLASS" }
+    "KEYBOARD",
+    "COFFEE",
+    "SUN",
+    "LOCK",
+    "CLOCK",
+    "CANDLE",
+    "MAP",
+    "MIRROR"
+  ]
+};
+const SPY_WORD_SPY_WORDS = {
+  easy: [
+    "TRAIN",
+    "MOUNTAIN",
+    "PENCIL",
+    "ROCKET",
+    "CANDLE",
+    "GUITAR",
+    "PILLOW",
+    "ELEPHANT"
+  ],
+  medium: [
+    "PLANET",
+    "DIAMOND",
+    "CLOCK",
+    "LEMON",
+    "DESERT",
+    "BRIDGE",
+    "CAMERA",
+    "VOLCANO"
+  ],
+  hard: [
+    "OCEAN",
+    "CASTLE",
+    "LIBRARY",
+    "BANANA",
+    "FOREST",
+    "AIRPORT",
+    "THUNDER",
+    "CHOCOLATE"
   ]
 };
 const BOOST_DEFAULT_PLAYERS = 4;
@@ -1957,7 +1989,29 @@ function beginRajaRaniTurnsTurn(room, turnIndex = 0, turnNumber = 1) {
 }
 
 function beginRajaRaniTurnsPlay(room) {
-  beginRajaRaniTurnsTurn(room, 0, 1);
+  const hostIndex = room.players.findIndex((player) => player.playerId === room.host);
+
+  beginRajaRaniTurnsTurn(room, hostIndex >= 0 ? hostIndex : 0, 1);
+}
+
+function beginRajaRaniTurnsReady(room) {
+  const state = room.rajaRaniTurns;
+
+  state.phase = "ready";
+  state.moveId = (state.moveId || 0) + 1;
+  state.activePlayerId = null;
+  state.activePlayerName = null;
+  state.currentTurnIndex = 0;
+  state.turnNumber = 0;
+  state.turnStartedAt = null;
+  state.turnDeadlineAt = null;
+  state.revealStartedAt = null;
+  state.revealDeadlineAt = null;
+  room.currentTurn = room.players.findIndex((player) => player.playerId === room.host);
+
+  if (room.currentTurn < 0) {
+    room.currentTurn = 0;
+  }
 }
 
 function startRajaRaniTurnsRound(room, round = 1) {
@@ -1984,7 +2038,7 @@ function startRajaRaniTurnsRound(room, round = 1) {
     startedAt: state.startedAt || Date.now()
   };
   beginRajaRaniCardPick(room, room.rajaRaniTurns, round);
-  autoPickRajaRaniBotCards(room, room.rajaRaniTurns, () => beginRajaRaniTurnsPlay(room));
+  autoPickRajaRaniBotCards(room, room.rajaRaniTurns, () => beginRajaRaniTurnsReady(room));
 }
 
 function revealRajaRaniTurnsRound(room) {
@@ -2436,9 +2490,19 @@ function resolveWordGuessRound(room) {
   startWordGuessRound(room);
 }
 
-function chooseSpyWordPair(difficulty) {
-  const pairs = SPY_WORD_PAIRS[cleanSpyWordDifficulty(difficulty)] || SPY_WORD_PAIRS.easy;
-  return pairs[Math.floor(Math.random() * pairs.length)];
+function chooseRandomItem(items) {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function chooseSpyWords(difficulty) {
+  const cleanDifficulty = cleanSpyWordDifficulty(difficulty);
+  const detectiveWords = SPY_WORD_DETECTIVE_WORDS[cleanDifficulty] || SPY_WORD_DETECTIVE_WORDS.easy;
+  const spyWords = SPY_WORD_SPY_WORDS[cleanDifficulty] || SPY_WORD_SPY_WORDS.easy;
+
+  return {
+    detective: chooseRandomItem(detectiveWords),
+    spy: chooseRandomItem(spyWords)
+  };
 }
 
 function getSpyWordRole(state, playerId) {
@@ -2447,7 +2511,7 @@ function getSpyWordRole(state, playerId) {
 
 function startSpyWordMatch(room) {
   const previousDifficulty = room.spyWord?.difficulty || "easy";
-  const pair = chooseSpyWordPair(previousDifficulty);
+  const words = chooseSpyWords(previousDifficulty);
   const spy = room.players[Math.floor(Math.random() * room.players.length)];
   const now = Date.now();
 
@@ -2458,8 +2522,8 @@ function startSpyWordMatch(room) {
     currentTurnIndex: 0,
     spyPlayerId: spy.playerId,
     spyPlayerName: spy.name,
-    detectiveWord: pair.detective,
-    spyWord: pair.spy,
+    detectiveWord: words.detective,
+    spyWord: words.spy,
     moveId: 1,
     startedAt: now
   };
@@ -5133,8 +5197,8 @@ export function submitRajaRaniTurnsCardPick({ socketId, roomCode, cardId }) {
     throw new Error("Card selection is not active.");
   }
 
-  const pick = processRajaRaniCardPick(room, state, player, cardId, () => beginRajaRaniTurnsPlay(room));
-  autoPickRajaRaniBotCards(room, state, () => beginRajaRaniTurnsPlay(room));
+  const pick = processRajaRaniCardPick(room, state, player, cardId, () => beginRajaRaniTurnsReady(room));
+  autoPickRajaRaniBotCards(room, state, () => beginRajaRaniTurnsReady(room));
   touch(room);
 
   return {
@@ -5142,6 +5206,39 @@ export function submitRajaRaniTurnsCardPick({ socketId, roomCode, cardId }) {
     pick: {
       completed: pick.completed
     }
+  };
+}
+
+export function startRajaRaniTurnsPlay({ socketId, roomCode }) {
+  const room = requireRoom(roomCode);
+  const player = findPlayerBySocket(room, socketId);
+  const state = room.rajaRaniTurns;
+
+  if (room.gameType !== "raja-rani-turns" || !state) {
+    throw new Error("Raja Rani is not active.");
+  }
+
+  if (!player) {
+    throw new Error("You are not in this room.");
+  }
+
+  if (room.host !== player.playerId) {
+    throw new Error("Only the host can start the round.");
+  }
+
+  if (!room.gameStarted || room.gameEnded || state.phase !== "ready") {
+    throw new Error("The round is not ready to start.");
+  }
+
+  if (!hasCompleteRajaRaniCardDistribution(room, state)) {
+    throw new Error("Wait for every player to pick a card.");
+  }
+
+  beginRajaRaniTurnsPlay(room);
+  touch(room);
+
+  return {
+    room
   };
 }
 

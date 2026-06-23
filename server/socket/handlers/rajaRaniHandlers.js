@@ -1,4 +1,5 @@
 import {
+  startRajaRaniTurnsPlay,
   submitRajaRaniGuess,
   submitRajaRaniCardPick,
   submitRajaRaniTurnsCardPick,
@@ -61,6 +62,23 @@ export function registerRajaRaniHandlers(socket, context, timers) {
       timers.scheduleRajaRaniTurnsTimer(result.room);
       context.callbackSuccess(callback, {
         pick: result.pick,
+        room: context.serializeRoomForSocket(result.room, socket)
+      });
+    } catch (error) {
+      context.callbackError(socket, callback, error);
+    }
+  });
+
+  socket.on("raja-rani-turns-start-play", (payload, callback) => {
+    try {
+      const result = startRajaRaniTurnsPlay({
+        socketId: socket.id,
+        roomCode: payload?.roomCode || socket.data.roomCode
+      });
+
+      context.emitRoomUpdate(result.room);
+      timers.scheduleRajaRaniTurnsTimer(result.room);
+      context.callbackSuccess(callback, {
         room: context.serializeRoomForSocket(result.room, socket)
       });
     } catch (error) {

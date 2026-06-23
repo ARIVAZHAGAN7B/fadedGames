@@ -854,6 +854,19 @@ export default function App() {
     return response;
   };
 
+  const handleRajaRaniTurnsStartPlay = async () => {
+    const response = await emitWithAck("raja-rani-turns-start-play", {
+      roomCode: session.roomCode
+    });
+
+    if (response.ok) {
+      setRoom(response.room);
+      setView(viewForRoom(response.room));
+    }
+
+    return response;
+  };
+
   const handleRajaRaniTurnsSelect = async (suspectPlayerId) => {
     const response = await emitWithAck("raja-rani-turns-select", {
       roomCode: session.roomCode,
@@ -1050,6 +1063,7 @@ export default function App() {
         room={room}
         session={session}
         onPickCard={handleRajaRaniTurnsPickCard}
+        onStartPlay={handleRajaRaniTurnsStartPlay}
         onSelect={handleRajaRaniTurnsSelect}
         onRestartGame={handleRestartGame}
         onLeaveRoom={handleLeaveRoom}

@@ -4,7 +4,15 @@ import BoardSetup from "../components/BoardSetup.jsx";
 import { GamePage, RoomHeader, StatusMessage } from "../components/game/GameLayout.jsx";
 import PlayerList from "../components/PlayerList.jsx";
 import RoomSettingsStrip from "../components/lobby/RoomSettingsStrip.jsx";
-import { guessNumberMaxOptions, resizeBoostNames, spyWordDifficulties, tagMaps, tagRoundOptions } from "../game/options.js";
+import {
+  guessNumberMaxOptions,
+  resizeBoostNames,
+  spyWordDifficulties,
+  spyWordMaxPlayers,
+  spyWordMinPlayers,
+  tagMaps,
+  tagRoundOptions
+} from "../game/options.js";
 import { getRajaRaniRoleImage } from "../utils/rajaRaniRoleImages.js";
 
 const teamMeta = {
@@ -292,7 +300,7 @@ function SpyWordSetup({ room }) {
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <Users className="mb-2 h-5 w-5 text-mint" aria-hidden="true" />
           <p className="text-xs font-extrabold uppercase text-ink/45">Players</p>
-          <p className="text-xl font-extrabold">4-10</p>
+          <p className="text-xl font-extrabold">{spyWordMinPlayers}-{spyWordMaxPlayers}</p>
         </div>
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <MessageSquare className="mb-2 h-5 w-5 text-honey" aria-hidden="true" />
@@ -537,7 +545,7 @@ export default function Lobby({
     : isWordGuess
       ? room.players.length === 2
       : isSpyWord
-        ? room.players.length >= 4 && room.players.length <= 10
+        ? room.players.length >= spyWordMinPlayers && room.players.length <= spyWordMaxPlayers
         : isBoost
           ? room.players.length === room.maxPlayers
           : isThirudanPolice
@@ -774,8 +782,8 @@ export default function Lobby({
                       <input
                         className="compact-input"
                         type="number"
-                        min={Math.max(3, room.players.length)}
-                        max="10"
+                        min={Math.max(spyWordMinPlayers, room.players.length)}
+                        max={spyWordMaxPlayers}
                         value={maxPlayers}
                         onChange={(event) => setMaxPlayers(event.target.value)}
                       />

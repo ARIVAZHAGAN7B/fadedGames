@@ -1,6 +1,7 @@
 export {
   resolveRajaRaniReveal,
   resolveRajaRaniTurnsTimer,
+  startRajaRaniTurnsPlay,
   submitRajaRaniCardPick,
   submitRajaRaniGuess,
   submitRajaRaniTurnsCardPick,

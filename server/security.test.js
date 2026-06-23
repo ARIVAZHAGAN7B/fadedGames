@@ -21,6 +21,9 @@ const [
     serializeRoom,
     shuffleWordGuessWords,
     startGame,
+    startRajaRaniTurnsPlay,
+    submitRajaRaniTurnsCardPick,
+    submitRajaRaniTurnsSelection,
     updateRoomSettings
   },
   { createApp },
@@ -228,6 +231,109 @@ try {
     wordHostShuffleView.wordGuess.wordPacks[wordGuest.player.playerId],
     undefined,
     "Word Guess reshuffle still does not leak the opponent's word pack"
+  );
+
+  const rajaRaniTargets = {
+    raja: "rani",
+    rani: "raja",
+    manthiri: "police",
+    police: "thirudan",
+    thirudan: "police"
+  };
+  const rajaRaniRoom = createRoom({
+    socketId: "rr-host",
+    nickname: "RR Host",
+    gameType: "raja-rani-turns"
+  });
+
+  for (let index = 1; index < 5; index += 1) {
+    joinRoom({
+      socketId: `rr-player-${index}`,
+      nickname: `RR Player ${index}`,
+      roomCode: rajaRaniRoom.room.roomCode
+    });
+  }
+
+  startGame({
+    socketId: "rr-host",
+    roomCode: rajaRaniRoom.room.roomCode
+  });
+
+  for (let index = 0; index < 5; index += 1) {
+    const activePlayer = rajaRaniRoom.room.players.find(
+      (entry) => entry.playerId === rajaRaniRoom.room.rajaRaniTurns.activePickerId
+    );
+
+    submitRajaRaniTurnsCardPick({
+      socketId: activePlayer.socketId,
+      roomCode: rajaRaniRoom.room.roomCode,
+      cardId: rajaRaniRoom.room.rajaRaniTurns.cardDeck[0].id
+    });
+  }
+
+  assert.equal(
+    rajaRaniRoom.room.rajaRaniTurns.phase,
+    "ready",
+    "Raja Rani Turns waits for the host after all cards are picked"
+  );
+  const rajaRaniHostReadyView = serializeRoom(
+    rajaRaniRoom.room,
+    rajaRaniRoom.player.playerId
+  ).rajaRaniTurns;
+  assert.ok(rajaRaniHostReadyView.viewerRole, "ready phase shows the viewer's private role");
+  assert.ok(rajaRaniHostReadyView.viewerTargetRole, "ready phase shows the viewer's target role");
+  assert.equal(rajaRaniHostReadyView.cardPick, null, "ready phase closes the card picker");
+  assert.deepEqual(
+    rajaRaniHostReadyView.players
+      .filter((entry) => entry.role)
+      .map((entry) => entry.playerId),
+    [rajaRaniRoom.player.playerId],
+    "ready phase does not reveal other players' roles"
+  );
+  assert.throws(
+    () =>
+      startRajaRaniTurnsPlay({
+        socketId: "rr-player-1",
+        roomCode: rajaRaniRoom.room.roomCode
+      }),
+    /Only the host can start the round/
+  );
+  startRajaRaniTurnsPlay({
+    socketId: "rr-host",
+    roomCode: rajaRaniRoom.room.roomCode
+  });
+  assert.equal(rajaRaniRoom.room.rajaRaniTurns.phase, "turn");
+  assert.equal(
+    rajaRaniRoom.room.rajaRaniTurns.activePlayerId,
+    rajaRaniRoom.player.playerId,
+    "host gets the first turn after starting"
+  );
+
+  const hostRoleBefore = rajaRaniRoom.room.rajaRaniTurns.rolesByPlayerId[rajaRaniRoom.player.playerId];
+  const wrongSuspect = rajaRaniRoom.room.players.find(
+    (entry) =>
+      entry.playerId !== rajaRaniRoom.player.playerId &&
+      rajaRaniRoom.room.rajaRaniTurns.rolesByPlayerId[entry.playerId] !==
+        rajaRaniTargets[hostRoleBefore]
+  );
+  const wrongSuspectRoleBefore =
+    rajaRaniRoom.room.rajaRaniTurns.rolesByPlayerId[wrongSuspect.playerId];
+  const wrongAction = submitRajaRaniTurnsSelection({
+    socketId: "rr-host",
+    roomCode: rajaRaniRoom.room.roomCode,
+    suspectPlayerId: wrongSuspect.playerId
+  }).action;
+
+  assert.equal(wrongAction.swapped, true, "wrong Raja Rani Turns selection swaps cards");
+  assert.equal(
+    rajaRaniRoom.room.rajaRaniTurns.rolesByPlayerId[rajaRaniRoom.player.playerId],
+    wrongSuspectRoleBefore,
+    "actor receives the selected wrong card immediately"
+  );
+  assert.equal(
+    rajaRaniRoom.room.rajaRaniTurns.rolesByPlayerId[wrongSuspect.playerId],
+    hostRoleBefore,
+    "wrong suspect receives the actor card immediately"
   );
 
   await recordVisit({

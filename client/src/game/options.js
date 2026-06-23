@@ -12,6 +12,9 @@ export const spyWordDifficulties = [
   { id: "hard", label: "Hard" }
 ];
 
+export const spyWordMinPlayers = 3;
+export const spyWordMaxPlayers = 10;
+
 export const boostDefaultNames = [
   "Perambalur",
   "Ariyalur",

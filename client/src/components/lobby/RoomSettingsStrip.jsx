@@ -1,5 +1,5 @@
 import { Bot, Play, Settings, Users } from "lucide-react";
-import { tagMaps } from "../../game/options.js";
+import { spyWordMinPlayers, tagMaps } from "../../game/options.js";
 
 export default function RoomSettingsStrip({ room, canStart, isHost, onAddBot, onStartGame }) {
   const isBingo = room.gameType === "bingo";
@@ -18,7 +18,7 @@ export default function RoomSettingsStrip({ room, canStart, isHost, onAddBot, on
   const neededPlayers = Math.max(
     0,
     (isSpyWord
-      ? 4
+      ? spyWordMinPlayers
       : isTag || isGuessNumber || isWordGuess || isTreasureHunt
         ? 2
         : isThirudanPolice || isRajaRaniTurns

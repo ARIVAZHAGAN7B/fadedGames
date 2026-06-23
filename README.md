@@ -141,6 +141,7 @@ Clockwise hidden-role variant for exactly 5 players.
 
 - Roles reshuffle every round
 - 10 rounds with 5 turns per round
+- Host starts the turn phase after all cards are picked
 - Each player gets 10 seconds on their turn
 - Every role has a target role
 - Correct target guess gives 100 points
