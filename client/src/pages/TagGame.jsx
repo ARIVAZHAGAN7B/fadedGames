@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  Maximize2,
+  Minimize2,
   Timer
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -1099,6 +1101,32 @@ function getCountdownLabel(tag) {
   return left > 0 ? String(left) : "GO";
 }
 
+function getFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+function canUseFullscreen(element) {
+  return Boolean(
+    element &&
+      (document.fullscreenEnabled ||
+        document.webkitFullscreenEnabled ||
+        element.requestFullscreen ||
+        element.webkitRequestFullscreen)
+  );
+}
+
+function requestFullscreen(element) {
+  const request = element.requestFullscreen || element.webkitRequestFullscreen;
+
+  return request.call(element);
+}
+
+function exitFullscreen() {
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+
+  return exit?.call(document);
+}
+
 function playTone(audioRef, frequency, durationMs, type = "sine", gainValue = 0.035) {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -1228,6 +1256,9 @@ function TagTouchControls({ activeControls, onPressChange }) {
 export default function TagGame({ room, session, onTagInput, onRestartGame, onLeaveRoom }) {
   const [status, setStatus] = useState("");
   const [activeVirtualControls, setActiveVirtualControls] = useState(() => new Set());
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenSupported, setFullscreenSupported] = useState(false);
+  const fullscreenRef = useRef(null);
   const pressedKeys = useRef(new Set());
   const virtualInput = useRef({ ...TAG_EMPTY_INPUT });
   const lastInput = useRef({ ...TAG_EMPTY_INPUT });
@@ -1249,6 +1280,24 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
   useEffect(() => {
     onTagInputRef.current = onTagInput;
   }, [onTagInput]);
+
+  useEffect(() => {
+    const fullscreenElement = fullscreenRef.current;
+
+    const syncFullscreenState = () => {
+      setIsFullscreen(getFullscreenElement() === fullscreenElement);
+    };
+
+    setFullscreenSupported(canUseFullscreen(fullscreenElement));
+    syncFullscreenState();
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener("webkitfullscreenchange", syncFullscreenState);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+      document.removeEventListener("webkitfullscreenchange", syncFullscreenState);
+    };
+  }, []);
 
   const sendInput = useCallback((gamepadInput = readGamepadInput(meIndex)) => {
     const input = getInputFromKeys(pressedKeys.current, gamepadInput, virtualInput.current);
@@ -1409,6 +1458,26 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
     }
   };
 
+  const handleToggleFullscreen = async () => {
+    const fullscreenElement = fullscreenRef.current;
+
+    try {
+      if (getFullscreenElement() === fullscreenElement) {
+        await exitFullscreen();
+        return;
+      }
+
+      if (!canUseFullscreen(fullscreenElement)) {
+        setStatus("Fullscreen is not available in this browser.");
+        return;
+      }
+
+      await requestFullscreen(fullscreenElement);
+    } catch {
+      setStatus("Fullscreen was blocked by the browser.");
+    }
+  };
+
   return (
     <GamePage>
       <RoomHeader
@@ -1435,8 +1504,29 @@ export default function TagGame({ room, session, onTagInput, onRestartGame, onLe
       <StatusMessage status={status} />
 
       <section className="overflow-hidden rounded-md border border-ink/10 bg-ink p-2 shadow-soft">
-        <div className={`relative overflow-hidden rounded-md bg-ink ${tension ? "tag-tension-frame" : ""}`}>
+        <div
+          ref={fullscreenRef}
+          className={`tag-fullscreen-stage relative overflow-hidden rounded-md bg-ink ${
+            tension ? "tag-tension-frame" : ""
+          }`}
+        >
           <TagCanvas room={room} />
+
+          {fullscreenSupported ? (
+            <button
+              type="button"
+              className="absolute right-3 top-3 z-40 inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/25 bg-ink/75 text-white shadow-soft backdrop-blur transition hover:bg-ink"
+              onClick={handleToggleFullscreen}
+              title={isFullscreen ? "Exit full screen" : "Full screen"}
+              aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-5 w-5" aria-hidden="true" />
+              ) : (
+                <Maximize2 className="h-5 w-5" aria-hidden="true" />
+              )}
+            </button>
+          ) : null}
 
           {countdownLabel ? (
             <div className="pointer-events-none absolute inset-0 grid place-items-center bg-ink/20">

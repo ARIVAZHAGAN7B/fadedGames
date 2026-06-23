@@ -63,6 +63,7 @@ export default function GuessNumber({
   const state = room.guessNumber || {};
   const min = state.min || 1;
   const max = state.max || 100;
+  const maxDigits = String(max).length;
   const readyPlayerIds = useMemo(() => new Set(state.readyPlayerIds || []), [state.readyPlayerIds]);
   const revealedSecretsById = useMemo(
     () => Object.fromEntries((state.revealedSecrets || []).map((entry) => [entry.playerId, entry])),
@@ -169,15 +170,16 @@ export default function GuessNumber({
                 ) : (
                   <form className="mx-auto max-w-sm" onSubmit={handleSecretSubmit}>
                     <label className="mb-3 block">
-                      <span className="compact-label">Secret Number</span>
+                      <span className="compact-label">Secret Number ({min}-{max})</span>
                       <input
                         className="compact-input bg-white text-center text-3xl font-extrabold tracking-normal"
                         type="password"
                         inputMode="numeric"
                         pattern="[0-9]*"
-                        maxLength={3}
+                        maxLength={maxDigits}
+                        placeholder={`${min}-${max}`}
                         value={secretNumber}
-                        onChange={(event) => setSecretNumber(event.target.value.replace(/\D/g, "").slice(0, 3))}
+                        onChange={(event) => setSecretNumber(event.target.value.replace(/\D/g, "").slice(0, maxDigits))}
                         autoFocus
                       />
                     </label>
@@ -211,7 +213,7 @@ export default function GuessNumber({
                 <form className="mx-auto max-w-md" onSubmit={handleGuessSubmit}>
                   <label className="mb-3 block">
                     <span className="compact-label">
-                      Guess {opponent?.name || "opponent"}'s number
+                      Guess {opponent?.name || "opponent"}'s number ({min}-{max})
                     </span>
                     <input
                       className="compact-input bg-white text-center text-4xl font-extrabold"

@@ -42,16 +42,6 @@ function getCluesByRound(clues = [], totalRounds = 5) {
   });
 }
 
-function roleLabel(role) {
-  return role === "spy" ? "Spy" : "Detective";
-}
-
-function roleClass(role) {
-  return role === "spy"
-    ? "border-coral bg-coral/10 text-coral"
-    : "border-mint bg-mint/10 text-mint";
-}
-
 function phaseTitle(state, room) {
   if (room.gameEnded || state.phase === "result") {
     return "Match Result";
@@ -62,26 +52,25 @@ function phaseTitle(state, room) {
   }
 
   if (state.phase === "voting") {
-    return "Vote for the spy";
+    return "Vote for a player";
   }
 
   if (state.phase === "spy-guess") {
-    return "Spy final guess";
+    return "Final guess";
   }
 
   return "Spy Word";
 }
 
 function SecretPanel({ state }) {
-  const role = state.viewerRole || "detective";
   const word = state.viewerWord || "Hidden";
 
   return (
-    <section className={`surface border-2 p-4 ${roleClass(role)}`}>
+    <section className="surface border-2 border-ink/10 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-extrabold uppercase opacity-70">Your Role</p>
-          <h2 className="text-2xl font-extrabold">{roleLabel(role)}</h2>
+          <h2 className="text-2xl font-extrabold">Player</h2>
         </div>
         <Shield className="h-8 w-8 shrink-0" aria-hidden="true" />
       </div>
@@ -95,7 +84,6 @@ function SecretPanel({ state }) {
 
 function ClueBoard({ state }) {
   const rounds = getCluesByRound(state.clues || [], state.totalRounds || 5);
-  const revealed = state.phase === "result";
 
   return (
     <section className="surface p-4">
@@ -123,15 +111,6 @@ function ClueBoard({ state }) {
                       <span className="min-w-0 truncate text-xs font-extrabold text-ink/50">
                         {clue.playerName}
                       </span>
-                      {revealed && clue.role ? (
-                        <span
-                          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${
-                            clue.role === "spy" ? "bg-coral text-white" : "bg-mint text-white"
-                          }`}
-                        >
-                          {clue.role === "spy" ? "Spy" : "Det"}
-                        </span>
-                      ) : null}
                     </div>
                     <p className="mt-1 break-words text-lg font-extrabold text-ink">{clue.clue}</p>
                   </div>
@@ -230,19 +209,19 @@ function ResultPanel({ room, state, onLeaveRoom, onRestartGame, restartDisabled 
       <Trophy className="winner-trophy mx-auto mb-2 h-12 w-12 text-honey" aria-hidden="true" />
       <p className="text-xs font-extrabold uppercase text-ink/50">Winner</p>
       <h2 className="text-3xl font-extrabold text-ink">
-        {spyWon ? "Spy Wins" : "Detectives Win"}
+        {spyWon ? "Solo Player Wins" : "Players Win"}
       </h2>
       <p className="mt-2 text-sm font-bold text-ink/60">
-        Spy: {state.spyPlayerName || state.result?.spyPlayerName || "Hidden"}
+        Player: {state.spyPlayerName || state.result?.spyPlayerName || "Hidden"}
       </p>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <div className="rounded-md border border-mint/30 bg-mint/10 p-3">
-          <p className="text-xs font-extrabold uppercase text-mint">Detectives</p>
+          <p className="text-xs font-extrabold uppercase text-mint">Shared Word</p>
           <p className="text-2xl font-extrabold text-ink">{state.detectiveWord || "-"}</p>
         </div>
         <div className="rounded-md border border-coral/30 bg-coral/10 p-3">
-          <p className="text-xs font-extrabold uppercase text-coral">Spy</p>
+          <p className="text-xs font-extrabold uppercase text-coral">Alternate Word</p>
           <p className="text-2xl font-extrabold text-ink">{state.spyWord || "-"}</p>
         </div>
       </div>
@@ -495,7 +474,7 @@ export default function SpyWord({
                         <>
                           <div className="mb-3 flex items-center gap-2">
                             <KeyRound className="h-4 w-4 text-coral" aria-hidden="true" />
-                            <h3 className="text-base font-extrabold">Guess the detectives word</h3>
+                            <h3 className="text-base font-extrabold">Guess the shared word</h3>
                           </div>
                           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                             <input
@@ -526,7 +505,7 @@ export default function SpyWord({
                       ) : (
                         <div className="grid place-items-center rounded-md bg-white p-5 text-center">
                           <Shield className="mx-auto mb-2 h-9 w-9 text-coral" aria-hidden="true" />
-                          <p className="text-xl font-extrabold text-ink">Spy is guessing</p>
+                          <p className="text-xl font-extrabold text-ink">Final guess in progress</p>
                         </div>
                       )}
                     </div>
@@ -553,7 +532,7 @@ export default function SpyWord({
               <section className="surface p-3">
                 <div className="flex items-center gap-2 rounded-md border border-coral/30 bg-coral/10 p-3 text-coral">
                   <XCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  <p className="text-sm font-extrabold">Spy escaped the vote</p>
+                  <p className="text-sm font-extrabold">Vote missed the target</p>
                 </div>
               </section>
             ) : null}

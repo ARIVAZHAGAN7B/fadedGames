@@ -30,6 +30,7 @@ import thirudanPoliceLogo from "../images/optimized/thirudan police.webp";
 import spyWordLogo from "../images/optimized/spy word.webp";
 import treasureHuntLogo from "../images/optimized/treasure hunt.webp";
 import wordGuessLogo from "../images/wordGuess.svg";
+import { guessNumberMaxOptions } from "../game/options.js";
 import { warmImageCache } from "../utils/imageCache.js";
 import { normalizeGameType, normalizeRoomCode, setGameRouteInUrl } from "../utils/roomLink.js";
 import { fetchAnalyticsSummary } from "../utils/visitorAnalytics.js";
@@ -150,7 +151,7 @@ const games = [
 
 const tagRoundOptions = [60, 90, 120];
 const boostPlayerOptions = [3, 4, 5];
-const spyWordPlayerOptions = [4, 5, 6, 7, 8, 9, 10];
+const spyWordPlayerOptions = [3, 4, 5, 6, 7, 8, 9, 10];
 const spyWordDifficulties = [
   { id: "easy", label: "Easy" },
   { id: "medium", label: "Medium" },
@@ -272,7 +273,7 @@ function getActiveRoomMode(room) {
   }
 
   if (room.gameType === "guess-number") {
-    return "1-100";
+    return `${room.guessNumberMin || 1}-${room.guessNumberMax || 100}`;
   }
 
   if (room.gameType === "word-guess") {
@@ -600,6 +601,7 @@ export default function Home({
   const [tagPlayerCount, setTagPlayerCount] = useState(2);
   const [tagMapId, setTagMapId] = useState("classic");
   const [tagRoundSeconds, setTagRoundSeconds] = useState(60);
+  const [guessNumberMax, setGuessNumberMax] = useState(100);
   const [boostPlayerCount, setBoostPlayerCount] = useState(4);
   const [spyWordPlayerCount, setSpyWordPlayerCount] = useState(6);
   const [spyWordDifficulty, setSpyWordDifficulty] = useState("easy");
@@ -715,6 +717,7 @@ export default function Home({
     setTagPlayerCount(2);
     setTagMapId("classic");
     setTagRoundSeconds(60);
+    setGuessNumberMax(100);
     setBoostPlayerCount(game.id === "boost" ? game.maxPlayers : 4);
     setSpyWordPlayerCount(game.id === "spy-word" ? game.maxPlayers : 6);
     setSpyWordDifficulty("easy");
@@ -875,6 +878,7 @@ export default function Home({
               isHandCricket && handCricketMode === "team" ? teamMemberCount : undefined,
             tagMapId: isTag ? tagMapId : undefined,
             tagRoundSeconds: isTag ? Number(tagRoundSeconds) : undefined,
+            guessNumberMax: isGuessNumber ? Number(guessNumberMax) : undefined,
             spyWordDifficulty: isSpyWord ? spyWordDifficulty : undefined,
             boostCategoryLabels: isBoost ? boostCategoryNames : undefined
           })
@@ -1293,6 +1297,28 @@ export default function Home({
                           </button>
                         ))}
                       </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {isGuessNumber ? (
+                  <div>
+                    <span className="compact-label">Number Range</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {guessNumberMaxOptions.map((max) => (
+                        <button
+                          key={max}
+                          type="button"
+                          className={`rounded-md border px-3 py-2 text-sm font-extrabold transition ${
+                            Number(guessNumberMax) === max
+                              ? "border-coral bg-coral text-white"
+                              : "border-ink/10 bg-white text-ink hover:border-mint"
+                          }`}
+                          onClick={() => setGuessNumberMax(max)}
+                        >
+                          1-{max}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 ) : null}

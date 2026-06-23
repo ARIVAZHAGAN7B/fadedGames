@@ -37,7 +37,7 @@ export default function RoomSettingsStrip({ room, canStart, isHost, onAddBot, on
     isBoost ? `${room.maxPlayers} card set` : null,
     isTag ? `${tagMaps[room.tag?.mapId] || "TAG Playground"}` : null,
     isTag ? `${room.tag?.roundSeconds || 60}s round` : null,
-    isGuessNumber ? "1-100" : null,
+    isGuessNumber ? `${room.guessNumber?.min || 1}-${room.guessNumber?.max || 100}` : null,
     isWordGuess ? "5 letters" : null,
     isSpyWord ? `${room.spyWord?.difficulty || "easy"} difficulty` : null,
     isSpyWord ? "5 clue rounds" : null,

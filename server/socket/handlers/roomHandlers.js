@@ -40,6 +40,7 @@ export function registerRoomHandlers(socket, context, timers, lifecycle) {
         handCricketTeamSize: payload?.handCricketTeamSize,
         tagMapId: payload?.tagMapId,
         tagRoundSeconds: payload?.tagRoundSeconds,
+        guessNumberMax: payload?.guessNumberMax,
         spyWordDifficulty: payload?.spyWordDifficulty,
         boostCategoryLabels: payload?.boostCategoryLabels
       });
@@ -211,6 +212,7 @@ export function registerRoomHandlers(socket, context, timers, lifecycle) {
         handCricketTeamSize: payload?.handCricketTeamSize,
         tagMapId: payload?.tagMapId,
         tagRoundSeconds: payload?.tagRoundSeconds,
+        guessNumberMax: payload?.guessNumberMax,
         spyWordDifficulty: payload?.spyWordDifficulty,
         boostCategoryLabels: payload?.boostCategoryLabels,
         discoverable: payload?.discoverable

@@ -4,6 +4,8 @@ export const tagMaps = {
 
 export const tagRoundOptions = [60, 90, 120];
 
+export const guessNumberMaxOptions = [100, 250, 500];
+
 export const spyWordDifficulties = [
   { id: "easy", label: "Easy" },
   { id: "medium", label: "Medium" },

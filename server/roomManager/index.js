@@ -49,14 +49,15 @@ const TAG_MIN_TAG_OVERLAP = 14;
 const TAG_FLASH_MS = 260;
 const GUESS_NUMBER_PLAYERS = 2;
 const GUESS_NUMBER_MIN = 1;
-const GUESS_NUMBER_MAX = 100;
+const GUESS_NUMBER_DEFAULT_MAX = 100;
+const GUESS_NUMBER_MAX_OPTIONS = new Set([100, 250, 500]);
 const WORD_GUESS_PLAYERS = 2;
 const WORD_GUESS_WORD_LENGTH = 5;
 const WORD_GUESS_WORDS_PER_PLAYER = 10;
 const WORD_GUESS_MAX_ATTEMPTS = 6;
 const WORD_GUESS_GUESS_MS = 60000;
 const WORD_GUESS_LOCK_REVEAL_MS = 5000;
-const SPY_WORD_MIN_PLAYERS = 4;
+const SPY_WORD_MIN_PLAYERS = 3;
 const SPY_WORD_MAX_PLAYERS = 10;
 const SPY_WORD_TOTAL_ROUNDS = 5;
 const SPY_WORD_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
@@ -663,11 +664,16 @@ function getBoostCategoryLabels(room) {
   );
 }
 
-function cleanGuessNumberValue(number) {
+function cleanGuessNumberMax(max) {
+  const value = Number(max || GUESS_NUMBER_DEFAULT_MAX);
+  return GUESS_NUMBER_MAX_OPTIONS.has(value) ? value : GUESS_NUMBER_DEFAULT_MAX;
+}
+
+function cleanGuessNumberValue(number, min = GUESS_NUMBER_MIN, max = GUESS_NUMBER_DEFAULT_MAX) {
   const value = Number(number);
 
-  if (!Number.isInteger(value) || value < GUESS_NUMBER_MIN || value > GUESS_NUMBER_MAX) {
-    throw new Error(`Choose a number from ${GUESS_NUMBER_MIN} to ${GUESS_NUMBER_MAX}.`);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`Choose a number from ${min} to ${max}.`);
   }
 
   return value;
@@ -1229,11 +1235,13 @@ function createTagState(phase = "waiting", mapId = "classic", roundSeconds = TAG
   };
 }
 
-function createGuessNumberState(phase = "waiting") {
+function createGuessNumberState(phase = "waiting", max = GUESS_NUMBER_DEFAULT_MAX) {
+  const cleanMax = cleanGuessNumberMax(max);
+
   return {
     phase,
     min: GUESS_NUMBER_MIN,
-    max: GUESS_NUMBER_MAX,
+    max: cleanMax,
     secrets: {},
     guesses: [],
     startedAt: null,
@@ -2532,7 +2540,7 @@ function finishSpyWordMatch(room, winnerSide, resultType, extra = {}) {
     type: resultType,
     winnerSide,
     spyPlayerId: state.spyPlayerId,
-    spyPlayerName: spyPlayer?.name || state.spyPlayerName || "Spy",
+    spyPlayerName: spyPlayer?.name || state.spyPlayerName || "Player",
     detectiveWord: state.detectiveWord,
     spyWord: state.spyWord
   };
@@ -2548,8 +2556,8 @@ function finishSpyWordMatch(room, winnerSide, resultType, extra = {}) {
       : {
           playerId: spyPlayer?.playerId || state.spyPlayerId,
           side: "spy",
-          name: spyPlayer?.name ? `Spy (${spyPlayer.name})` : "Spy",
-          spyPlayerName: spyPlayer?.name || state.spyPlayerName || "Spy",
+          name: spyPlayer?.name || "Player",
+          spyPlayerName: spyPlayer?.name || state.spyPlayerName || "Player",
           resultType
         };
 }
@@ -3556,8 +3564,8 @@ function serializeGuessNumber(room) {
 
   return {
     phase: state.phase,
-    min: state.min,
-    max: state.max,
+    min: state.min || GUESS_NUMBER_MIN,
+    max: state.max || GUESS_NUMBER_DEFAULT_MAX,
     readyPlayerIds,
     guesses: [...(state.guesses || [])],
     revealedSecrets,
@@ -4055,6 +4063,8 @@ function serializeActiveRoom(room) {
     handCricketTeamSize: room.handCricketTeamSize,
     tagMapId: room.tag?.mapId || null,
     tagRoundSeconds: room.tag?.roundSeconds || null,
+    guessNumberMin: room.guessNumber?.min || null,
+    guessNumberMax: room.guessNumber?.max || null,
     spyWordDifficulty: room.spyWord?.difficulty || null,
     roomName: room.roomName,
     playerCount: room.players.length,
@@ -4083,6 +4093,7 @@ export function createRoom({
   handCricketTeamSize,
   tagMapId,
   tagRoundSeconds,
+  guessNumberMax,
   spyWordDifficulty,
   boostCategoryLabels
 }) {
@@ -4101,6 +4112,8 @@ export function createRoom({
       : null;
   const cleanTagMap = type === "tag" ? cleanTagMapId(tagMapId) : null;
   const cleanTagRound = type === "tag" ? cleanTagRoundSeconds(tagRoundSeconds) : null;
+  const cleanGuessNumberMaxValue =
+    type === "guess-number" ? cleanGuessNumberMax(guessNumberMax) : null;
   const cleanSpyDifficulty = type === "spy-word" ? cleanSpyWordDifficulty(spyWordDifficulty) : null;
   const boostPlayers = type === "boost" ? cleanBoostMaxPlayers(maxPlayers) : null;
   const boostCategories =
@@ -4125,7 +4138,7 @@ export function createRoom({
     boards: {},
     handCricket: type === "hand-cricket" ? createHandCricketState("waiting", cricketMode) : null,
     tag: type === "tag" ? createTagState("waiting", cleanTagMap, cleanTagRound) : null,
-    guessNumber: type === "guess-number" ? createGuessNumberState("waiting") : null,
+    guessNumber: type === "guess-number" ? createGuessNumberState("waiting", cleanGuessNumberMaxValue) : null,
     wordGuess: type === "word-guess" ? createWordGuessState("waiting") : null,
     spyWord: type === "spy-word" ? createSpyWordState("waiting", cleanSpyDifficulty) : null,
     boost: type === "boost" ? createBoostState("waiting", boostCategories) : null,
@@ -4230,6 +4243,7 @@ export function updateRoomSettings({
   handCricketTeamSize,
   tagMapId,
   tagRoundSeconds,
+  guessNumberMax,
   spyWordDifficulty,
   boostCategoryLabels,
   discoverable
@@ -4292,6 +4306,12 @@ export function updateRoomSettings({
   if (room.gameType === "tag") {
     room.tag.mapId = cleanTagMapId(tagMapId || room.tag.mapId);
     room.tag.roundSeconds = cleanTagRoundSeconds(tagRoundSeconds || room.tag.roundSeconds);
+  }
+
+  if (room.gameType === "guess-number") {
+    room.guessNumber = room.guessNumber || createGuessNumberState("waiting");
+    room.guessNumber.min = GUESS_NUMBER_MIN;
+    room.guessNumber.max = cleanGuessNumberMax(guessNumberMax || room.guessNumber.max);
   }
 
   if (room.gameType === "boost") {
@@ -4487,7 +4507,7 @@ export function startGame({ socketId, roomCode }) {
     room.gameEnded = false;
     room.winner = null;
     room.guessNumber = {
-      ...createGuessNumberState("secret"),
+      ...createGuessNumberState("secret", room.guessNumber?.max),
       startedAt: Date.now()
     };
     touch(room);
@@ -4731,7 +4751,7 @@ export function restartGame({ socketId, roomCode }) {
   }
 
   if (room.gameType === "guess-number") {
-    room.guessNumber = createGuessNumberState("waiting");
+    room.guessNumber = createGuessNumberState("waiting", room.guessNumber?.max);
     touch(room);
 
     return room;
@@ -5241,7 +5261,6 @@ export function setGuessNumberSecret({ socketId, roomCode, number }) {
   const room = requireRoom(roomCode);
   const player = findPlayerBySocket(room, socketId);
   const state = room.guessNumber;
-  const value = cleanGuessNumberValue(number);
 
   if (room.gameType !== "guess-number" || !state) {
     throw new Error("Guess Number is not active.");
@@ -5254,6 +5273,12 @@ export function setGuessNumberSecret({ socketId, roomCode, number }) {
   if (!room.gameStarted || room.gameEnded || state.phase !== "secret") {
     throw new Error("Secret numbers are not being set right now.");
   }
+
+  const value = cleanGuessNumberValue(
+    number,
+    state.min || GUESS_NUMBER_MIN,
+    state.max || GUESS_NUMBER_DEFAULT_MAX
+  );
 
   if (state.secrets[player.playerId] !== undefined) {
     throw new Error("Your secret number is already locked.");
@@ -5275,7 +5300,6 @@ export function submitGuessNumberGuess({ socketId, roomCode, number }) {
   const room = requireRoom(roomCode);
   const player = findPlayerBySocket(room, socketId);
   const state = room.guessNumber;
-  const value = cleanGuessNumberValue(number);
   const currentPlayer = room.players[room.currentTurn];
 
   if (room.gameType !== "guess-number" || !state) {
@@ -5293,6 +5317,12 @@ export function submitGuessNumberGuess({ socketId, roomCode, number }) {
   if (!currentPlayer || currentPlayer.playerId !== player.playerId) {
     throw new Error("It is not your turn.");
   }
+
+  const value = cleanGuessNumberValue(
+    number,
+    state.min || GUESS_NUMBER_MIN,
+    state.max || GUESS_NUMBER_DEFAULT_MAX
+  );
 
   const opponent = getOpponent(room, player.playerId);
 
@@ -5648,11 +5678,11 @@ export function submitSpyWordGuess({ socketId, roomCode, guess }) {
   }
 
   if (!room.gameStarted || room.gameEnded || state.phase !== "spy-guess") {
-    throw new Error("The spy guess is not active.");
+    throw new Error("The final guess is not active.");
   }
 
   if (player.playerId !== state.spyPlayerId) {
-    throw new Error("Only the spy can make the final guess.");
+    throw new Error("Only the selected player can make the final guess.");
   }
 
   const correct =

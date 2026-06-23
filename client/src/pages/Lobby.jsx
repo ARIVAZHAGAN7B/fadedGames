@@ -4,7 +4,7 @@ import BoardSetup from "../components/BoardSetup.jsx";
 import { GamePage, RoomHeader, StatusMessage } from "../components/game/GameLayout.jsx";
 import PlayerList from "../components/PlayerList.jsx";
 import RoomSettingsStrip from "../components/lobby/RoomSettingsStrip.jsx";
-import { resizeBoostNames, spyWordDifficulties, tagMaps, tagRoundOptions } from "../game/options.js";
+import { guessNumberMaxOptions, resizeBoostNames, spyWordDifficulties, tagMaps, tagRoundOptions } from "../game/options.js";
 import { getRajaRaniRoleImage } from "../utils/rajaRaniRoleImages.js";
 
 const teamMeta = {
@@ -204,6 +204,9 @@ function TagSetup({ room }) {
 }
 
 function GuessNumberSetup({ room }) {
+  const min = room.guessNumber?.min || 1;
+  const max = room.guessNumber?.max || 100;
+
   return (
     <section className="surface p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -219,7 +222,7 @@ function GuessNumberSetup({ room }) {
       <div className="grid gap-2 sm:grid-cols-3">
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <KeyRound className="mb-2 h-5 w-5 text-coral" aria-hidden="true" />
-          <p className="text-sm font-extrabold text-ink">Lock a secret number from 1 to 100.</p>
+          <p className="text-sm font-extrabold text-ink">Lock a secret number from {min} to {max}.</p>
         </div>
         <div className="rounded-md border border-ink/10 bg-paper p-3">
           <Clock className="mb-2 h-5 w-5 text-mint" aria-hidden="true" />
@@ -503,6 +506,7 @@ export default function Lobby({
   const [teamMembers, setTeamMembers] = useState(room.handCricketTeamSize || 2);
   const [tagMapId, setTagMapId] = useState(room.tag?.mapId || "classic");
   const [tagRoundSeconds, setTagRoundSeconds] = useState(room.tag?.roundSeconds || 60);
+  const [guessNumberMax, setGuessNumberMax] = useState(room.guessNumber?.max || 100);
   const [spyWordDifficulty, setSpyWordDifficulty] = useState(room.spyWord?.difficulty || "easy");
   const [boostCategoryNames, setBoostCategoryNames] = useState(
     resizeBoostNames((room.boost?.categories || []).map((category) => category.label), room.maxPlayers)
@@ -557,11 +561,12 @@ export default function Lobby({
     setTeamMembers(room.handCricketTeamSize || 2);
     setTagMapId(room.tag?.mapId || "classic");
     setTagRoundSeconds(room.tag?.roundSeconds || 60);
+    setGuessNumberMax(room.guessNumber?.max || 100);
     setSpyWordDifficulty(room.spyWord?.difficulty || "easy");
     setBoostCategoryNames(
       resizeBoostNames((room.boost?.categories || []).map((category) => category.label), room.maxPlayers)
     );
-  }, [room.boost?.categories, room.discoverable, room.handCricketTeamSize, room.maxPlayers, room.roomName, room.spyWord?.difficulty, room.tag?.mapId, room.tag?.roundSeconds]);
+  }, [room.boost?.categories, room.discoverable, room.guessNumber?.max, room.handCricketTeamSize, room.maxPlayers, room.roomName, room.spyWord?.difficulty, room.tag?.mapId, room.tag?.roundSeconds]);
 
   const handleStart = async () => {
     const result = await onStartGame();
@@ -582,6 +587,7 @@ export default function Lobby({
       handCricketTeamSize: isTeamHandCricket ? Number(teamMembers) : undefined,
       tagMapId: isTag ? tagMapId : undefined,
       tagRoundSeconds: isTag ? Number(tagRoundSeconds) : undefined,
+      guessNumberMax: isGuessNumber ? Number(guessNumberMax) : undefined,
       spyWordDifficulty: isSpyWord ? spyWordDifficulty : undefined,
       boostCategoryLabels: isBoost ? boostCategoryNames : undefined
     });
@@ -734,6 +740,33 @@ export default function Lobby({
                       </>
                     ) : null}
                   </div>
+                ) : isGuessNumber ? (
+                  <div className="mb-3 space-y-3">
+                    <div>
+                      <span className="compact-label">Number Range</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {guessNumberMaxOptions.map((max) => (
+                          <button
+                            key={max}
+                            type="button"
+                            className={`rounded-md border px-2 py-2 text-sm font-extrabold transition ${
+                              Number(guessNumberMax) === max
+                                ? "border-coral bg-coral text-white"
+                                : "border-ink/10 bg-paper text-ink hover:border-mint"
+                            }`}
+                            onClick={() => setGuessNumberMax(max)}
+                          >
+                            1-{max}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-md border border-ink/10 bg-paper px-3 py-2">
+                      <span className="compact-label">Players</span>
+                      <p className="text-sm font-extrabold text-ink">2</p>
+                    </div>
+                  </div>
                 ) : isSpyWord ? (
                   <div className="mb-3 space-y-3">
                     <label className="block">
@@ -741,7 +774,7 @@ export default function Lobby({
                       <input
                         className="compact-input"
                         type="number"
-                        min={Math.max(4, room.players.length)}
+                        min={Math.max(3, room.players.length)}
                         max="10"
                         value={maxPlayers}
                         onChange={(event) => setMaxPlayers(event.target.value)}

@@ -1,5 +1,5 @@
 export function getBoardSize(numPlayers) {
-  return Math.max(2, numPlayers + 2);
+  return Math.max(5, numPlayers + 2);
 }
 
 export function generateBoard(boardSize = 5) {
